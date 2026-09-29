@@ -873,13 +873,13 @@ function sinCondiciones(f){
   const p=proveedorBD(nombreProv(f));
   return !p||!p.tipo_hoja;
 }
-// Cuándo se validó. Las que valida una persona llevan la fecha. Las que valida
-// el sistema solo, todavía no la guardan: se dice "automática" y no se inventa.
+// Cuándo se validó. A mano: la fecha de la persona. Automática: el día en que el
+// sistema la dio por buena (_validada_en); las antiguas, el día en que entró.
 function validacion(f){
   const ia=f.json_extraccion_ia||{};
   const rev=ia._revision||{};
   if(rev.accion==='VALIDADA'&&rev.fecha)return {fecha:rev.fecha,como:'a mano',por:rev.por||''};
-  if(OK_CERRADAS.includes(f.estado))return {fecha:ia._validada_en||null,como:'automática',por:''};
+  if(OK_CERRADAS.includes(f.estado))return {fecha:ia._validada_en||f.creado_en||f.fecha_recepcion||null,como:'automática',por:''};
   return null;
 }
 function fechaContabilizada(f){

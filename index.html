@@ -2150,14 +2150,15 @@ async function exportAS400(){
       d=tiposEnBD.length?tiposEnBD:[{tipo:f.porcentaje_iva||0,base:f.base_imponible,cuota:f.importe_iva}];
     }
     // Construir arrays de IVA por tipo
-    const ivaMap={0:{base:'',cuota:''},10:{base:'',cuota:''},21:{base:'',cuota:''}};
+    const ivaMap={0:{on:false,cuota:0},10:{on:false,cuota:0},21:{on:false,cuota:0}};
     d.forEach(item=>{
-      const tipo=item.tipo==='EXENTO'||item.tipo==='0'?0:Math.round(+item.tipo||0);
+      const tipo=/EXENT/i.test(String(item.tipo))?0:Math.round(parseFloat(String(item.tipo).replace(',','.'))||0);
       if(ivaMap[tipo]){
-        ivaMap[tipo].base=item.base||'';
-        ivaMap[tipo].cuota=item.cuota||'';
+        ivaMap[tipo].on=true;
+        ivaMap[tipo].cuota=Math.round((ivaMap[tipo].cuota+(parseFloat(item.cuota)||0))*100)/100;
       }
     });
+    const col=t=>ivaMap[t].on?[t+'%',ivaMap[t].cuota]:['',''];
     const base=[
       dt(f.fecha_factura||f.fecha_recepcion),
       prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'',nombreProv(f),nifLimpio(nifProv(f)),
@@ -2165,9 +2166,7 @@ async function exportAS400(){
       f.numero_factura||'',numeroPedido(f),
       ia._ambito_iva||'NACIONAL',ia._delegacion||f.delegacion_detectada||'',
       f.base_imponible||'',
-      ivaMap[0].base?'0%':'',ivaMap[0].cuota||'',
-      ivaMap[10].base?'10%':'',ivaMap[10].cuota||'',
-      ivaMap[21].base?'21%':'',ivaMap[21].cuota||'',
+      ...col(0),...col(10),...col(21),
       portes,f.total_factura||'',
       'C',
       (()=>{const v=validacion(f);return v&&v.fecha?dt(v.fecha):(v?'automática':'');})(),

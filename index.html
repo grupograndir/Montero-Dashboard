@@ -791,6 +791,10 @@ async function loadAll(){
     const r=await api(`configuracion?select=valor&clave=eq.proveedores_giro`);
     state.giro=r&&r[0]?(JSON.parse(r[0].valor).nombres||[]).map(normProv):[];
   }catch(e){state.giro=[];}
+  try{
+    const r=await api(`configuracion?select=valor&clave=eq.proveedores_condiciones`);
+    state.condiciones=r&&r[0]?JSON.parse(r[0].valor)||[]:[];
+  }catch(e){state.condiciones=[];}
   recalcularGruposProv();          // antes de pintar nada: de ahí sale quién es quién
   state.incidencias=deriveIncidencias(state.facturas);
   updateNav();render();
@@ -853,6 +857,32 @@ function nifLimpio(n){
 // rellenado nadie, y el Excel del AS400 solo miraba ese: salía en blanco en
 // todas (25/09/2026). Si no se ha puesto a mano, vale el que se leyó del pedido.
 // "215.767" -> 215767; varios pedidos, separados por " / ".
+// La delegación, solo la ciudad. Primero lo que se leyó del pedido/factura
+// (nombre de ciudad o código postal); si no, la última letra del código de
+// homologación local del Excel de proveedores (HLGV -> Valencia).
+const DELEG_CIUDADES=[['SEVILLA',/SEVILLA/],['MALAGA',/MALAGA/],['MURCIA',/MURCIA/],['ALICANTE',/ALICANTE|ALACANT/],
+  ['VALENCIA',/VALENCIA/],['CASTELLON',/CASTELLO/],['MADRID',/MADRID/],['ZARAGOZA',/ZARAGOZA/],['BARCELONA',/BARCELONA/],['BILBAO',/BILBAO|BIZKAIA|VIZCAYA/]];
+const DELEG_CP={'41':'SEVILLA','29':'MALAGA','30':'MURCIA','03':'ALICANTE','46':'VALENCIA','12':'CASTELLON','28':'MADRID','50':'ZARAGOZA','08':'BARCELONA','48':'BILBAO'};
+const DELEG_LETRA={S:'SEVILLA',G:'MALAGA',U:'MURCIA',A:'ALICANTE',V:'VALENCIA',C:'CASTELLON',M:'MADRID',Z:'ZARAGOZA',B:'BARCELONA',I:'BILBAO'};
+function ciudadDe(txt){
+  const t=String(txt||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if(!t.trim())return '';
+  for(const [c,re] of DELEG_CIUDADES) if(re.test(t)) return c;
+  const cp=t.match(/\b(\d{2})\d{3}\b/);
+  return cp&&DELEG_CP[cp[1]]||'';
+}
+function delegacionCiudad(f){
+  const ia=f.json_extraccion_ia||{};
+  const cli=ia.cliente||ia.factura?.cliente||{};
+  for(const t of [ia._delegacion,f.delegacion_detectada,cli.delegacion,f.direccion_envio_detectada,cli.direccion_envio]){
+    const c=ciudadDe(t); if(c) return c;
+  }
+  const nom=normProv(nombreProv(f)),cod=String(codigoProveedorPorNombre(nombreProv(f))||'');
+  const cond=(state.condiciones||[]).find(c=>cod&&String(c.codigo)===cod)
+    ||(state.condiciones||[]).find(c=>c.nombre&&normProv(c.nombre)===nom);
+  const hom=String(cond&&cond.homologacion||'').toUpperCase().trim();
+  return /^HL[A-Z]{2}$/.test(hom)&&DELEG_LETRA[hom[3]]||'';
+}
 function numeroPedido(f){
   const ia=f.json_extraccion_ia||{};
   const crudo=f.numero_pedido_montero||(ia._pedido||{}).numero||(ia.pedido||{}).numero||'';
@@ -2107,39 +2137,16 @@ async function exportAS400(){
   // Forma de pago y vencimiento salen del plazo acordado con cada proveedor: no
   // es la fecha en que se paga -eso lo sabe el AS400, no nosotros- es la fecha en
   // que toca pagarla, que es lo que sirve para ordenar una remesa.
-  const head=['Fecha Factura','Cod. Proveedor','Proveedor','NIF','Homologación','Cuenta Contable','Artículo',
+  const head=['Fecha Factura','Cod. Proveedor','Proveedor','NIF','Homologación',
     'Nº Factura','Nº Pedido Montero','Ámbito IVA','Delegación',
     'Base Imponible','Tipo IVA (0%)','Cuota IVA','Tipo IVA (10%)','Cuota IVA','Tipo IVA (21%)','Cuota IVA',
-    'Portes','Total Factura','Estado','Validada el','Descargado el','Contabilizada el','Forma de pago','Vence el','IRPF %','IRPF importe'];
+    'Total Factura','Estado','Validada el','Descargado el','Contabilizada el','Forma de pago','IRPF %','IRPF importe'];
   for(let i=1;i<=10;i++) head.push('Albarán '+i);
   const rows=[];
   ff.forEach(f=>{
     const ia=f.json_extraccion_ia||{};
     const prov=ia.proveedor||{};
     const albs=albaranesConFecha(ia);
-    const imp=ia?.factura?.importes||ia?.datos_extraidos?.factura?.importes||{};
-    // Los portes casi nunca vienen como importe aparte: el proveedor los factura como
-    // una línea más ("PORTES", "TRANSPORTE", "Envío"). Si no está el importe suelto,
-    // se suman esas líneas.
-    let portes=imp.portes;
-    if(portes==null){
-      const lp=lineasDe(f).filter(l=>/PORTE|TRANSPORT|ENV[IÍ]O/i.test(`${l.descripcion||''} ${l.referencia||''}`));
-      portes=lp.length?Math.round(lp.reduce((s,l)=>s+(+l.importe_linea||0),0)*100)/100:'';
-    }
-    // El artículo de MONTERO, que es el que enlaza con la cuenta contable. Sale del
-    // PEDIDO, no de la factura: el proveedor imprime su propia referencia. Donde no
-    // hay pedido se pone la del proveedor marcada como tal, para no confundirlas.
-    const articulo=articuloDe(f);
-    // El plazo puede venir de la propia factura ("60 dias fecha factura") o del
-    // acuerdo que Montero tiene con ese proveedor. Si no hay ninguno, no se
-    // inventa una fecha: se deja en blanco.
-    const plazoTxt=`${f.plazo_pago_factura||''} ${ia._plazo_acordado||''}`;
-    const dias=(plazoTxt.match(/(\d{2,3})/)||[])[1];
-    let vence='';
-    if(dias&&(f.fecha_factura||f.fecha_recepcion)){
-      const d0=new Date(f.fecha_factura||f.fecha_recepcion);
-      if(!isNaN(d0)){ d0.setDate(d0.getDate()+ +dias); vence=dt(d0.toISOString().slice(0,10)); }
-    }
     let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva:[];
     if(!d.length && ia.factura?.importes?.desglose_iva) d=ia.factura.importes.desglose_iva;
     if(!d.length){
@@ -2162,18 +2169,17 @@ async function exportAS400(){
     const base=[
       dt(f.fecha_factura||f.fecha_recepcion),
       prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'',nombreProv(f),nifLimpio(nifProv(f)),
-      homologacionPorNombre(nombreProv(f))||'',cuentaContablePorNombre(nombreProv(f))||'',articulo,
+      homologacionPorNombre(nombreProv(f))||'',
       f.numero_factura||'',numeroPedido(f),
-      ia._ambito_iva||'NACIONAL',ia._delegacion||f.delegacion_detectada||'',
+      ia._ambito_iva||'NACIONAL',delegacionCiudad(f),
       f.base_imponible||'',
       ...col(0),...col(10),...col(21),
-      portes,f.total_factura||'',
+      f.total_factura||'',
       'C',
       (()=>{const v=validacion(f);return v&&v.fecha?dt(v.fecha):(v?'automática':'');})(),
       dt(new Date().toISOString().slice(0,10)),
       fechaContabilizada(f)?dt(fechaContabilizada(f)):'',
       f.forma_pago_factura||ia._plazo_acordado||'',
-      vence,
       ia._irpf?.pct || ia.factura?.importes?.irpf?.pct || f.importe_irpf||'',
       ia._irpf?.importe || ia.factura?.importes?.irpf?.importe || f.importe_irpf||''
     ];
@@ -2181,8 +2187,8 @@ async function exportAS400(){
     rows.push(base.map(v=>v==null||v===''||(typeof v==='number'&&isNaN(v))?0:v));
   });
   const ws=XLSX.utils.aoa_to_sheet([head,...rows]);
-  ws['!cols']=[{wch:12},{wch:12},{wch:28},{wch:12},{wch:13},{wch:15},{wch:16},{wch:16},{wch:14},{wch:12},{wch:14},
-    {wch:12},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:9},{wch:12},{wch:7},{wch:12},{wch:13},{wch:15},{wch:22},{wch:11},{wch:7},{wch:11},
+  ws['!cols']=[{wch:12},{wch:12},{wch:28},{wch:12},{wch:13},{wch:16},{wch:14},{wch:12},{wch:12},
+    {wch:12},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:12},{wch:7},{wch:12},{wch:13},{wch:15},{wch:22},{wch:7},{wch:11},
     ...Array(10).fill({wch:12})];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'AS400');

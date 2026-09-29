@@ -1924,6 +1924,7 @@ async function pedirTarea(accion,boton,extra){
 
 function bindContent(){
   document.querySelectorAll('[data-tarea]').forEach(b=>b.onclick=()=>pedirTarea(b.dataset.tarea,b));
+  document.querySelectorAll('#content [data-pdf]').forEach(b=>b.onclick=()=>openPdf(b.dataset.pdf));
   // Sin asignar: abrir el formulario, guardar, cancelar y buscar sin repintar
   // (repintar se lleva el foco del cuadro de búsqueda a cada letra).
   document.querySelectorAll('[data-asignar]').forEach(b=>b.onclick=()=>{

@@ -986,12 +986,12 @@ function deriveIncidencias(ff){
 }
 function setConn(ok,msg){$('#conn-dot').className='dot'+(ok?'':' off');$('#conn-txt').textContent=ok?'Conectado':'Sin conexión';}
 function updateNav(){
-  $('#nav-fac').textContent=state.facturas.filter(f=>f.estado!=='PAGADA').length;
+  $('#nav-fac').textContent=state.facturas.filter(f=>!f.json_extraccion_ia?._pago).length;
   // el contador refleja FACTURAS afectadas, no incidencias sueltas (coherente con la vista agrupada)
   $('#nav-inc').textContent=new Set(state.incidencias.filter(i=>i.estado==='ABIERTA').map(i=>i.factura_id)).size;
   const provs=new Set(state.facturas.map(claveProv));$('#nav-prov').textContent=provs.size;
   $('#nav-sueltos').textContent=state.sueltos===null?'?':state.sueltos.length;
-  $('#nav-pagadas').textContent=state.facturas.filter(f=>f.estado==='PAGADA'&&!f.eliminada).length;
+  $('#nav-pagadas').textContent=state.facturas.filter(f=>f.json_extraccion_ia?._pago&&!f.eliminada).length;
 }
 
 /* ---------- router ---------- */
@@ -1165,7 +1165,7 @@ function colaTrabajo(ff){
 
 /* ---------- FACTURAS ---------- */
 function filtradas(){
-  let ff=state.facturas.filter(f=>f.estado!=='PAGADA');
+  let ff=state.facturas.filter(f=>!f.json_extraccion_ia?._pago);
   // Una factura que llegó dos veces no es trabajo pendiente: es la misma otra vez,
   // y verla en el listado hace pensar que hay algo que revisar. "Si están
   // duplicadas no tienen que aparecer" (María, 12/08/2026). Siguen estando: se ven
@@ -1322,7 +1322,7 @@ function tablaFacturas(ff,full){
 /* ---------- FACTURAS PAGADAS ---------- */
 function viewPagadas(){
   const ff=state.facturas
-    .filter(f=>f.estado==='PAGADA'&&!f.eliminada)
+    .filter(f=>f.json_extraccion_ia?._pago&&!f.eliminada)
     .sort((a,b)=>{const da=new Date(a.fecha_factura||a.fecha_recepcion),db=new Date(b.fecha_factura||b.fecha_recepcion);return db-da;});
   if(!ff.length)return`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">Sin facturas pagadas todavía</p><small>Cuando marques una factura como pagada, aparecerá aquí</small></div></div>`;
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
@@ -1468,7 +1468,7 @@ async function openDrawer(id){
       ${(f.estado==='VALIDADA'||f.estado==='RECHAZADA')?`<button class="act-btn" data-act="EN_REVISION" data-id="${f.id}" title="Quitarle el estado y volver a dejarla pendiente">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Devolver a revisión</button>`:''}
       ${f.estado==='VALIDADA'?`<button class="act-btn cont" data-act="CONTABILIZADA" data-id="${f.id}" title="El asiento ya está hecho en el AS400">${svg('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h4"/>')}Marcar contabilizada</button>`:''}
       ${f.estado==='CONTABILIZADA'?`<button class="act-btn del" data-act="VALIDADA" data-id="${f.id}" title="Deshacer: volver a dejarla pendiente de contabilizar">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer contabilizada</button>`:''}
-      ${f.estado!=='PAGADA'?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Marcar como pagada por transferencia bancaria">${svg(ICN.card)}Pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
+      ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Marcar como pagada por transferencia bancaria">${svg(ICN.card)}Pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>
     </div>`:''}
     ${rev?`<div class="rev-note">${svg(ICN.check,'var(--green)').replace('viewBox','width="15" height="15" viewBox')}Revisada manualmente · ${dtL(rev.fecha)} → <b>${esc(rev.accion)}</b>${rev.por?` · ${esc(rev.por)}`:''}</div>`:''}
@@ -1759,15 +1759,23 @@ async function resolverFactura(id,nuevoEstado){
   // de quién la validó: son dos decisiones distintas y las dos hay que poder mirarlas.
   if(nuevoEstado==='CONTABILIZADA')ia._contabilizacion={fecha:new Date().toISOString(),por:quien};
   else if(esDeshacer)delete ia._contabilizacion;
-  else if(nuevoEstado==='PAGADA')ia._pago={fecha:new Date().toISOString(),por:quien,estado_anterior:f.estado};
-  else ia._revision={accion:nuevoEstado,fecha:new Date().toISOString(),por:quien};
+  else if(nuevoEstado==='PAGADA'){ia._pago={fecha:new Date().toISOString(),por:quien};
+    try{
+      const tok=getToken()||SB_ANON;
+      const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:ia})});
+      const data=await r.json().catch(()=>[]);
+      if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
+      closeDrawer();toast('Factura marcada como pagada');await loadAll();
+    }catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');}
+    return;
+  }else ia._revision={accion:nuevoEstado,fecha:new Date().toISOString(),por:quien};
   try{
     const tok=getToken()||SB_ANON;
     const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({estado:nuevoEstado,json_extraccion_ia:ia})});
     const data=await r.json().catch(()=>[]);
     if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
     const MSG={VALIDADA:'Factura validada',RECHAZADA:'Factura rechazada',CONTABILIZADA:'Factura marcada como contabilizada',
-               EN_REVISION:'Devuelta a revisión',PAGADA:'Factura marcada como pagada'};
+               EN_REVISION:'Devuelta a revisión'};
     closeDrawer();toast(esDeshacer?'Ya no consta como contabilizada':(MSG[nuevoEstado]||'Factura actualizada'));await loadAll();
   }catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');}
 }
@@ -1775,11 +1783,10 @@ async function deshacerPagada(id){
   const f=state.facturas.find(x=>x.id===id);if(!f)return;
   if(!confirm(`¿Deshacer el pago de la factura ${f.numero_factura||''}?\n\nVolverá al listado general de facturas.`))return;
   const ia=Object.assign({},f.json_extraccion_ia||{});
-  const estadoAnterior=(ia._pago||{}).estado_anterior||'VALIDADA';
   delete ia._pago;
   try{
     const tok=getToken()||SB_ANON;
-    const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({estado:estadoAnterior,json_extraccion_ia:ia})});
+    const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:ia})});
     const data=await r.json().catch(()=>[]);
     if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
     closeDrawer();toast('Factura devuelta al listado general');await loadAll();

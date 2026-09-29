@@ -140,6 +140,7 @@ td.r{text-align:right}
 .bdg{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:7px;font-size:11.5px;font-weight:600;white-space:nowrap}
 .bdg::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
 .bdg.s-VALIDADA,.bdg.s-COMPLETADA,.bdg.s-EXPORTADA{background:var(--green-s);color:var(--green)}
+.bdg.s-PAGADA{background:var(--violet-s);color:var(--violet)}
 /* Contabilizada es el final del recorrido: verde macizo para que se distinga de
    validada de un vistazo, sin tener que leer la etiqueta. */
 .bdg.s-CONTABILIZADA{background:var(--green);color:#fff}
@@ -259,6 +260,8 @@ details.raw pre{background:#0f172a;color:#cbd5e1;padding:14px;border-radius:10px
 .act-btn.no:hover{background:var(--rd);color:#fff}
 .act-btn.cont{background:#fff;color:var(--green);border:1px solid var(--green)}
 .act-btn.cont:hover{background:var(--green);color:#fff}
+.act-btn.pay{background:#fff;color:var(--violet);border:1px solid var(--violet)}
+.act-btn.pay:hover{background:var(--violet);color:#fff}
 .rev-note{display:flex;align-items:center;gap:8px;padding:12px 24px;background:var(--green-s);color:#0c7a43;font-size:12.5px;font-weight:600;border-bottom:1px solid var(--line)}
 .bdg.s-RESUELTA{background:var(--green-s);color:var(--green)}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:var(--shadow-lg);z-index:200;opacity:0;pointer-events:none;transition:.25s}
@@ -339,6 +342,7 @@ details.raw pre{background:#0f172a;color:#cbd5e1;padding:14px;border-radius:10px
       <button class="nav-item" data-view="incidencias"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Incidencias</span><span class="ct" id="nav-inc">0</span></button>
       <button class="nav-item" data-view="proveedores"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg><span>Proveedores</span><span class="ct" id="nav-prov">0</span></button>
       <button class="nav-item" data-view="sueltos" title="Albaranes, pedidos y facturas que no están asignados a ninguna factura"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Sin asignar</span><span class="ct" id="nav-sueltos">0</span></button>
+      <button class="nav-item" data-view="pagadas" title="Facturas marcadas como pagadas manualmente por Montero"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg><span>Pagadas</span><span class="ct" id="nav-pagadas">0</span></button>
     </nav>
     <div class="side-foot">
       <div class="user-email" id="user-email-lbl"></div>
@@ -512,7 +516,7 @@ const OK_CERRADAS=['VALIDADA','EXPORTADA','CONTABILIZADA'];
 // mezclar "me llevé el fichero" con "está asentado". Mientras esté en false se
 // marcan una a una desde la ficha, que es una decisión consciente de quien mira.
 const AUTO_CONTABILIZAR=false;
-const LABEL={VALIDADA:'Validada',CONTABILIZADA:'Contabilizada',EXPORTADA:'Exportada AS400',ILEGIBLE:'Ilegible',EN_REVISION:'En revisión',DUPLICADO_PENDIENTE:'Duplicado pendiente',PENDIENTE_CRITERIO:'Criterio pendiente',RECHAZADA:'Rechazada',COMPLETADA:'Completada'};
+const LABEL={VALIDADA:'Validada',CONTABILIZADA:'Contabilizada',EXPORTADA:'Exportada AS400',ILEGIBLE:'Ilegible',EN_REVISION:'En revisión',DUPLICADO_PENDIENTE:'Duplicado pendiente',PENDIENTE_CRITERIO:'Criterio pendiente',RECHAZADA:'Rechazada',COMPLETADA:'Completada',PAGADA:'Pagada'};
 const estadoLbl=e=>LABEL[e]||e||'—';
 
 /* ---------- helpers ---------- */
@@ -987,10 +991,11 @@ function updateNav(){
   $('#nav-inc').textContent=new Set(state.incidencias.filter(i=>i.estado==='ABIERTA').map(i=>i.factura_id)).size;
   const provs=new Set(state.facturas.map(claveProv));$('#nav-prov').textContent=provs.size;
   $('#nav-sueltos').textContent=state.sueltos===null?'?':state.sueltos.length;
+  $('#nav-pagadas').textContent=state.facturas.filter(f=>f.estado==='PAGADA'&&!f.eliminada).length;
 }
 
 /* ---------- router ---------- */
-const TITLES={resumen:['Resumen','Vista general de la facturación'],facturas:['Facturas','Listado completo de facturas procesadas'],incidencias:['Incidencias','Validaciones, avisos y bloqueos detectados'],proveedores:['Proveedores','Actividad y ranking de proveedores'],sueltos:['Sin asignar','Documentos que han llegado y no están puestos con ninguna factura']};
+const TITLES={resumen:['Resumen','Vista general de la facturación'],facturas:['Facturas','Listado completo de facturas procesadas'],incidencias:['Incidencias','Validaciones, avisos y bloqueos detectados'],proveedores:['Proveedores','Actividad y ranking de proveedores'],sueltos:['Sin asignar','Documentos que han llegado y no están puestos con ninguna factura'],pagadas:['Facturas Pagadas','Facturas abonadas manualmente por Montero']};
 function setView(v){
   state.view=v;state.provSel=null;state.quickFilter='';
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
@@ -1004,6 +1009,7 @@ function render(){
   else if(state.view==='incidencias')c.innerHTML=viewIncidencias();
   else if(state.view==='proveedores')c.innerHTML=viewProveedores();
   else if(state.view==='sueltos')c.innerHTML=viewSueltos();
+  else if(state.view==='pagadas')c.innerHTML=viewPagadas();
   bindContent();
   if(state.view==='resumen')drawCharts();
 }
@@ -1313,6 +1319,20 @@ function tablaFacturas(ff,full){
   </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
+/* ---------- FACTURAS PAGADAS ---------- */
+function viewPagadas(){
+  const ff=state.facturas
+    .filter(f=>f.estado==='PAGADA'&&!f.eliminada)
+    .sort((a,b)=>{const da=new Date(a.fecha_factura||a.fecha_recepcion),db=new Date(b.fecha_factura||b.fecha_recepcion);return db-da;});
+  if(!ff.length)return`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">Sin facturas pagadas todavía</p><small>Cuando marques una factura como pagada, aparecerá aquí</small></div></div>`;
+  const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
+  return`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
+    <div class="kpi"><div class="kpi-top"><div class="kpi-ic blue">${svg(ICN.card)}</div></div><div class="kpi-val">${ff.length}</div><div class="kpi-lbl">Facturas pagadas</div></div>
+    <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${svg(ICN.euro)}</div></div><div class="kpi-val">${eurS(total)}</div><div class="kpi-lbl">Total pagado</div></div>
+  </div>
+  <div class="card">${tablaFacturas(ff,true)}</div>`;
+}
+
 /* ---------- INCIDENCIAS ---------- */
 function viewIncidencias(){
   const inc=state.incidencias;
@@ -1448,6 +1468,7 @@ async function openDrawer(id){
       ${(f.estado==='VALIDADA'||f.estado==='RECHAZADA')?`<button class="act-btn" data-act="EN_REVISION" data-id="${f.id}" title="Quitarle el estado y volver a dejarla pendiente">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Devolver a revisión</button>`:''}
       ${f.estado==='VALIDADA'?`<button class="act-btn cont" data-act="CONTABILIZADA" data-id="${f.id}" title="El asiento ya está hecho en el AS400">${svg('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h4"/>')}Marcar contabilizada</button>`:''}
       ${f.estado==='CONTABILIZADA'?`<button class="act-btn del" data-act="VALIDADA" data-id="${f.id}" title="Deshacer: volver a dejarla pendiente de contabilizar">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer contabilizada</button>`:''}
+      ${f.estado!=='PAGADA'?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Marcar como pagada por transferencia bancaria">${svg(ICN.card)}Pagada</button>`:''}
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>
     </div>`:''}
     ${rev?`<div class="rev-note">${svg(ICN.check,'var(--green)').replace('viewBox','width="15" height="15" viewBox')}Revisada manualmente · ${dtL(rev.fecha)} → <b>${esc(rev.accion)}</b>${rev.por?` · ${esc(rev.por)}`:''}</div>`:''}
@@ -1726,7 +1747,7 @@ async function resolverFactura(id,nuevoEstado){
   // devuelve a contabilizada en la siguiente pasada.
   const esDeshacer=f.estado==='CONTABILIZADA'&&nuevoEstado==='VALIDADA';
   const ACC={VALIDADA:'validar',RECHAZADA:'rechazar',CONTABILIZADA:'dar por contabilizada en el AS400',
-             EN_REVISION:'devolver a revisión'};
+             EN_REVISION:'devolver a revisión',PAGADA:'marcar como pagada'};
   const accionTxt=esDeshacer?'dejar de dar por contabilizada':(ACC[nuevoEstado]||'cambiar');
   if(!confirm(`¿Seguro que quieres ${accionTxt} la factura ${f.numero_factura||''}?`))return;
   const ia=Object.assign({},f.json_extraccion_ia||{});
@@ -1737,6 +1758,7 @@ async function resolverFactura(id,nuevoEstado){
   // de quién la validó: son dos decisiones distintas y las dos hay que poder mirarlas.
   if(nuevoEstado==='CONTABILIZADA')ia._contabilizacion={fecha:new Date().toISOString(),por:quien};
   else if(esDeshacer)delete ia._contabilizacion;
+  else if(nuevoEstado==='PAGADA')ia._pago={fecha:new Date().toISOString(),por:quien};
   else ia._revision={accion:nuevoEstado,fecha:new Date().toISOString(),por:quien};
   try{
     const tok=getToken()||SB_ANON;
@@ -1744,7 +1766,7 @@ async function resolverFactura(id,nuevoEstado){
     const data=await r.json().catch(()=>[]);
     if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
     const MSG={VALIDADA:'Factura validada',RECHAZADA:'Factura rechazada',CONTABILIZADA:'Factura marcada como contabilizada',
-               EN_REVISION:'Devuelta a revisión'};
+               EN_REVISION:'Devuelta a revisión',PAGADA:'Factura marcada como pagada'};
     closeDrawer();toast(esDeshacer?'Ya no consta como contabilizada':(MSG[nuevoEstado]||'Factura actualizada'));await loadAll();
   }catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');}
 }

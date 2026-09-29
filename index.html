@@ -2183,7 +2183,7 @@ async function exportAS400(){
   });
   const ws=XLSX.utils.aoa_to_sheet([head,...rows]);
   ws['!cols']=[{wch:12},{wch:12},{wch:28},{wch:12},{wch:13},{wch:15},{wch:16},{wch:16},{wch:14},{wch:12},{wch:14},
-    {wch:12},{wch:12},{wch:9},{wch:12},{wch:9},{wch:12},{wch:9},{wch:9},{wch:12},{wch:7},{wch:12},{wch:13},{wch:15},{wch:22},{wch:11},{wch:7},{wch:11},
+    {wch:12},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:9},{wch:12},{wch:7},{wch:12},{wch:13},{wch:15},{wch:22},{wch:11},{wch:7},{wch:11},
     ...Array(10).fill({wch:12})];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'AS400');

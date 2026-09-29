@@ -2141,7 +2141,15 @@ async function exportAS400(){
       if(!isNaN(d0)){ d0.setDate(d0.getDate()+ +dias); vence=dt(d0.toISOString().slice(0,10)); }
     }
     let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva:[];
-    if(!d.length) d=[{tipo:f.porcentaje_iva||0,base:f.base_imponible,cuota:f.importe_iva}];
+    if(!d.length && ia.factura?.importes?.desglose_iva) d=ia.factura.importes.desglose_iva;
+    if(!d.length){
+      // Construir desglose desde columnas nuevas de BD o desde valores individuales
+      const tiposEnBD=[];
+      if(f.base_iva_21>0) tiposEnBD.push({tipo:21,base:f.base_iva_21,cuota:f.cuota_iva_21});
+      if(f.base_iva_10>0) tiposEnBD.push({tipo:10,base:f.base_iva_10,cuota:f.cuota_iva_10});
+      if(f.base_iva_exento>0) tiposEnBD.push({tipo:0,base:f.base_iva_exento,cuota:0});
+      d=tiposEnBD.length?tiposEnBD:[{tipo:f.porcentaje_iva||0,base:f.base_imponible,cuota:f.importe_iva}];
+    }
     const base=[
       dt(f.fecha_factura||f.fecha_recepcion),
       prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'',nombreProv(f),nifLimpio(nifProv(f)),
@@ -2163,8 +2171,9 @@ async function exportAS400(){
         idx===0?vence:'',
         // La retención la pidió Paqui el 23/09/2026: el informático necesita el
         // porcentaje (1, 7, 15 o 19) y el importe retenido.
-        idx===0&&ia._irpf?ia._irpf.pct:'',
-        idx===0&&ia._irpf?ia._irpf.importe:''
+        // Leer de BD o del JSON según disponibilidad
+        idx===0?(ia._irpf?.pct || ia.factura?.importes?.irpf?.pct || (f.importe_irpf?'':'')):'' ,
+        idx===0?(ia._irpf?.importe || ia.factura?.importes?.irpf?.importe || f.importe_irpf || ''):''
       ];
       for(let i=0;i<10;i++) row.push(idx===0?albs[i]||'':'');
       rows.push(row);

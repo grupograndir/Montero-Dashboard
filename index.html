@@ -2109,7 +2109,7 @@ async function exportAS400(){
   // que toca pagarla, que es lo que sirve para ordenar una remesa.
   const head=['Fecha Factura','Cod. Proveedor','Proveedor','NIF','Homologación','Cuenta Contable','Artículo',
     'Nº Factura','Nº Pedido Montero','Ámbito IVA','Delegación',
-    'Tipo IVA 0%','Cuota IVA 0%','Tipo IVA 10%','Cuota IVA 10%','Tipo IVA 21%','Cuota IVA 21%',
+    'Base Imponible','Tipo IVA (0%)','Cuota IVA','Tipo IVA (10%)','Cuota IVA','Tipo IVA (21%)','Cuota IVA',
     'Portes','Total Factura','Estado','Validada el','Descargado el','Contabilizada el','Forma de pago','Vence el','IRPF %','IRPF importe'];
   for(let i=1;i<=10;i++) head.push('Albarán '+i);
   const rows=[];
@@ -2164,9 +2164,10 @@ async function exportAS400(){
       homologacionPorNombre(nombreProv(f))||'',cuentaContablePorNombre(nombreProv(f))||'',articulo,
       f.numero_factura||'',numeroPedido(f),
       ia._ambito_iva||'NACIONAL',ia._delegacion||f.delegacion_detectada||'',
-      ivaMap[0].base,ivaMap[0].cuota,
-      ivaMap[10].base,ivaMap[10].cuota,
-      ivaMap[21].base,ivaMap[21].cuota,
+      f.base_imponible||'',
+      ivaMap[0].base?'0%':'',ivaMap[0].cuota||'',
+      ivaMap[10].base?'10%':'',ivaMap[10].cuota||'',
+      ivaMap[21].base?'21%':'',ivaMap[21].cuota||'',
       portes,f.total_factura||'',
       'C',
       (()=>{const v=validacion(f);return v&&v.fecha?dt(v.fecha):(v?'automática':'');})(),
@@ -2182,7 +2183,7 @@ async function exportAS400(){
   });
   const ws=XLSX.utils.aoa_to_sheet([head,...rows]);
   ws['!cols']=[{wch:12},{wch:12},{wch:28},{wch:12},{wch:13},{wch:15},{wch:16},{wch:16},{wch:14},{wch:12},{wch:14},
-    {wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:9},{wch:12},{wch:7},{wch:12},{wch:13},{wch:15},{wch:22},{wch:11},{wch:7},{wch:11},
+    {wch:12},{wch:12},{wch:9},{wch:12},{wch:9},{wch:12},{wch:9},{wch:9},{wch:12},{wch:7},{wch:12},{wch:13},{wch:15},{wch:22},{wch:11},{wch:7},{wch:11},
     ...Array(10).fill({wch:12})];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'AS400');

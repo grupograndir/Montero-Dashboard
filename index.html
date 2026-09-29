@@ -870,7 +870,8 @@ function numeroPedido(f){
 // homologarlo (Paqui, 25/09/2026). Lo decide el proceso al recalcular: cuando
 // encuentra al proveedor en el Excel, le pone su código del AS400.
 function sinCondiciones(f){
-  return !((f.json_extraccion_ia||{})._codigo_as400);
+  const p=proveedorBD(nombreProv(f));
+  return !p||!p.tipo_hoja;
 }
 // Cuándo se validó. Las que valida una persona llevan la fecha. Las que valida
 // el sistema solo, todavía no la guardan: se dice "automática" y no se inventa.

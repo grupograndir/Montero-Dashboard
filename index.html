@@ -926,6 +926,14 @@ function homologacionPorNIF(nif){
   const p=(state.proveedoresBD||[]).find(x=>nifLimpio(x.nif_cif||'')===n);
   return p?(p.tipo_hoja||null):null;
 }
+function homologacionDe(f){
+  const cod=String(codigoProveedorPorNombre(nombreProv(f))||'');
+  const nom=normProv(nombreProv(f));
+  const cs=state.condiciones||[];
+  const cond=(cod&&cs.find(c=>String(c.codigo||'')===cod))||cs.find(c=>c.nombre&&normProv(c.nombre)===nom);
+  if(cond&&cond.homologacion)return String(cond.homologacion).toUpperCase().trim();
+  return homologacionPorNIF(nifProv(f))||homologacionPorNombre(nombreProv(f))||'';
+}
 // El albarán con su fecha detrás, que es como lo quieren para cuadrarlo:
 // "10281548 · 12/06/2026". La fecha sale de lo que la IA leyó de cada albarán.
 function albaranesConFecha(ia){
@@ -2175,7 +2183,7 @@ async function exportAS400(){
     const base=[
       dt(f.fecha_factura||f.fecha_recepcion),
       prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'',nombreProv(f),nifLimpio(nifProv(f)),
-      homologacionPorNIF(nifProv(f))||homologacionPorNombre(nombreProv(f))||'',
+      homologacionDe(f),
       f.numero_factura||'',numeroPedido(f),
       ia._ambito_iva||'NACIONAL',delegacionCiudad(f),
       f.base_imponible||'',

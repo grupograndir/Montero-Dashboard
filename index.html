@@ -927,11 +927,24 @@ function homologacionPorNIF(nif){
   return p?(p.tipo_hoja||null):null;
 }
 function homologacionDe(f){
-  const cod=String(codigoProveedorPorNombre(nombreProv(f))||'');
-  const nom=normProv(nombreProv(f));
+  const ia=f.json_extraccion_ia||{};
+  const prov=ia.proveedor||{};
   const cs=state.condiciones||[];
-  const cond=(cod&&cs.find(c=>String(c.codigo||'')===cod))||cs.find(c=>c.nombre&&normProv(c.nombre)===nom);
-  if(cond&&cond.homologacion)return String(cond.homologacion).toUpperCase().trim();
+  // 1. Código AS400 directo (del pedido/factura o por nombre en BD)
+  const cod=String(prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'');
+  if(cod){const c=cs.find(x=>String(x.codigo||'')===cod);if(c&&c.homologacion)return String(c.homologacion).toUpperCase().trim();}
+  // 2. NIF → código en proveedoresBD → condiciones
+  const nif=nifLimpio(nifProv(f)||'');
+  if(nif){
+    const bd=(state.proveedoresBD||[]).find(x=>nifLimpio(x.nif_cif||'')===nif);
+    const cod2=String(bd&&bd.codigo_proveedor||'');
+    if(cod2){const c=cs.find(x=>String(x.codigo||'')===cod2);if(c&&c.homologacion)return String(c.homologacion).toUpperCase().trim();}
+  }
+  // 3. Nombre normalizado en condiciones
+  const nom=normProv(nombreProv(f));
+  const cn=cs.find(c=>c.nombre&&normProv(c.nombre)===nom);
+  if(cn&&cn.homologacion)return String(cn.homologacion).toUpperCase().trim();
+  // 4. Fallback: tipo_hoja de proveedoresBD
   return homologacionPorNIF(nifProv(f))||homologacionPorNombre(nombreProv(f))||'';
 }
 // El albarán con su fecha detrás, que es como lo quieren para cuadrarlo:

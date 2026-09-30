@@ -877,11 +877,15 @@ function delegacionCiudad(f){
   for(const t of [ia._delegacion,f.delegacion_detectada,cli.delegacion,f.direccion_envio_detectada,cli.direccion_envio]){
     const c=ciudadDe(t); if(c) return c;
   }
-  const nom=normProv(nombreProv(f)),cod=String(codigoProveedorPorNombre(nombreProv(f))||'');
-  const cond=(state.condiciones||[]).find(c=>cod&&String(c.codigo)===cod)
-    ||(state.condiciones||[]).find(c=>c.nombre&&normProv(c.nombre)===nom);
-  const hom=String(cond&&cond.homologacion||'').toUpperCase().trim();
-  return /^HL[A-Z]{2}$/.test(hom)&&DELEG_LETRA[hom[3]]||'';
+  const prov_ia=(ia.proveedor||{});
+  const cod=String(prov_ia.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'');
+  const nom=normProv(nombreProv(f));
+  const cs=state.condiciones||[];
+  const cond=(cod&&cs.find(c=>String(c.codigo)===cod))||cs.find(c=>c.nombre&&normProv(c.nombre)===nom);
+  // Siglas desde condiciones, luego desde tipo_hoja (que ahora tiene el código real)
+  const hom=(String(cond&&cond.homologacion||'')||homologacionPorNIF(nifProv(f))||homologacionPorNombre(nombreProv(f))||'').toUpperCase().trim();
+  // HL__ y HS__ son locales: última letra indica delegación. HN__ son nacionales (sin ciudad).
+  return /^H[LS][A-Z]{2}$/.test(hom)&&DELEG_LETRA[hom[3]]||'';
 }
 function numeroPedido(f){
   const ia=f.json_extraccion_ia||{};

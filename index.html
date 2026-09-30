@@ -736,7 +736,7 @@ async function loadAll(){
     if(e instanceof SesionCaducada){clearSession();showLogin();return;}
     console.error(e);setConn(false,e.message);state.facturas=[];}
   try{
-    state.proveedoresBD=await api(`proveedores?select=nombre,codigo_proveedor,cuenta_contable,tipo_hoja,actividad`);
+    state.proveedoresBD=await api(`proveedores?select=nombre,nif_cif,codigo_proveedor,cuenta_contable,tipo_hoja,actividad`);
   }catch(e){console.error(e);state.proveedoresBD=[];}
   // Documentos que han llegado y no están puestos con ninguna factura: ni son la
   // factura ni figuran como su respaldo. Es lo que antes solo se veía leyendo un
@@ -918,6 +918,12 @@ function fechaContabilizada(f){
 }
 function homologacionPorNombre(nombre){
   const p=proveedorBD(nombre);
+  return p?(p.tipo_hoja||null):null;
+}
+function homologacionPorNIF(nif){
+  const n=nifLimpio(nif||'');
+  if(!n)return null;
+  const p=(state.proveedoresBD||[]).find(x=>nifLimpio(x.nif_cif||'')===n);
   return p?(p.tipo_hoja||null):null;
 }
 // El albarán con su fecha detrás, que es como lo quieren para cuadrarlo:
@@ -2086,7 +2092,7 @@ function exportExcel(){
     const iva=d[0]||{};
     const row=[
       prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'', nombreProv(f), nifLimpio(nifProv(f)),
-      homologacionPorNombre(nombreProv(f))||'', cuentaContablePorNombre(nombreProv(f))||'',
+      homologacionPorNIF(nifProv(f))||homologacionPorNombre(nombreProv(f))||'', cuentaContablePorNombre(nombreProv(f))||'',
       f.numero_factura||'', dt(f.fecha_factura||f.fecha_recepcion),
       numeroPedido(f),
       ia._ambito_iva||'NACIONAL', ia._delegacion||f.delegacion_detectada||'',
@@ -2169,7 +2175,7 @@ async function exportAS400(){
     const base=[
       dt(f.fecha_factura||f.fecha_recepcion),
       prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'',nombreProv(f),nifLimpio(nifProv(f)),
-      homologacionPorNombre(nombreProv(f))||'',
+      homologacionPorNIF(nifProv(f))||homologacionPorNombre(nombreProv(f))||'',
       f.numero_factura||'',numeroPedido(f),
       ia._ambito_iva||'NACIONAL',delegacionCiudad(f),
       f.base_imponible||'',

@@ -759,7 +759,7 @@ async function loadAll(){
       // de una factura de julio o de septiembre salía como suelto. Paqui vio 422
       // "sin asignar" en agosto (23/09/2026) cuando de verdad eran unos 170, y
       // la mayoría de hoy mismo, esperando a su factura.
-      const todas=await api(`facturas_procesadas?select=id,documento_recibido_id,eliminada,numero_factura,total_factura,fecha_factura,prov:json_extraccion_ia->proveedor->>nombre,adj:json_extraccion_ia->_adjuntos&limit=20000`);
+      const todas=await api(`facturas_procesadas?select=id,documento_recibido_id,eliminada,numero_factura,total_factura,fecha_factura,prov:json_extraccion_ia->proveedor->>nombre,adj:json_extraccion_ia->_adjuntos,sug:json_extraccion_ia->_sugeridos&limit=20000`);
       state.todasFacturas=todas.filter(f=>!f.eliminada);
       const propios=new Set(todas.map(f=>f.documento_recibido_id));
       const puestos=new Set();
@@ -767,6 +767,18 @@ async function loadAll(){
       state.sueltos=docs.filter(d=>!propios.has(d.id)&&!puestos.has(d.id));
     }
   }catch(e){console.error(e);state.sueltos=null;}
+  // Documentos sueltos cuyo número casa con alguna factura pero no con la
+  // seguridad de colgarlos solos (el nº de pedido se repite entre proveedores, o
+  // el número casa con varias). Lo deja emparejar_documentos.py en cada pasada,
+  // escrito en la propia factura (_sugeridos): de configuracion el panel solo
+  // puede leer la salud.
+  state.sugerencias=new Map();
+  (state.todasFacturas||[]).forEach(f=>(Array.isArray(f.sug)?f.sug:[]).forEach(id=>{
+    const x=state.sugerencias.get(id)||{documento_id:id,facturas:[]};
+    x.facturas.push(f.id);
+    x.motivo=x.facturas.length>1?'el número casa con varias facturas':'el nº de pedido coincide';
+    state.sugerencias.set(id,x);
+  }));
   // Peticiones lanzadas desde aquí, para poder enseñar en qué han quedado.
   try{
     state.tareas=await api(`auditoria_workflow?select=id,evento,nivel,detalle,creado_en&evento=like.TAREA:*&evento=neq.TAREA: asignar&order=creado_en.desc&limit=8`);
@@ -1103,7 +1115,9 @@ function viewSueltos(){
           Han llegado por correo y no están puestos con ninguna factura, de ningún mes: no depende
           del periodo elegido arriba. Puede ser que su factura aún no haya llegado, que sea de un mes
           anterior o que el emparejado no los haya reconocido.${hoy?` <b>${hoy} han llegado hoy</b> y lo normal es que se emparejen solos a lo largo del día.`:''}
-          Si sabes de qué factura es uno, pulsa «Poner con una factura».
+          Se emparejan solos aunque lleguen en correos distintos: cuando el número de albarán
+          coincide con el que cita una factura, se ponen con ella y la factura se recalcula.
+          ${(()=>{const n=ds.filter(d=>(state.sugerencias||new Map()).has(d.id)).length;return n?`<b>${n} tienen una sugerencia</b>: confírmala con «Sí, es de esta». `:''})()}Si sabes de qué factura es uno, pulsa «Poner con una factura».
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1134,9 +1148,19 @@ function viewSueltos(){
     const esFactura=/FACTURA/i.test(tipo)&&!/ALBAR|PEDIDO/i.test(tipo);
     const pdf=`${SB_URL}/storage/v1/object/facturas/${esc(d.hash_archivo)}.pdf`;
     const a=asig.get(d.id);
+    // Sugerencia del emparejado: el número casa, pero no lo bastante para
+    // colgarlo solo. Se confirma con un clic; si no es, se usa el botón de siempre.
+    const sug=(state.sugerencias||new Map()).get(d.id);
+    const tipoSug=/PEDIDO/i.test(tipo)&&!/ALBAR/i.test(tipo)?'PEDIDO':'ALBARAN';
+    const sugFacs=sug?(sug.facturas||[]).map(id=>(state.todasFacturas||[]).find(x=>x.id===id)).filter(Boolean):[];
+    const sugHtml=sugFacs.length&&!(a&&['PENDIENTE','EN_CURSO'].includes(a.estado))
+      ? `<div style="font-size:11.5px;margin-bottom:6px;line-height:1.5"><span style="color:var(--muted)">Parece ${sugFacs.length>1?'de una de estas':'de la factura'} (${esc(sug.motivo||'por el número')}):</span>`
+        + sugFacs.map(f=>`<div style="display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap"><b>${esc(f.numero_factura||'(sin número)')}</b><span style="color:var(--muted)">${esc(f.prov||'')} · ${eur(f.total_factura)}</span><button class="act-btn ok" data-sug-doc="${d.id}" data-sug-fac="${f.id}" data-sug-tipo="${tipoSug}" style="flex:none;height:26px;padding:0 10px;font-size:12px">Sí, es de esta</button></div>`).join('')
+        + `</div>`
+      : '';
     const accion=a&&['PENDIENTE','EN_CURSO'].includes(a.estado)
       ? `<span style="font-size:12px;color:var(--muted)">Se pone con la <b>${esc(nFac(a.factura_id))}</b> en la próxima pasada</span>`
-      : `${a&&a.estado==='ERROR'?`<div style="font-size:11.5px;color:var(--rd);margin-bottom:4px">No se pudo: ${esc(a.resultado||'error')}</div>`:''}<button class="act-btn cont" data-asignar="${d.id}" style="${BTN}">Poner con una factura</button>`;
+      : `${a&&a.estado==='ERROR'?`<div style="font-size:11.5px;color:var(--rd);margin-bottom:4px">No se pudo: ${esc(a.resultado||'error')}</div>`:''}${sugHtml}<button class="act-btn cont" data-asignar="${d.id}" style="${BTN}">${sugHtml?'Es de otra factura':'Poner con una factura'}</button>`;
     // Texto largo en varias líneas: en una sola, la tabla medía 2.300 px y el
     // botón quedaba fuera de la pantalla.
     const W='white-space:normal;word-break:break-word';
@@ -2019,6 +2043,8 @@ function bindContent(){
     const f=document.querySelector(`tr[data-form="${b.dataset.asigNo}"]`);if(f)f.style.display='none';
   });
   document.querySelectorAll('[data-asig-ok]').forEach(b=>b.onclick=()=>asignarDocumento(b.dataset.asigOk,b));
+  document.querySelectorAll('[data-sug-doc]').forEach(b=>b.onclick=()=>pedirTarea('asignar',b,
+    {documento_id:b.dataset.sugDoc,factura_id:b.dataset.sugFac,tipo:b.dataset.sugTipo}));
   const ss=$('#s-search');
   if(ss)ss.oninput=e=>{
     const q=e.target.value.toLowerCase().trim(), qn=q.replace(/[^a-z0-9]/g,'');

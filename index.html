@@ -1227,7 +1227,7 @@ function viewResumen(){
   const kpi=(ic,cls,val,lbl,extra='')=>`<div class="kpi ${extra}"><div class="kpi-top"><div class="kpi-ic ${cls}">${svg(ic)}</div></div><div class="kpi-val">${val}</div><div class="kpi-lbl">${lbl}</div></div>`;
   return `
   <div class="kpis">
-    ${kpi(ICN.check,'green',`${pctAuto}%`,`Validadas en automático (${m.validadas} de ${m.total})`,'clk" data-go="aprobadas')}
+    ${kpi(ICN.check,'green',`${pctAuto}%`,`Validadas en automático (${m.validadas} de ${m.total})`,'clk" data-go="cerradas')}
     ${kpi(ICN.alert,'amber',m.revision,'Requieren revisión','clk" data-go="revision')}
     ${kpi(ICN.file,'blue',m.total,'Facturas en el periodo')}
     ${kpi(ICN.euro,'green',eurS(m.importe),'Importe total')}
@@ -1266,10 +1266,11 @@ function filtradas(){
     ff=ff.filter(f=>f.estado!=='DUPLICADO_PENDIENTE');
   if(state.quickFilter==='revision')ff=ff.filter(f=>PEND.includes(f.estado));
   else if(state.quickFilter==='duplicados')ff=ff.filter(f=>f.es_duplicado||f.estado==='DUPLICADO_PENDIENTE');
-  // Aprobadas = todo lo que ya pasó el corte, esté contabilizado o no. Las otras
+  // Cerradas = todo lo que ya pasó el corte, esté contabilizado o no. Las otras
   // dos parten eso en las dos mitades del trabajo: lo que falta por llevar al
-  // AS400 (validadas) y lo que ya está asentado (contabilizadas).
-  else if(state.quickFilter==='aprobadas')ff=ff.filter(f=>OK_CERRADAS.includes(f.estado));
+  // AS400 (validadas) y lo que ya está asentado (contabilizadas). Antes se llamaba
+  // «Aprobadas»; ese nombre es ahora la sección de aprobadas A MANO para pago.
+  else if(state.quickFilter==='cerradas')ff=ff.filter(f=>OK_CERRADAS.includes(f.estado));
   else if(state.quickFilter==='validadas')ff=ff.filter(f=>f.estado==='VALIDADA');
   else if(state.quickFilter==='contabilizadas')ff=ff.filter(f=>f.estado==='CONTABILIZADA');
   else if(state.quickFilter==='sincond')ff=ff.filter(sinCondiciones);
@@ -1315,7 +1316,7 @@ function viewFacturas(){
   const hay=new Set(state.facturas.map(f=>formaPago(f).tipo));
   const pagos=FORMAS_PAGO.filter(p=>hay.has(p));
   const ff=filtradas();
-  const chips=[['','Todas'],['revision','Requieren revisión'],['duplicados','Duplicados'],['aprobadas','Aprobadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['sincond','Sin condiciones'],['mes','Este mes']];
+  const chips=[['','Todas'],['revision','Requieren revisión'],['duplicados','Duplicados'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['sincond','Sin condiciones'],['mes','Este mes']];
   const chipElim=`<button class="chip ${state.verEliminadas?'active':''}" data-elim="1" title="Facturas quitadas del listado">Eliminadas</button>`;
   // Cuántas facturas están a medio comprobar. Sale aquí y no en un log del
   // servidor: si el proceso que las lee se para, el atasco se ve crecer solo. Un
@@ -1425,7 +1426,8 @@ function viewAprobadas(){
       <td class="r cell-strong">${eur(f.total_factura)}</td>
       <td class="mono" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)}</td>
       <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span></td>
-      <td class="r"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">${svg(ICN.card)}Pagada</button></td>
+      <td class="r" style="white-space:nowrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">${svg(ICN.card)}Pagada</button>
+        <button class="act-btn del" data-desaprobar-fila="${f.id}" title="Vuelve a su sitio en el listado de facturas" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap;margin-left:6px">Deshacer aprobación</button></td>
     </tr>`;}).join('');
   return`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
     <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${svg(ICN.check)}</div></div><div class="kpi-val">${ff.length}</div><div class="kpi-lbl">Aprobadas pendientes de pago</div></div>
@@ -1586,7 +1588,7 @@ async function openDrawer(id){
       ${f.estado==='VALIDADA'?`<button class="act-btn cont" data-act="CONTABILIZADA" data-id="${f.id}" title="El asiento ya está hecho en el AS400">${svg('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h4"/>')}Marcar contabilizada</button>`:''}
       ${f.estado==='CONTABILIZADA'?`<button class="act-btn del" data-act="VALIDADA" data-id="${f.id}" title="Deshacer: volver a dejarla pendiente de contabilizar">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer contabilizada</button>`:''}
       ${!f.json_extraccion_ia?._pago?(f.json_extraccion_ia?._aprobada_pago
-        ?`<button class="act-btn del" data-desaprobar="${f.id}" title="Quitar la aprobación: vuelve al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Quitar aprobación</button>`
+        ?`<button class="act-btn del" data-desaprobar="${f.id}" title="Deshacer la aprobación: vuelve a su sitio en el listado de facturas">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer aprobación</button>`
         :`<button class="act-btn cont" data-aprobar="${f.id}" title="Aprobarla para pago: pasa a la sección «Aprobadas»">${svg(ICN.check)}Aprobar para pago</button>`):''}
       ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Marcar como pagada por transferencia bancaria">${svg(ICN.card)}Pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>
@@ -1912,11 +1914,11 @@ async function guardarIA(id,ia){
 async function aprobarPago(id,aprobar){
   const f=state.facturas.find(x=>x.id===id);if(!f)return;
   if(!confirm(aprobar?`¿Aprobar para pago la factura ${f.numero_factura||''}?\n\nPasará a la sección «Aprobadas».`
-                     :`¿Quitar la aprobación de pago de la factura ${f.numero_factura||''}?\n\nVolverá al listado general.`))return;
+                     :`¿Deshacer la aprobación de pago de la factura ${f.numero_factura||''}?\n\nVolverá a su sitio en el listado de facturas.`))return;
   const ia=Object.assign({},f.json_extraccion_ia||{});
   if(aprobar)ia._aprobada_pago={fecha:new Date().toISOString(),por:(_session?.user?.email||'Panel')};
   else delete ia._aprobada_pago;
-  try{await guardarIA(id,ia);closeDrawer();toast(aprobar?'Factura aprobada para pago':'Aprobación quitada');await loadAll();}
+  try{await guardarIA(id,ia);closeDrawer();toast(aprobar?'Factura aprobada para pago':'Aprobación deshecha');await loadAll();}
   catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');}
 }
 async function marcarPagada(id,boton){
@@ -2096,6 +2098,7 @@ async function pedirTarea(accion,boton,extra){
 function bindContent(){
   document.querySelectorAll('[data-tarea]').forEach(b=>b.onclick=()=>pedirTarea(b.dataset.tarea,b));
   document.querySelectorAll('#content [data-pagar]').forEach(b=>b.onclick=e=>{e.stopPropagation();marcarPagada(b.dataset.pagar,b);});
+  document.querySelectorAll('#content [data-desaprobar-fila]').forEach(b=>b.onclick=e=>{e.stopPropagation();aprobarPago(b.dataset.desaprobarFila,false);});
   document.querySelectorAll('#content [data-pdf]').forEach(b=>b.onclick=()=>openPdf(b.dataset.pdf));
   // Sin asignar: abrir el formulario, guardar, cancelar y buscar sin repintar
   // (repintar se lleva el foco del cuadro de búsqueda a cada letra).
@@ -2123,7 +2126,7 @@ function bindContent(){
   };
   document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));
   document.querySelectorAll('.inc[data-id]').forEach(el=>el.onclick=()=>openDrawer(el.dataset.id));
-  document.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{const g=el.dataset.go;if(['revision','aprobadas','validadas','contabilizadas'].includes(g)){setView('facturas');state.quickFilter=g;render();}else setView(g);});
+  document.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{const g=el.dataset.go;if(['revision','cerradas','validadas','contabilizadas'].includes(g)){setView('facturas');state.quickFilter=g;render();}else setView(g);});
   document.querySelectorAll('[data-chip]').forEach(el=>el.onclick=()=>{
     state.quickFilter=el.dataset.chip;
     if(state.verEliminadas){state.verEliminadas=false;loadAll();}else render();});

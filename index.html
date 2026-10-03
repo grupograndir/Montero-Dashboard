@@ -54,7 +54,11 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 
 /* ===== MAIN ===== */
 .main{display:flex;flex-direction:column;min-width:0}
-.topbar{background:rgba(255,255,255,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:0 26px;height:60px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:30}
+.topbar{background:rgba(255,255,255,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:8px 20px;min-height:56px;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;position:sticky;top:0;z-index:30}
+/* Menú lateral ocultable: en Montero usan ratón y pantallas pequeñas; el menú se
+   comía media pantalla y obligaba a desplazarse de lado, que con ratón no se puede. */
+body.side-off .app{grid-template-columns:1fr}
+body.side-off .sidebar{display:none}
 .page-title{font-size:17px;font-weight:700;letter-spacing:-.3px}
 .page-sub{font-size:12px;color:var(--faint);font-weight:500}
 .tb-spacer{flex:1}
@@ -72,7 +76,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .ico-btn.primary{background:var(--red);color:#fff;border-color:var(--red)}
 .ico-btn.primary:hover{background:var(--red-d)}
 
-.content{padding:24px 26px 40px;flex:1}
+.content{padding:20px 20px 40px;flex:1;min-width:0}
 
 /* ===== KPIS ===== */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px}
@@ -98,6 +102,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .card-meta{font-size:12px;color:var(--faint);font-weight:500}
 
 .grid-2{display:grid;grid-template-columns:1.55fr 1fr;gap:18px;margin-bottom:18px}
+@media(max-width:1600px){.grid-2{grid-template-columns:1fr}}
 .grid-charts{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
 
 /* ===== TABLE ===== */
@@ -121,12 +126,18 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .chip.active{background:var(--red);color:#fff;border-color:var(--red)}
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
-thead th{padding:11px 18px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);background:#fbfcfd;border-bottom:1px solid var(--line);white-space:nowrap;user-select:none}
+thead th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);background:#fbfcfd;border-bottom:1px solid var(--line);white-space:nowrap;user-select:none}
 thead th.srt{cursor:pointer}
 thead th.srt:hover{color:var(--muted)}
 thead th.r{text-align:right}
 thead th .arr{opacity:.5;font-size:9px;margin-left:3px}
-tbody td{padding:13px 18px;border-bottom:1px solid var(--line-2);font-size:13px;color:var(--ink-2);white-space:nowrap}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--line-2);font-size:13px;color:var(--ink-2);white-space:normal;overflow-wrap:break-word}
+tbody td.mono,tbody td.r{white-space:nowrap;overflow-wrap:normal}
+tbody td.mono{font-size:12px}
+tbody td.mono.cell-strong{white-space:normal;overflow-wrap:anywhere;min-width:6.5rem}
+@media(max-width:1440px){thead th,tbody td{padding-left:9px;padding-right:9px}.prov-av{display:none}}
+.tbl-wrap .trunc{white-space:normal;max-width:16rem;min-width:8rem}
+.tbl-wrap thead th{white-space:normal}
 tbody tr{cursor:pointer;transition:.1s}
 tbody tr:hover{background:#fafbfc}
 tbody tr:last-child td{border-bottom:none}
@@ -293,7 +304,9 @@ details.raw pre{background:#0f172a;color:#cbd5e1;padding:14px;border-radius:10px
 
 @media(max-width:1000px){
   .app{grid-template-columns:64px 1fr}
-  .brand .bt,.brand .bs,.nav-lbl,.nav-item span,.nav-item .ct,.side-foot{display:none}
+  .brand .bt,.brand .bs,.nav-lbl,.nav-item span,.nav-item .ct,.side-foot .user-email,#conn-txt{display:none}
+  .side-foot{padding:10px 6px;text-align:center}
+  .side-foot .logout-btn{font-size:0;justify-content:center}
   .brand{justify-content:center;padding:16px 0}
   .nav-item{justify-content:center;padding:11px}
   .grid-2,.grid-charts{grid-template-columns:1fr}
@@ -346,6 +359,7 @@ details.raw pre{background:#0f172a;color:#cbd5e1;padding:14px;border-radius:10px
       <button class="nav-item" data-view="pagadas" title="Facturas marcadas como pagadas manualmente por Montero"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg><span>Pagadas</span><span class="ct" id="nav-pagadas">0</span></button>
     </nav>
     <div class="side-foot">
+      <button class="logout-btn" id="btn-leyenda" title="Qué significa cada estado" style="margin:0 0 8px"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Leyenda</button>
       <div class="user-email" id="user-email-lbl"></div>
       <button class="logout-btn" onclick="doLogout()"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Cerrar sesión</button>
       <div style="margin-top:8px"><span class="dot" id="conn-dot"></span><span id="conn-txt">Conectado</span></div>
@@ -355,10 +369,7 @@ details.raw pre{background:#0f172a;color:#cbd5e1;padding:14px;border-radius:10px
   <!-- MAIN -->
   <div class="main">
     <div class="topbar">
-      <div>
-        <div class="page-title" id="pg-title">Resumen</div>
-        <div class="page-sub" id="pg-sub">Vista general de la facturación</div>
-      </div>
+      <button class="ico-btn" id="btn-side" title="Ocultar o mostrar el menú lateral"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg><span id="btn-side-txt">Ocultar menú</span></button>
       <div class="tb-spacer"></div>
       <div class="period" id="period">
         <button data-d="1">Hoy</button>
@@ -373,11 +384,9 @@ details.raw pre{background:#0f172a;color:#cbd5e1;padding:14px;border-radius:10px
         <span>Del</span><input type="date" id="rg-desde"><span>al</span><input type="date" id="rg-hasta">
         <button class="ico-btn" id="rg-limpiar" title="Quitar el rango">✕</button>
       </div>
-      <button class="ico-btn" id="btn-leyenda" title="Qué significa cada estado"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Leyenda</button>
       <button class="ico-btn" id="btn-export"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Resumen</button>
       <button class="ico-btn" id="btn-export-as400"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>AS400</button>
       <button class="ico-btn" id="btn-descargar-docs" title="Descarga los PDF de las facturas que estés viendo, en una carpeta por factura"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polyline points="12 11 12 17"/><polyline points="9 14 12 17 15 14"/></svg>Documentos</button>
-      <button class="ico-btn primary" id="btn-refresh"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Actualizar</button>
     </div>
     <div class="content" id="content"></div>
   </div>
@@ -1078,7 +1087,7 @@ const TITLES={resumen:['Resumen','Vista general de la facturación'],facturas:['
 function setView(v){
   state.view=v;state.provSel=null;state.quickFilter='';
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
-  $('#pg-title').textContent=TITLES[v][0];$('#pg-sub').textContent=TITLES[v][1];
+  document.title=`${TITLES[v][0]} · Montero`;
   render();
 }
 function render(){
@@ -1392,7 +1401,7 @@ function tablaFacturas(ff,full){
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
       <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span></div></td>
-      ${full?(()=>{const p=formaPago(f);return `<td style="font-size:12.5px;white-space:nowrap" title="${esc(p.original?'La factura dice: '+p.original:'La factura no dice cómo se paga')}${p.acordado?' · días según lo acordado con el proveedor':''}">${esc(p.texto)}</td>`;})():''}
+      ${full?(()=>{const p=formaPago(f);return `<td style="font-size:12.5px" title="${esc(p.original?'La factura dice: '+p.original:'La factura no dice cómo se paga')}${p.acordado?' · días según lo acordado con el proveedor':''}">${esc(p.texto)}</td>`;})():''}
       <td class="r cell-strong">${eur(f.total_factura)} ${warn?`<span title="Diferencia ${eur(dif)}" style="color:var(--rd)">${svg(ICN.alert).replace('viewBox','width="13" height="13" style="vertical-align:-2px" viewBox')}</span>`:''}</td>
       ${full?(()=>{const v=validacion(f),c=fechaContabilizada(f);
         return `<td class="mono" style="white-space:nowrap" title="${v?esc('Validada '+v.como+(v.por?' por '+v.por:'')):''}">${v?(v.fecha?dt(v.fecha):'<span style="color:var(--muted)">auto</span>'):'—'}</td>
@@ -1407,7 +1416,7 @@ function tablaFacturas(ff,full){
     ${full?th('prov','Proveedor'):'<th>Proveedor</th>'}
     ${full?th('pago','Forma de pago'):''}
     ${full?th('total','Total',1):'<th class="r">Total</th>'}
-    ${full?th('validada','Validada')+th('contab','Contabilizada'):''}
+    ${full?th('validada','Validada')+th('contab','Contab.'):''}
     <th>Estado</th>
   </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
@@ -1422,12 +1431,12 @@ function viewAprobadas(){
       <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
       <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span></div></td>
-      <td style="font-size:12.5px;white-space:nowrap">${esc(formaPago(f).texto)}</td>
+      <td style="font-size:12.5px">${esc(formaPago(f).texto)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
       <td class="mono" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)}</td>
       <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span></td>
-      <td class="r" style="white-space:nowrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">${svg(ICN.card)}Pagada</button>
-        <button class="act-btn del" data-desaprobar-fila="${f.id}" title="Vuelve a su sitio en el listado de facturas" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap;margin-left:6px">Deshacer aprobación</button></td>
+      <td style="text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">${svg(ICN.card)}Pagada</button>
+        <button class="act-btn del" data-desaprobar-fila="${f.id}" title="Vuelve a su sitio en el listado de facturas" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">Deshacer aprobación</button></div></td>
     </tr>`;}).join('');
   return`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
     <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${svg(ICN.check)}</div></div><div class="kpi-val">${ff.length}</div><div class="kpi-lbl">Aprobadas pendientes de pago</div></div>
@@ -2169,11 +2178,17 @@ $('#rg-limpiar').onclick=()=>{
   $('#period').querySelectorAll('button').forEach(x=>x.classList.toggle('active',+x.dataset.d===state.dias));
   pintaRango();loadAll();};
 $('#ov').onclick=closeDrawer;
-$('#btn-refresh').onclick=loadAll;
 $('#btn-export').onclick=exportExcel;
 $('#btn-export-as400').onclick=exportAS400;
 $('#btn-descargar-docs').onclick=descargarDocumentos;
 $('#btn-leyenda').onclick=openLegend;
+function aplicarMenu(off){
+  document.body.classList.toggle('side-off',off);
+  $('#btn-side-txt').textContent=off?'Mostrar menú':'Ocultar menú';
+  try{localStorage.setItem('mb_menu_oculto',off?'1':'0');}catch(e){}
+}
+$('#btn-side').onclick=()=>aplicarMenu(!document.body.classList.contains('side-off'));
+try{aplicarMenu(localStorage.getItem('mb_menu_oculto')==='1');}catch(e){aplicarMenu(false);}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
 
 // Desglose de IVA por tipo (con fallback al IVA simple de la factura)

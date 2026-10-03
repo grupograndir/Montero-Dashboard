@@ -342,6 +342,7 @@ details.raw pre{background:#0f172a;color:#cbd5e1;padding:14px;border-radius:10px
       <button class="nav-item" data-view="incidencias"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Incidencias</span><span class="ct" id="nav-inc">0</span></button>
       <button class="nav-item" data-view="proveedores"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg><span>Proveedores</span><span class="ct" id="nav-prov">0</span></button>
       <button class="nav-item" data-view="sueltos" title="Albaranes, pedidos y facturas que no están asignados a ninguna factura"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Sin asignar</span><span class="ct" id="nav-sueltos">0</span></button>
+      <button class="nav-item" data-view="aprobadas" title="Facturas aprobadas a mano para pago, pendientes de pagar"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Aprobadas</span><span class="ct" id="nav-aprobadas">0</span></button>
       <button class="nav-item" data-view="pagadas" title="Facturas marcadas como pagadas manualmente por Montero"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg><span>Pagadas</span><span class="ct" id="nav-pagadas">0</span></button>
     </nav>
     <div class="side-foot">
@@ -1060,16 +1061,20 @@ function deriveIncidencias(ff){
 }
 function setConn(ok,msg){$('#conn-dot').className='dot'+(ok?'':' off');$('#conn-txt').textContent=ok?'Conectado':'Sin conexión';}
 function updateNav(){
-  $('#nav-fac').textContent=state.facturas.filter(f=>!f.json_extraccion_ia?._pago).length;
+  $('#nav-fac').textContent=state.facturas.filter(f=>!f.json_extraccion_ia?._pago&&!aprobadaPago(f)).length;
   // el contador refleja FACTURAS afectadas, no incidencias sueltas (coherente con la vista agrupada)
   $('#nav-inc').textContent=new Set(state.incidencias.filter(i=>i.estado==='ABIERTA').map(i=>i.factura_id)).size;
   const provs=new Set(state.facturas.map(claveProv));$('#nav-prov').textContent=provs.size;
   $('#nav-sueltos').textContent=state.sueltos===null?'?':state.sueltos.length;
   $('#nav-pagadas').textContent=state.facturas.filter(f=>f.json_extraccion_ia?._pago&&!f.eliminada).length;
+  $('#nav-aprobadas').textContent=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada).length;
 }
+// Aprobada para pago a mano y todavía sin pagar. Al pagarla pasa a «Pagadas»; la
+// aprobación se conserva para saber quién la autorizó.
+function aprobadaPago(f){return !!(f.json_extraccion_ia?._aprobada_pago&&!f.json_extraccion_ia?._pago);}
 
 /* ---------- router ---------- */
-const TITLES={resumen:['Resumen','Vista general de la facturación'],facturas:['Facturas','Listado completo de facturas procesadas'],incidencias:['Incidencias','Validaciones, avisos y bloqueos detectados'],proveedores:['Proveedores','Actividad y ranking de proveedores'],sueltos:['Sin asignar','Documentos que han llegado y no están puestos con ninguna factura'],pagadas:['Facturas Pagadas','Facturas abonadas manualmente por Montero']};
+const TITLES={resumen:['Resumen','Vista general de la facturación'],facturas:['Facturas','Listado completo de facturas procesadas'],incidencias:['Incidencias','Validaciones, avisos y bloqueos detectados'],proveedores:['Proveedores','Actividad y ranking de proveedores'],sueltos:['Sin asignar','Documentos que han llegado y no están puestos con ninguna factura'],pagadas:['Facturas Pagadas','Facturas abonadas manualmente por Montero'],aprobadas:['Aprobadas para pago','Facturas aprobadas a mano, pendientes de pagar']};
 function setView(v){
   state.view=v;state.provSel=null;state.quickFilter='';
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
@@ -1084,6 +1089,7 @@ function render(){
   else if(state.view==='proveedores')c.innerHTML=viewProveedores();
   else if(state.view==='sueltos')c.innerHTML=viewSueltos();
   else if(state.view==='pagadas')c.innerHTML=viewPagadas();
+  else if(state.view==='aprobadas')c.innerHTML=viewAprobadas();
   bindContent();
   if(state.view==='resumen')drawCharts();
 }
@@ -1251,7 +1257,7 @@ function colaTrabajo(ff){
 
 /* ---------- FACTURAS ---------- */
 function filtradas(){
-  let ff=state.facturas.filter(f=>!f.json_extraccion_ia?._pago);
+  let ff=state.facturas.filter(f=>!f.json_extraccion_ia?._pago&&!aprobadaPago(f));
   // Una factura que llegó dos veces no es trabajo pendiente: es la misma otra vez,
   // y verla en el listado hace pensar que hay algo que revisar. "Si están
   // duplicadas no tienen que aparecer" (María, 12/08/2026). Siguen estando: se ven
@@ -1405,6 +1411,31 @@ function tablaFacturas(ff,full){
   </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
+/* ---------- APROBADAS PARA PAGO ---------- */
+function viewAprobadas(){
+  const ff=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada)
+    .sort((a,b)=>String(a.json_extraccion_ia._aprobada_pago.fecha||'').localeCompare(String(b.json_extraccion_ia._aprobada_pago.fecha||'')));
+  if(!ff.length)return`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">No hay facturas aprobadas pendientes de pago</p><small>Cuando pulses «Aprobar para pago» en una factura, aparecerá aquí</small></div></div>`;
+  const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
+  const rows=ff.map(f=>{const a=f.json_extraccion_ia._aprobada_pago;return `<tr data-id="${f.id}">
+      <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
+      <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
+      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span></div></td>
+      <td style="font-size:12.5px;white-space:nowrap">${esc(formaPago(f).texto)}</td>
+      <td class="r cell-strong">${eur(f.total_factura)}</td>
+      <td class="mono" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)}</td>
+      <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span></td>
+      <td class="r"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">${svg(ICN.card)}Pagada</button></td>
+    </tr>`;}).join('');
+  return`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
+    <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${svg(ICN.check)}</div></div><div class="kpi-val">${ff.length}</div><div class="kpi-lbl">Aprobadas pendientes de pago</div></div>
+    <div class="kpi"><div class="kpi-top"><div class="kpi-ic blue">${svg(ICN.euro)}</div></div><div class="kpi-val">${eurS(total)}</div><div class="kpi-lbl">Total a pagar</div></div>
+  </div>
+  <div class="card"><div class="tbl-wrap"><table><thead><tr>
+    <th>Fecha fra.</th><th>Nº Factura</th><th>Proveedor</th><th>Forma de pago</th><th class="r">Total</th><th>Aprobada</th><th>Estado</th><th></th>
+  </tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+
 /* ---------- FACTURAS PAGADAS ---------- */
 function viewPagadas(){
   const ff=state.facturas
@@ -1554,6 +1585,9 @@ async function openDrawer(id){
       ${(f.estado==='VALIDADA'||f.estado==='RECHAZADA')?`<button class="act-btn" data-act="EN_REVISION" data-id="${f.id}" title="Quitarle el estado y volver a dejarla pendiente">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Devolver a revisión</button>`:''}
       ${f.estado==='VALIDADA'?`<button class="act-btn cont" data-act="CONTABILIZADA" data-id="${f.id}" title="El asiento ya está hecho en el AS400">${svg('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h4"/>')}Marcar contabilizada</button>`:''}
       ${f.estado==='CONTABILIZADA'?`<button class="act-btn del" data-act="VALIDADA" data-id="${f.id}" title="Deshacer: volver a dejarla pendiente de contabilizar">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer contabilizada</button>`:''}
+      ${!f.json_extraccion_ia?._pago?(f.json_extraccion_ia?._aprobada_pago
+        ?`<button class="act-btn del" data-desaprobar="${f.id}" title="Quitar la aprobación: vuelve al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Quitar aprobación</button>`
+        :`<button class="act-btn cont" data-aprobar="${f.id}" title="Aprobarla para pago: pasa a la sección «Aprobadas»">${svg(ICN.check)}Aprobar para pago</button>`):''}
       ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Marcar como pagada por transferencia bancaria">${svg(ICN.card)}Pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>
     </div>`:''}
@@ -1782,6 +1816,8 @@ async function openDrawer(id){
   document.querySelectorAll('#dr-body [data-act]').forEach(b=>b.onclick=()=>resolverFactura(b.dataset.id,b.dataset.act));
   document.querySelectorAll('#dr-body [data-del]').forEach(b=>b.onclick=()=>eliminarFactura(b.dataset.del));
   document.querySelectorAll('#dr-body [data-despagada]').forEach(b=>b.onclick=()=>deshacerPagada(b.dataset.despagada));
+  document.querySelectorAll('#dr-body [data-aprobar]').forEach(b=>b.onclick=()=>aprobarPago(b.dataset.aprobar,true));
+  document.querySelectorAll('#dr-body [data-desaprobar]').forEach(b=>b.onclick=()=>aprobarPago(b.dataset.desaprobar,false));
   // Los botones de la ayuda: el que lanza la acción que arregla el aviso y el que
   // prepara el mensaje cuando la acción no lo arregla.
   document.querySelectorAll('#dr-body [data-ayuda-accion]').forEach(b=>b.onclick=()=>pedirTarea(b.dataset.ayudaAccion,b));
@@ -1864,6 +1900,33 @@ async function resolverFactura(id,nuevoEstado){
                EN_REVISION:'Devuelta a revisión'};
     closeDrawer();toast(esDeshacer?'Ya no consta como contabilizada':(MSG[nuevoEstado]||'Factura actualizada'));await loadAll();
   }catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');}
+}
+// Guarda solo json_extraccion_ia: aprobar y pagar no cambian el estado de la
+// factura (validada, contabilizada…), que es otra decisión.
+async function guardarIA(id,ia){
+  const tok=getToken()||SB_ANON;
+  const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:ia})});
+  const data=await r.json().catch(()=>[]);
+  if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
+}
+async function aprobarPago(id,aprobar){
+  const f=state.facturas.find(x=>x.id===id);if(!f)return;
+  if(!confirm(aprobar?`¿Aprobar para pago la factura ${f.numero_factura||''}?\n\nPasará a la sección «Aprobadas».`
+                     :`¿Quitar la aprobación de pago de la factura ${f.numero_factura||''}?\n\nVolverá al listado general.`))return;
+  const ia=Object.assign({},f.json_extraccion_ia||{});
+  if(aprobar)ia._aprobada_pago={fecha:new Date().toISOString(),por:(_session?.user?.email||'Panel')};
+  else delete ia._aprobada_pago;
+  try{await guardarIA(id,ia);closeDrawer();toast(aprobar?'Factura aprobada para pago':'Aprobación quitada');await loadAll();}
+  catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');}
+}
+async function marcarPagada(id,boton){
+  const f=state.facturas.find(x=>x.id===id);if(!f)return;
+  if(!confirm(`¿Marcar como pagada la factura ${f.numero_factura||''} (${eur(f.total_factura)})?\n\nPasará a la sección «Pagadas».`))return;
+  if(boton)boton.disabled=true;
+  const ia=Object.assign({},f.json_extraccion_ia||{});
+  ia._pago={fecha:new Date().toISOString(),por:(_session?.user?.email||'Panel')};
+  try{await guardarIA(id,ia);toast('Factura marcada como pagada');await loadAll();}
+  catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');if(boton)boton.disabled=false;}
 }
 async function deshacerPagada(id){
   const f=state.facturas.find(x=>x.id===id);if(!f)return;
@@ -2032,6 +2095,7 @@ async function pedirTarea(accion,boton,extra){
 
 function bindContent(){
   document.querySelectorAll('[data-tarea]').forEach(b=>b.onclick=()=>pedirTarea(b.dataset.tarea,b));
+  document.querySelectorAll('#content [data-pagar]').forEach(b=>b.onclick=e=>{e.stopPropagation();marcarPagada(b.dataset.pagar,b);});
   document.querySelectorAll('#content [data-pdf]').forEach(b=>b.onclick=()=>openPdf(b.dataset.pdf));
   // Sin asignar: abrir el formulario, guardar, cancelar y buscar sin repintar
   // (repintar se lleva el foco del cuadro de búsqueda a cada letra).

@@ -1104,6 +1104,13 @@ function render(){
 }
 
 /* ---------- SIN ASIGNAR ---------- */
+// El PC que atiende las peticiones deja su rastro en salud_sistema cada 10
+// minutos. Si lleva más de 40 sin hacerlo, una petición se queda esperando y
+// hay que decirlo: si no, parece que el botón no hace nada.
+function pcParado(){
+  const f=state.salud&&state.salud.fecha;
+  return !f||(Date.now()-new Date(f).getTime())>40*60*1000;
+}
 // Un albarán que llega y no se engancha a su factura no da error en ninguna parte:
 // simplemente no está. Antes eso solo se veía leyendo el log del ordenador donde
 // corre el proceso, así que se ve aquí, con el botón para reintentar al lado.
@@ -1140,7 +1147,9 @@ function viewSueltos(){
         <button class="act-btn" data-tarea="salud" ${enCurso?'disabled':''}>Comprobar el sistema</button>
       </div>
     </div>
-    ${enCurso?`<div class="rev-note" style="margin-top:10px">Petición enviada · se ejecuta en la próxima pasada (como mucho 10 minutos). Recarga para ver el resultado.</div>`:''}
+    ${enCurso?(pcParado()
+      ?`<div class="rev-note" style="margin-top:10px;color:var(--rd)"><b>El ordenador del proceso no responde</b> desde ${state.salud&&state.salud.fecha?dtL(state.salud.fecha):"hace tiempo"}. La petición está guardada y se hará en cuanto vuelva a funcionar.</div>`
+      :`<div class="rev-note" style="margin-top:10px">Petición enviada · se ejecuta en la próxima pasada (como mucho 10 minutos). Recarga para ver el resultado.</div>`):''}
     ${!enCurso&&ultima?`<div class="rev-note" style="margin-top:10px">Última ejecución (${esc(ultima.evento.replace('TAREA: ',''))}) · ${dtL(ultima.creado_en)} · <b>${(ultima.detalle||{}).estado==='HECHO'?'correcta':'con error'}</b><br><span style="font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted);white-space:pre-wrap">${esc(String((ultima.detalle||{}).resultado||'').split('\n').slice(-3).join('\n'))}</span></div>`:''}
   </div>`;
   if(!ds.length) return cab+`<div class="card"><div class="empty">No hay nada suelto: todo lo que ha llegado está puesto con su factura.</div></div>`;

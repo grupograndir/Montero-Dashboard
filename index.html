@@ -1609,7 +1609,17 @@ async function openDrawer(id){
         ?`<button class="act-btn del" data-desaprobar="${f.id}" title="Deshacer la aprobación: vuelve a su sitio en el listado de facturas">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer aprobación</button>`
         :`<button class="act-btn cont" data-aprobar="${f.id}" title="Aprobarla para pago: pasa a la sección «Aprobadas»">${svg(ICN.check)}Aprobar para pago</button>`):''}
       ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Marcar como pagada por transferencia bancaria">${svg(ICN.card)}Pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
+      <button class="act-btn cont" data-manual="${f.id}" title="Subir un albarán, un pedido u otro papel que esté guardado en otro sitio y ponerlo con esta factura">${svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>')}Añadir manualmente</button>
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>
+    </div>`:''}
+    ${!f.eliminada?`<div id="manual-form" style="display:none;margin:10px 0;padding:12px;border:1px dashed var(--line);border-radius:10px;background:var(--bg)">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">Añadir un documento a esta factura</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input type="file" id="manual-archivo" accept=".pdf,application/pdf,image/jpeg,image/png" style="flex:1 1 14rem;min-width:12rem;font-size:12.5px">
+        <select class="sel" id="manual-tipo"><option value="ALBARAN">Es el albarán</option><option value="PEDIDO">Es el pedido</option><option value="OTRO">Otro papel</option></select>
+        <button class="act-btn ok" id="manual-subir" data-fac="${f.id}">Subir y añadir</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:6px">PDF, JPG o PNG. Queda puesto con esta factura y cuenta como revisado por ti.</div>
     </div>`:''}
     ${rev?`<div class="rev-note">${svg(ICN.check,'var(--green)').replace('viewBox','width="15" height="15" viewBox')}Revisada manualmente · ${dtL(rev.fecha)} → <b>${esc(rev.accion)}</b>${rev.por?` · ${esc(rev.por)}`:''}</div>`:''}
     ${sinCondiciones(f)?`<div class="rev-note" style="border-color:var(--amber);background:var(--amber-s);color:var(--ink)"><b>Sin condiciones:</b> este proveedor no está en el Excel de condiciones de Montero, así que no se sabe si lleva pedido y albarán, con qué plazo se paga ni su código del AS400. Hay que homologarlo.</div>`:''}
@@ -1837,6 +1847,10 @@ async function openDrawer(id){
   document.querySelectorAll('#dr-body [data-del]').forEach(b=>b.onclick=()=>eliminarFactura(b.dataset.del));
   document.querySelectorAll('#dr-body [data-despagada]').forEach(b=>b.onclick=()=>deshacerPagada(b.dataset.despagada));
   document.querySelectorAll('#dr-body [data-aprobar]').forEach(b=>b.onclick=()=>aprobarPago(b.dataset.aprobar,true));
+  document.querySelectorAll('#dr-body [data-manual]').forEach(b=>b.onclick=()=>{
+    const fm=$('#manual-form');if(fm){fm.style.display=fm.style.display==='none'?'':'none';if(fm.style.display==='')fm.scrollIntoView({block:'nearest'});}
+  });
+  const subir=$('#manual-subir');if(subir)subir.onclick=()=>anadirManual(subir.dataset.fac,subir);
   document.querySelectorAll('#dr-body [data-desaprobar]').forEach(b=>b.onclick=()=>aprobarPago(b.dataset.desaprobar,false));
   // Los botones de la ayuda: el que lanza la acción que arregla el aviso y el que
   // prepara el mensaje cuando la acción no lo arregla.
@@ -1947,6 +1961,74 @@ async function marcarPagada(id,boton){
   ia._pago={fecha:new Date().toISOString(),por:(_session?.user?.email||'Panel')};
   try{await guardarIA(id,ia);toast('Factura marcada como pagada');await loadAll();}
   catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');if(boton)boton.disabled=false;}
+}
+// «Añadir manualmente»: un albarán o un pedido que tienen guardado en otro sitio.
+// Se sube a Storage como el resto ({hash}.pdf), se registra como documento
+// recibido (origen MANUAL) y se pone con la factura. También se deja la misma
+// petición que «Poner con una factura», para que el emparejado del ordenador del
+// proceso lo conserve y recalcule el estado de la factura.
+async function aPdf(archivo){
+  const bytes=new Uint8Array(await archivo.arrayBuffer());
+  if(/pdf$/i.test(archivo.type)||/\.pdf$/i.test(archivo.name))return bytes;
+  const doc=await PDFLib.PDFDocument.create();
+  const img=/png$/i.test(archivo.type)||/\.png$/i.test(archivo.name)?await doc.embedPng(bytes):await doc.embedJpg(bytes);
+  // Página A4 con la foto entera, girada si es apaisada
+  const A4=[595.28,841.89], ap=img.width>img.height;
+  const [W,H]=ap?[A4[1],A4[0]]:A4, m=20, k=Math.min((W-2*m)/img.width,(H-2*m)/img.height);
+  const pg=doc.addPage([W,H]);
+  pg.drawImage(img,{x:(W-img.width*k)/2,y:(H-img.height*k)/2,width:img.width*k,height:img.height*k});
+  return await doc.save();
+}
+async function anadirManual(facId,boton){
+  const f=state.facturas.find(x=>x.id===facId);if(!f)return;
+  const archivo=$('#manual-archivo')?.files?.[0];
+  const tipo=$('#manual-tipo')?.value||'ALBARAN';
+  if(!archivo){toast('Elige primero el archivo','err');return;}
+  if(!/pdf|jpe?g|png/i.test(archivo.type+archivo.name)){toast('Solo PDF, JPG o PNG','err');return;}
+  if(archivo.size>25*1024*1024){toast('El archivo pasa de 25 MB','err');return;}
+  const antes=boton.textContent;boton.disabled=true;boton.textContent='Subiendo…';
+  const tok=getToken()||SB_ANON, quien=(_session?.user?.email||'panel');
+  const H={apikey:SB_ANON,Authorization:`Bearer ${tok}`};
+  try{
+    const pdf=await aPdf(archivo);
+    const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',pdf))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    const nombre=archivo.name.replace(/\.(jpe?g|png)$/i,'.pdf');
+    // 1) el PDF. Si ya estaba (mismo contenido), vale el que hay.
+    const up=await fetch(`${SB_URL}/storage/v1/object/facturas/${hash}.pdf`,{method:'POST',
+      headers:{...H,'Content-Type':'application/pdf'},body:pdf});
+    if(!up.ok){const t=await up.text();if(!/Duplicate|already exists|409/i.test(t+up.status))throw new Error('No se ha podido subir el archivo: '+t.slice(0,120));}
+    // 2) el documento: el mismo papel no se registra dos veces
+    let doc=(await api(`documentos_recibidos?select=id&hash_archivo=eq.${hash}&limit=1`))[0];
+    if(!doc){
+      const r=await fetch(`${SB_URL}/rest/v1/documentos_recibidos`,{method:'POST',
+        headers:{...H,'Content-Type':'application/json',Prefer:'return=representation'},
+        body:JSON.stringify({origen:'MANUAL',nombre_archivo:nombre,hash_archivo:hash,
+          ruta_almacenamiento:`facturas/${hash}.pdf`,estado_procesamiento:'COMPLETADO',
+          email_remitente:quien,email_asunto:`Añadido a mano a la factura ${f.numero_factura||''}`,
+          tipo_documento_ia:tipo})});
+      const d=await r.json().catch(()=>[]);
+      if(!r.ok||!Array.isArray(d)||!d.length)throw new Error('No se ha podido registrar el documento');
+      doc=d[0];
+    }
+    // 3) ponerlo con la factura, ya
+    const ia=Object.assign({},f.json_extraccion_ia||{});
+    const adj=(Array.isArray(ia._adjuntos)?ia._adjuntos:[]).filter(a=>a.documento_id!==doc.id);
+    adj.push({nombre,tipo,documento_id:doc.id,como:`añadido a mano por ${quien}`,leido:true,a_mano:true,
+              url:`${SB_URL}/storage/v1/object/public/facturas/${hash}.pdf`});
+    ia._adjuntos=adj;
+    await guardarIA(facId,ia);
+    // 4) y que el emparejado lo respete y recalcule la factura
+    await fetch(`${SB_URL}/rest/v1/auditoria_workflow`,{method:'POST',headers:{...H,'Content-Type':'application/json'},
+      body:JSON.stringify({evento:'TAREA: asignar',nivel:'INFO',n8n_execution_id:'panel',
+        detalle:{documento_id:doc.id,factura_id:facId,tipo,accion:'asignar',estado:'PENDIENTE',
+                 pedido_por:quien,cuando:new Date().toISOString()}})}).catch(()=>{});
+    toast(`${tipo==='ALBARAN'?'Albarán':tipo==='PEDIDO'?'Pedido':'Documento'} añadido a la factura`);
+    await loadAll();openDrawer(facId);
+  }catch(e){
+    console.error(e);
+    toast(/row-level|42501|403/.test(String(e.message||e))?'La base no deja subir documentos desde el panel':String(e.message||e),'err');
+    boton.disabled=false;boton.textContent=antes;
+  }
 }
 async function deshacerPagada(id){
   const f=state.facturas.find(x=>x.id===id);if(!f)return;

@@ -4,7 +4,7 @@
 # con permiso de administrador. No lleva ninguna clave: las pide el instalador.
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$url = 'https://kehamwcxejrgaqsjlhig.supabase.co/storage/v1/object/sign/instalador/montero_instalador.zip?token=eyJraWQiOiIzOGI4MWVmOS02Mzk5LTQzOTctOTI3My01MmZhNTUzMDczZjkiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJpbnN0YWxhZG9yL21vbnRlcm9faW5zdGFsYWRvci56aXAiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzkxMTQ3OTk3LCJleHAiOjE3OTI5NjIzOTd9.wwNvBzjlii88GNIJISwDu1E9VZPzBon2pbd8ID2Otfc'
+$url = 'https://kehamwcxejrgaqsjlhig.supabase.co/storage/v1/object/sign/instalador/montero_instalador_v2.zip?token=eyJraWQiOiIzOGI4MWVmOS02Mzk5LTQzOTctOTI3My01MmZhNTUzMDczZjkiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJpbnN0YWxhZG9yL21vbnRlcm9faW5zdGFsYWRvcl92Mi56aXAiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzkxMTkxMTk5LCJleHAiOjE3OTMwMDU1OTl9.4Hc7vKix3kE2oAshTjAMr_4BRua6CWECr4c_jOS_33c'
 $tmp = Join-Path $env:TEMP 'montero_instalador'
 if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
 New-Item -ItemType Directory -Path $tmp | Out-Null

@@ -329,8 +329,8 @@ details.raw pre{background:#0f172a;color:#cbd5e1;padding:14px;border-radius:10px
     <div class="login-h">Acceso al panel</div>
     <div class="login-sub">Gestión de facturas · Montero Alquiler</div>
     <div class="login-field">
-      <label for="l-email">Correo electrónico</label>
-      <input type="email" id="l-email" placeholder="usuario@montero.com" autocomplete="username">
+      <label for="l-email">Usuario o correo</label>
+      <input type="text" id="l-email" placeholder="paqui" autocomplete="username" autocapitalize="none" spellcheck="false">
     </div>
     <div class="login-field">
       <label for="l-pass">Contraseña</label>
@@ -361,6 +361,7 @@ details.raw pre{background:#0f172a;color:#cbd5e1;padding:14px;border-radius:10px
     <div class="side-foot">
       <button class="logout-btn" id="btn-leyenda" title="Qué significa cada estado" style="margin:0 0 8px"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Leyenda</button>
       <div class="user-email" id="user-email-lbl"></div>
+      <button class="logout-btn" id="btn-perfil" title="Ver tus datos y cambiar la contraseña" style="margin:0"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Mi perfil</button>
       <button class="logout-btn" onclick="doLogout()"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Cerrar sesión</button>
       <div style="margin-top:8px"><span class="dot" id="conn-dot"></span><span id="conn-txt">Conectado</span></div>
     </div>
@@ -414,11 +415,12 @@ function loadSession(){try{const s=localStorage.getItem(SESSION_KEY);if(s)_sessi
 function getToken(){return _session?.access_token||null;}
 
 async function doLogin(){
-  const email=$('#l-email').value.trim();
+  let email=$('#l-email').value.trim().toLowerCase();
+  if(email&&!email.includes('@'))email+=DOMINIO_USUARIOS;
   const pass=$('#l-pass').value;
   const btn=$('#l-btn');
   $('#l-err').textContent='';
-  if(!email||!pass){$('#l-err').textContent='Introduce correo y contraseña.';return;}
+  if(!email||!pass){$('#l-err').textContent='Introduce usuario y contraseña.';return;}
   btn.disabled=true;btn.textContent='Entrando…';
   try{
     const r=await fetch(`${SB_URL}/auth/v1/token?grant_type=password`,{
@@ -427,7 +429,7 @@ async function doLogin(){
       body:JSON.stringify({email,password:pass})
     });
     const data=await r.json();
-    if(!r.ok)throw new Error(data.error_description||data.msg||'Credenciales incorrectas');
+    if(!r.ok)throw new Error(data.error_code==='invalid_credentials'?'Usuario o contraseña incorrectos':(data.error_description||data.msg||'Credenciales incorrectas'));
     saveSession(data);
     showApp();
     loadAll();
@@ -461,7 +463,76 @@ async function doLogout(){
 }
 
 function showLogin(){$('#login-overlay').classList.remove('hidden');$('#l-email').value='';$('#l-pass').value='';$('#l-err').textContent='';}
-function showApp(){$('#login-overlay').classList.add('hidden');const em=_session?.user?.email||'';$('#user-email-lbl').textContent=em;}
+function showApp(){
+  $('#login-overlay').classList.add('hidden');
+  const u=_session?.user||{};
+  $('#user-email-lbl').textContent=u.user_metadata?.nombre||u.email||'';
+  if(u.user_metadata?.cambiar_clave)openPerfil(true);
+}
+
+/* ---------- mi perfil ---------- */
+// Los usuarios del panel entran con un nombre corto («paqui»); por debajo
+// Supabase necesita un correo, así que se completa con este dominio interno.
+const DOMINIO_USUARIOS='@montero.local';
+function openPerfil(primeraVez){
+  const u=_session?.user||{};
+  const usuario=(u.email||'').endsWith(DOMINIO_USUARIOS)?u.email.slice(0,-DOMINIO_USUARIOS.length):(u.email||'');
+  $('#ov').classList.add('open');$('#drawer').classList.add('open');
+  $('#dr-head').innerHTML=`<div><div class="dr-title">Mi perfil</div><div class="dr-sub">${esc(u.user_metadata?.nombre||usuario)}</div></div><button class="x" id="dr-close">${svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>')}</button>`;
+  $('#dr-close').onclick=closeDrawer;
+  $('#dr-body').innerHTML=`
+    <div class="dr-sec">
+      <div class="dr-sec-t">Datos</div>
+      <div style="font-size:13px;color:var(--ink-2);line-height:1.9">
+        <div><b>Nombre:</b> ${esc(u.user_metadata?.nombre||'—')}</div>
+        <div><b>Usuario para entrar:</b> ${esc(usuario)}</div>
+      </div>
+    </div>
+    <div class="dr-sec">
+      <div class="dr-sec-t">Cambiar contraseña</div>
+      ${primeraVez?`<div style="font-size:13px;padding:10px 12px;border-radius:9px;background:var(--amber-s);color:var(--ink-2);margin-bottom:12px">Estás usando la contraseña inicial. Pon una tuya para que nadie más pueda entrar con tu usuario.</div>`:''}
+      <div class="login-field"><label for="p-nueva">Nueva contraseña</label><input type="password" id="p-nueva" autocomplete="new-password" placeholder="Mínimo 12 caracteres"></div>
+      <div id="p-reglas" style="font-size:12px;color:var(--muted);margin:-8px 0 14px;line-height:1.7"></div>
+      <div class="login-field"><label for="p-repite">Repite la nueva contraseña</label><input type="password" id="p-repite" autocomplete="new-password"></div>
+      <button class="act-btn ok" id="p-guardar">Guardar contraseña</button>
+      <div class="login-err" id="p-err" style="text-align:left"></div>
+    </div>`;
+  $('#p-guardar').onclick=cambiarClave;
+  const pinta=()=>{$('#p-reglas').innerHTML=REGLAS_CLAVE.map(([t,f])=>`<div style="color:${f($('#p-nueva').value)?'var(--green,#16a34a)':'var(--muted)'}">${f($('#p-nueva').value)?'✓':'○'} ${t}</div>`).join('');};
+  $('#p-nueva').oninput=pinta;pinta();
+  setTimeout(()=>$('#p-nueva')?.focus(),300);
+}
+// Lo que exige Supabase en este proyecto (Auth → Password requirements).
+const REGLAS_CLAVE=[
+  ['Al menos 12 caracteres',v=>v.length>=12],
+  ['Una letra minúscula',v=>/[a-z]/.test(v)],
+  ['Una letra mayúscula',v=>/[A-Z]/.test(v)],
+  ['Un número',v=>/[0-9]/.test(v)],
+  ['Un símbolo (por ejemplo ! . - _ @)',v=>/[^A-Za-z0-9]/.test(v)],
+];
+async function cambiarClave(){
+  const nueva=$('#p-nueva').value,rep=$('#p-repite').value,err=$('#p-err'),btn=$('#p-guardar');
+  err.textContent='';
+  const falta=REGLAS_CLAVE.filter(([,f])=>!f(nueva)).map(([t])=>t.toLowerCase());
+  if(falta.length){err.textContent='Falta: '+falta.join(', ')+'.';return;}
+  if(nueva!==rep){err.textContent='Las dos contraseñas no coinciden.';return;}
+  btn.disabled=true;btn.textContent='Guardando…';
+  const enviar=()=>fetch(`${SB_URL}/auth/v1/user`,{method:'PUT',
+    headers:{'apikey':SB_ANON,'Authorization':`Bearer ${getToken()}`,'Content-Type':'application/json'},
+    body:JSON.stringify({password:nueva,data:{cambiar_clave:false}})});
+  try{
+    let r=await enviar();
+    if(r.status===401&&await refreshToken())r=await enviar();
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){
+      const m={same_password:'La nueva contraseña tiene que ser distinta de la actual.',weak_password:'Contraseña demasiado débil: mínimo 12 caracteres con mayúscula, minúscula, número y símbolo.',reauthentication_needed:'Cierra sesión, vuelve a entrar y repite el cambio.'};
+      throw new Error(m[d.error_code]||d.msg||d.error_description||'No se pudo cambiar la contraseña');
+    }
+    if(d.id)saveSession({..._session,user:d});
+    closeDrawer();toast('Contraseña cambiada');
+  }catch(e){err.textContent=e.message;}
+  finally{btn.disabled=false;btn.textContent='Guardar contraseña';}
+}
 
 const state={view:'resumen',dias:0,desde:'',hasta:'',verEliminadas:false,facturas:[],incidencias:[],proveedoresBD:[],search:'',fProv:'',fEstado:'',fPago:[],provSel:null,quickFilter:'',sort:{k:'fecha',dir:-1}};
 let chartMes=null;
@@ -2273,6 +2344,7 @@ $('#btn-export').onclick=exportExcel;
 $('#btn-export-as400').onclick=exportAS400;
 $('#btn-descargar-docs').onclick=descargarDocumentos;
 $('#btn-leyenda').onclick=openLegend;
+$('#btn-perfil').onclick=()=>openPerfil(false);
 function aplicarMenu(off){
   document.body.classList.toggle('side-off',off);
   $('#btn-side-txt').textContent=off?'Mostrar menú':'Ocultar menú';

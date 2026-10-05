@@ -1,7 +1,24 @@
 {
   "headers": [
-    { "source": "/instalar.ps1", "headers": [
-      { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
-      { "key": "Cache-Control", "value": "no-store" } ] }
+    {
+      "source": "/instalar.ps1",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/paquete.zip",
+      "destination": "https://kehamwcxejrgaqsjlhig.supabase.co/storage/v1/object/sign/instalador/montero_instalador.zip?token=eyJraWQiOiIzOGI4MWVmOS02Mzk5LTQzOTctOTI3My01MmZhNTUzMDczZjkiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJpbnN0YWxhZG9yL21vbnRlcm9faW5zdGFsYWRvci56aXAiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzkxMTQ3OTk3LCJleHAiOjE3OTI5NjIzOTd9.wwNvBzjlii88GNIJISwDu1E9VZPzBon2pbd8ID2Otfc",
+      "permanent": false
+    }
   ]
 }

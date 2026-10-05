@@ -1505,7 +1505,7 @@ function tablaFacturas(ff,full){
 function viewAprobadas(){
   const ff=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada)
     .sort((a,b)=>String(a.json_extraccion_ia._aprobada_pago.fecha||'').localeCompare(String(b.json_extraccion_ia._aprobada_pago.fecha||'')));
-  if(!ff.length)return`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">No hay facturas aprobadas pendientes de pago</p><small>Cuando pulses «Aprobar para pago» en una factura, aparecerá aquí</small></div></div>`;
+  if(!ff.length)return`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">No hay facturas aprobadas pendientes de pago</p><small>Cuando pulses «APROBADA PAGAR» en una factura, aparecerá aquí</small></div></div>`;
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
   const rows=ff.map(f=>{const a=f.json_extraccion_ia._aprobada_pago;return `<tr data-id="${f.id}">
       <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
@@ -1678,7 +1678,7 @@ async function openDrawer(id){
       ${f.estado==='CONTABILIZADA'?`<button class="act-btn del" data-act="VALIDADA" data-id="${f.id}" title="Deshacer: volver a dejarla pendiente de contabilizar">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer contabilizada</button>`:''}
       ${!f.json_extraccion_ia?._pago?(f.json_extraccion_ia?._aprobada_pago
         ?`<button class="act-btn del" data-desaprobar="${f.id}" title="Deshacer la aprobación: vuelve a su sitio en el listado de facturas">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer aprobación</button>`
-        :`<button class="act-btn cont" data-aprobar="${f.id}" title="Aprobarla para pago: pasa a la sección «Aprobadas»">${svg(ICN.check)}Aprobar para pago</button>`):''}
+        :`<button class="act-btn cont" data-aprobar="${f.id}" style="white-space:nowrap" title="Aprobarla para pago: pasa a la sección «Aprobadas»">${svg(ICN.check)}APROBADA PAGAR</button>`):''}
       ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Marcar como pagada por transferencia bancaria">${svg(ICN.card)}Pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
       <button class="act-btn cont" data-manual="${f.id}" title="Subir un albarán, un pedido u otro papel que esté guardado en otro sitio y ponerlo con esta factura">${svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>')}Añadir manualmente</button>
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>

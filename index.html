@@ -1505,16 +1505,16 @@ function tablaFacturas(ff,full){
 /* ---------- APROBADAS PARA PAGO ---------- */
 function viewAprobadas(){
   const ff=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada)
-    .sort((a,b)=>String(a.json_extraccion_ia._aprobada_pago.fecha||'').localeCompare(String(b.json_extraccion_ia._aprobada_pago.fecha||'')));
+    .sort((a,b)=>(new Date(a.json_extraccion_ia._aprobada_pago.fecha||0)-new Date(b.json_extraccion_ia._aprobada_pago.fecha||0))||String(a.fecha_factura||'').localeCompare(String(b.fecha_factura||'')));
   if(!ff.length)return`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">No hay facturas aprobadas pendientes de pago</p><small>Cuando pulses «APROBADA PAGAR» en una factura, aparecerá aquí</small></div></div>`;
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
   const rows=ff.map(f=>{const a=f.json_extraccion_ia._aprobada_pago;return `<tr data-id="${f.id}">
+      <td class="mono cell-strong" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)} <span style="color:var(--faint);font-weight:400">${a.fecha?new Date(a.fecha).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):''}</span></td>
       <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
       <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span></div></td>
       <td style="font-size:12.5px">${esc(formaPago(f).texto)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
-      <td class="mono" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)}</td>
       <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span></td>
       <td style="text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">${svg(ICN.card)}Pagada</button>
         <button class="act-btn del" data-desaprobar-fila="${f.id}" title="Vuelve a su sitio en el listado de facturas" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">Deshacer aprobación</button></div></td>
@@ -1524,7 +1524,7 @@ function viewAprobadas(){
     <div class="kpi"><div class="kpi-top"><div class="kpi-ic blue">${svg(ICN.euro)}</div></div><div class="kpi-val">${eurS(total)}</div><div class="kpi-lbl">Total a pagar</div></div>
   </div>
   <div class="card"><div class="tbl-wrap"><table><thead><tr>
-    <th>Fecha fra.</th><th>Nº Factura</th><th>Proveedor</th><th>Forma de pago</th><th class="r">Total</th><th>Aprobada</th><th>Estado</th><th></th>
+    <th>Aprobada ▲</th><th>Fecha fra.</th><th>Nº Factura</th><th>Proveedor</th><th>Forma de pago</th><th class="r">Total</th><th>Estado</th><th></th>
   </tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 

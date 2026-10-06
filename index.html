@@ -2487,7 +2487,11 @@ async function exportAS400(){
       ia._irpf?.importe || ia.factura?.importes?.irpf?.importe || f.importe_irpf||''
     ];
     for(let i=0;i<10;i++) base.push(albs[i]||'');
-    rows.push(base.map(v=>v==null||v===''||(typeof v==='number'&&isNaN(v))?0:v));
+    // Paqui, 06/10/2026: vacía y numérica → 0; vacía y de texto → en blanco.
+    // Numéricas son los importes y los tipos (base, IVA, total, IRPF); los
+    // códigos y números de documento (pedido, albaranes…) son texto.
+    const AS400_NUM=new Set([9,10,11,12,13,14,15,16,22,23]);
+    rows.push(base.map((v,i)=>v==null||v===''||(typeof v==='number'&&isNaN(v))?(AS400_NUM.has(i)?0:''):v));
   });
   const ws=XLSX.utils.aoa_to_sheet([head,...rows]);
   ws['!cols']=[{wch:12},{wch:12},{wch:28},{wch:12},{wch:13},{wch:16},{wch:14},{wch:12},{wch:12},

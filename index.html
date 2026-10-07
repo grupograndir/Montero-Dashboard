@@ -2383,6 +2383,7 @@ function exportExcel(){
   const rows=ff.map(f=>{
     const ia=f.json_extraccion_ia||{};
     const prov=ia.proveedor||{};
+    const albs=albaranesConFecha(ia);
     let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva:[];
     if(!d.length) d=[{tipo:f.porcentaje_iva||0, base:f.base_imponible, cuota:f.importe_iva}];
     const iva=d[0]||{};

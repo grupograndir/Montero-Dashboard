@@ -2383,7 +2383,6 @@ function exportExcel(){
   const rows=ff.map(f=>{
     const ia=f.json_extraccion_ia||{};
     const prov=ia.proveedor||{};
-    const albs=albaranesConFecha(ia);
     let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva:[];
     if(!d.length) d=[{tipo:f.porcentaje_iva||0, base:f.base_imponible, cuota:f.importe_iva}];
     const iva=d[0]||{};
@@ -2449,7 +2448,6 @@ async function exportAS400(){
   ff.forEach(f=>{
     const ia=f.json_extraccion_ia||{};
     const prov=ia.proveedor||{};
-    const albs=albaranesConFecha(ia);
     let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva:[];
     if(!d.length && ia.factura?.importes?.desglose_iva) d=ia.factura.importes.desglose_iva;
     if(!d.length){
@@ -2486,7 +2484,10 @@ async function exportAS400(){
       ia._irpf?.pct || ia.factura?.importes?.irpf?.pct || f.importe_irpf||'',
       ia._irpf?.importe || ia.factura?.importes?.irpf?.importe || f.importe_irpf||''
     ];
-    for(let i=0;i<10;i++) base.push(albs[i]||'');
+    // Paqui, 07/10/2026: el albarán va solo con sus cifras, sin prefijo, símbolos
+    // ni fecha, porque cada delegación lo graba a su manera en el AS400.
+    const albNum=(Array.isArray(ia._albaranes)?ia._albaranes:[]).map(n=>String(n||'').replace(/\D/g,'')).filter(Boolean);
+    for(let i=0;i<10;i++) base.push(albNum[i]||'');
     // Paqui, 06/10/2026: vacía y numérica → 0; vacía y de texto → en blanco.
     // Numéricas son los importes y los tipos (base, IVA, total, IRPF); los
     // códigos y números de documento (pedido, albaranes…) son texto.

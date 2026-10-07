@@ -2472,7 +2472,7 @@ async function exportAS400(){
       dt(f.fecha_factura||f.fecha_recepcion),
       prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'',nombreProv(f),nifLimpio(nifProv(f)),
       homologacionDe(f),
-      f.numero_factura||'',numeroPedido(f),
+      String(f.numero_factura||'').replace(/[^A-Za-z0-9]/g,''),numeroPedido(f),
       ia._ambito_iva||'NACIONAL',delegacionCiudad(f),
       f.base_imponible||'',
       ...col(0),...col(10),...col(21),

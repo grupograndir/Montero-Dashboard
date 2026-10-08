@@ -818,8 +818,9 @@ async function loadAll(){
     if(e instanceof SesionCaducada){clearSession();showLogin();return;}
     console.error(e);setConn(false,e.message);state.facturas=[];}
   try{
-    state.proveedoresBD=await api(`proveedores?select=nombre,nif_cif,codigo_proveedor,cuenta_contable,tipo_hoja,actividad`);
+    state.proveedoresBD=await api(`proveedores?select=id,nombre,nif_cif,codigo_proveedor,cuenta_contable,tipo_hoja,actividad`);
   }catch(e){console.error(e);state.proveedoresBD=[];}
+  _codCache.clear();
   // Documentos que han llegado y no están puestos con ninguna factura: ni son la
   // factura ni figuran como su respaldo. Es lo que antes solo se veía leyendo un
   // log en el ordenador donde corre el proceso.
@@ -908,6 +909,29 @@ function codigoProveedorPorNombre(nombre){
   const p=proveedorBD(nombre);
   return p?p.codigo_proveedor||null:null;
 }
+// El proveedor del maestro para una factura: por nombre y, si no casa, por NIF
+// (una sola candidata, por lo mismo que en proveedorBD).
+function proveedorDeFactura(f){
+  const p=proveedorBD(nombreProv(f));
+  if(p)return p;
+  const nif=nifLimpio(nifProv(f)||'');
+  if(!nif)return null;
+  const c=(state.proveedoresBD||[]).filter(x=>nifLimpio(x.nif_cif||'')===nif);
+  return c.length===1?c[0]:null;
+}
+// Código AS400 de la factura. Se guarda por nombre+NIF: la tabla lo pide en cada
+// fila y buscar en el maestro cada vez es lento con mil facturas.
+const _codCache=new Map();
+function codigoProv(f){
+  const ia=f.json_extraccion_ia||{};
+  if((ia.proveedor||{}).codigo_si_aparece)return String(ia.proveedor.codigo_si_aparece);
+  const k=nombreProv(f)+'|'+(nifProv(f)||'');
+  if(!_codCache.has(k))_codCache.set(k,String((proveedorDeFactura(f)||{}).codigo_proveedor||''));
+  return _codCache.get(k);
+}
+function badgeSinCodigo(f){
+  return codigoProv(f)?'':'<span class="bdg sincond" title="Proveedor sin código AS400: ábrela y escríbelo una vez">sin código</span>';
+}
 // La homologación que pide Rubén para dar el visto bueno. Ya está en el maestro
 // ("HOMOL. NAC", "HOM LOCALES"), no hay que deducirla de ningún sitio.
 // Si a este proveedor se le paga por adelantado: giro, tarjeta o al contado. Los
@@ -976,7 +1000,7 @@ function delegacionCiudad(f){
     const c=ciudadDe(t); if(c) return c;
   }
   const prov_ia=(ia.proveedor||{});
-  const cod=String(prov_ia.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'');
+  const cod=codigoProv(f);
   const nom=normProv(nombreProv(f));
   const cs=state.condiciones||[];
   const cond=(cod&&cs.find(c=>String(c.codigo)===cod))||cs.find(c=>c.nombre&&normProv(c.nombre)===nom);
@@ -1033,7 +1057,7 @@ function homologacionDe(f){
   const prov=ia.proveedor||{};
   const cs=state.condiciones||[];
   // 1. Código AS400 directo (del pedido/factura o por nombre en BD)
-  const cod=String(prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'');
+  const cod=codigoProv(f);
   if(cod){const c=cs.find(x=>String(x.codigo||'')===cod);if(c&&c.homologacion)return String(c.homologacion).toUpperCase().trim();}
   // 2. NIF → código en proveedoresBD → condiciones
   const nif=nifLimpio(nifProv(f)||'');
@@ -1338,7 +1362,7 @@ function viewResumen(){
 function colaTrabajo(ff){
   if(!ff.length)return`<div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">Todo al día</p><small>No hay facturas pendientes de revisar</small></div>`;
   const rows=ff.slice(0,8).map(f=>`<tr data-id="${f.id}">
-      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span></div></td>
+      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
       <td class="mono">${dt(f.fecha_factura)}</td>
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
@@ -1368,6 +1392,7 @@ function filtradas(){
   else if(state.quickFilter==='validadas')ff=ff.filter(f=>f.estado==='VALIDADA');
   else if(state.quickFilter==='contabilizadas')ff=ff.filter(f=>f.estado==='CONTABILIZADA');
   else if(state.quickFilter==='sincond')ff=ff.filter(sinCondiciones);
+  else if(state.quickFilter==='sincodigo')ff=ff.filter(f=>!codigoProv(f));
   else if(state.quickFilter==='mes'){const n=new Date();ff=ff.filter(f=>{const d=new Date(f.fecha_factura||f.fecha_recepcion);return !isNaN(d)&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();});}
   // El desplegable guarda la clave agrupada, no el nombre suelto: filtrar por
   // "SECODI" tiene que traer sus 4 facturas, no las 3 de una de las dos formas.
@@ -1410,7 +1435,7 @@ function viewFacturas(){
   const hay=new Set(state.facturas.map(f=>formaPago(f).tipo));
   const pagos=FORMAS_PAGO.filter(p=>hay.has(p));
   const ff=filtradas();
-  const chips=[['','Todas'],['revision','Requieren revisión'],['duplicados','Duplicados'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['sincond','Sin condiciones'],['mes','Este mes']];
+  const chips=[['','Todas'],['revision','Requieren revisión'],['duplicados','Duplicados'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['sincond','Sin condiciones'],['sincodigo','Sin código proveedor'],['mes','Este mes']];
   const chipElim=`<button class="chip ${state.verEliminadas?'active':''}" data-elim="1" title="Facturas quitadas del listado">Eliminadas</button>`;
   // Cuántas facturas están a medio comprobar. Sale aquí y no en un log del
   // servidor: si el proceso que las lee se para, el atasco se ve crecer solo. Un
@@ -1485,7 +1510,7 @@ function tablaFacturas(ff,full){
       <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
-      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span></div></td>
+      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
       ${full?(()=>{const p=formaPago(f);return `<td style="font-size:12.5px" title="${esc(p.original?'La factura dice: '+p.original:'La factura no dice cómo se paga')}${p.acordado?' · días según lo acordado con el proveedor':''}">${esc(p.texto)}</td>`;})():''}
       <td class="r cell-strong">${eur(f.total_factura)} ${warn?`<span title="Diferencia ${eur(dif)}" style="color:var(--rd)">${svg(ICN.alert).replace('viewBox','width="13" height="13" style="vertical-align:-2px" viewBox')}</span>`:''}</td>
       ${full?(()=>{const v=validacion(f),c=fechaContabilizada(f);
@@ -1516,7 +1541,7 @@ function viewAprobadas(){
       <td class="mono cell-strong" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)} <span style="color:var(--faint);font-weight:400">${a.fecha?new Date(a.fecha).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):''}</span></td>
       <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
-      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span></div></td>
+      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
       <td style="font-size:12.5px">${esc(formaPago(f).texto)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
       <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span></td>
@@ -1718,6 +1743,12 @@ async function openDrawer(id){
       <div class="kv">
         <div class="kv-item"><div class="k">Nombre</div><div class="v">${esc(nombreProv(f))}</div></div>
         <div class="kv-item"><div class="k">NIF / CIF</div><div class="v mono">${esc(nifProv(f)||'—')}</div></div>
+        <div class="kv-item" style="grid-column:1/-1"><div class="k">Código de proveedor (AS400)</div>
+          ${codigoProv(f)?'':`<div style="margin:4px 0 6px;padding:8px 10px;border-radius:8px;background:var(--amber-s);color:var(--amber);font-size:12px;font-weight:600">Proveedor sin código AS400: en el Excel del AS400 saldrá en blanco. Escríbelo aquí una vez y valdrá para todas sus facturas.</div>`}
+          <div class="v" style="display:flex;gap:8px;align-items:center;margin-top:2px">
+            <input id="inp-cod-prov" type="text" inputmode="numeric" style="flex:1;padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit" value="${esc(codigoProv(f))}" placeholder="Ej: 5613">
+            <button onclick="guardarCodigoProveedor('${f.id}')" style="padding:6px 14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;white-space:nowrap;font-weight:600">Guardar</button>
+          </div></div>
         <div class="kv-item"><div class="k">Fecha factura</div><div class="v">${dt(f.fecha_factura)}</div></div>
         <div class="kv-item"><div class="k">Recibida</div><div class="v">${dt(f.fecha_recepcion)}</div></div>
       </div>
@@ -2141,6 +2172,22 @@ async function guardarObservaciones(id){
   if(aviso)aviso.textContent=txt?'guardado':'observaciones borradas';
   refreshTabla();
 }
+async function guardarCodigoProveedor(id){
+  const f=state.facturas.find(x=>x.id===id);if(!f)return;
+  const val=(($('#inp-cod-prov')||{}).value||'').trim();
+  if(!/^\d{1,8}$/.test(val)){toast('El código de proveedor solo lleva números','err');return;}
+  const p=proveedorDeFactura(f);
+  const nom=nombreProv(f);
+  const tok=getToken()||SB_ANON;
+  const r=await fetch(`${SB_URL}/rest/v1/rpc/asignar_codigo_proveedor`,{method:'POST',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+    body:JSON.stringify({p_id:p&&p.id||null,p_nombre:nom==='Sin identificar'?null:nom,p_nif:nifProv(f)||null,p_codigo:val})});
+  const data=await r.json().catch(()=>null);
+  if(!r.ok||!data||!data.id){toast(data&&data.message||'No se pudo guardar — vuelve a iniciar sesión','err');return;}
+  try{state.proveedoresBD=await api(`proveedores?select=id,nombre,nif_cif,codigo_proveedor,cuenta_contable,tipo_hoja,actividad`);}catch(e){console.error(e);}
+  _codCache.clear();
+  toast(data.otros?`Código ${val} guardado. Ojo: ${data.otros} también tiene ese código`:`Código ${val} guardado para todas las facturas de ${data.nombre}`);
+  refreshTabla();openDrawer(id);
+}
 async function guardarPedidoMontero(id){
   const val=($('#inp-pedido-montero')||{}).value||'';
   const tok=getToken()||SB_ANON;
@@ -2392,7 +2439,7 @@ function exportExcel(){
     if(!d.length) d=[{tipo:f.porcentaje_iva||0, base:f.base_imponible, cuota:f.importe_iva}];
     const iva=d[0]||{};
     const row=[
-      prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'', nombreProv(f), nifLimpio(nifProv(f)),
+      codigoProv(f), nombreProv(f), nifLimpio(nifProv(f)),
       homologacionPorNIF(nifProv(f))||homologacionPorNombre(nombreProv(f))||'', cuentaContablePorNombre(nombreProv(f))||'',
       f.numero_factura||'', dt(f.fecha_factura||f.fecha_recepcion),
       numeroPedido(f),
@@ -2432,9 +2479,11 @@ async function exportAS400(){
                       :'No hay facturas para exportar'),'err');
     return;
   }
-  if(!confirm(rehacer
+  const sinCod=ff.filter(f=>!codigoProv(f)).length;
+  const avisoCod=sinCod?`\n\nOjo: ${sinCod} factura${sinCod!==1?'s':''} sin código de proveedor (saldrá en blanco). Filtro "Sin código proveedor" para completarlas.`:'';
+  if(!confirm((rehacer
       ?`Se volverá a descargar el Excel de ${ff.length} factura${ff.length!==1?'s':''} ya contabilizada${ff.length!==1?'s':''}, con el ZIP de sus PDF.\nNo cambia nada: es solo una copia del mismo fichero.\n\n¿Continuar?`
-      :`Se exportarán ${ff.length} factura${ff.length!==1?'s':''} al AS400${AUTO_CONTABILIZAR?' y pasarán a CONTABILIZADAS':'. Seguirán como validadas hasta que las marques como contabilizadas'}.\nCon el Excel se descarga un ZIP con el PDF de cada factura (solo las hojas de factura, sin pedido ni albarán) para el registro de IVA soportado.${excluidas?`\nSe excluyen ${excluidas} (duplicadas, rechazadas o en revisión).`:''}\n\nPodrás volver a descargar este Excel cuando quieras desde el filtro "Contabilizadas".\n\n¿Continuar?`))return;
+      :`Se exportarán ${ff.length} factura${ff.length!==1?'s':''} al AS400${AUTO_CONTABILIZAR?' y pasarán a CONTABILIZADAS':'. Seguirán como validadas hasta que las marques como contabilizadas'}.\nCon el Excel se descarga un ZIP con el PDF de cada factura (solo las hojas de factura, sin pedido ni albarán) para el registro de IVA soportado.${excluidas?`\nSe excluyen ${excluidas} (duplicadas, rechazadas o en revisión).`:''}\n\nPodrás volver a descargar este Excel cuando quieras desde el filtro "Contabilizadas".\n\n¿Continuar?`)+avisoCod))return;
   if(btn)btn.disabled=true;
   try{
   // Estado y fecha de descarga van DENTRO del fichero, no solo en el panel. Lo
@@ -2474,7 +2523,7 @@ async function exportAS400(){
     const col=t=>ivaMap[t].on?[t+'%',ivaMap[t].cuota]:['',''];
     const base=[
       dt(f.fecha_factura||f.fecha_recepcion),
-      prov.codigo_si_aparece||codigoProveedorPorNombre(nombreProv(f))||'',nombreProv(f),nifLimpio(nifProv(f)),
+      codigoProv(f),nombreProv(f),nifLimpio(nifProv(f)),
       homologacionDe(f),
       String(f.numero_factura||'').replace(/[^A-Za-z0-9]/g,''),numeroPedido(f),
       ia._ambito_iva||'NACIONAL',delegacionCiudad(f),

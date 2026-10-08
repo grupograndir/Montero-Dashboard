@@ -841,11 +841,15 @@ async function loadAll(){
       // de una factura de julio o de septiembre salía como suelto. Paqui vio 422
       // "sin asignar" en agosto (23/09/2026) cuando de verdad eran unos 170, y
       // la mayoría de hoy mismo, esperando a su factura.
-      const todas=await api(`facturas_procesadas?select=id,documento_recibido_id,eliminada,numero_factura,total_factura,fecha_factura,prov:json_extraccion_ia->proveedor->>nombre,adj:json_extraccion_ia->_adjuntos,sug:json_extraccion_ia->_sugeridos&limit=20000`);
+      const todas=await api(`facturas_procesadas?select=id,documento_recibido_id,eliminada,motivo_eliminacion,numero_factura,total_factura,fecha_factura,prov:json_extraccion_ia->proveedor->>nombre,adj:json_extraccion_ia->_adjuntos,sug:json_extraccion_ia->_sugeridos&limit=20000`);
       state.todasFacturas=todas.filter(f=>!f.eliminada);
-      const propios=new Set(todas.map(f=>f.documento_recibido_id));
+      // Menos las retiradas por NO SER facturas: un albarán que entró como factura
+      // y se sacó del listado no está asignado a nada, está esperando a la suya
+      // (Leuka ATC/260812, 08/10/2026). Si contara, María no lo veía en ningún sitio.
+      const cuentan=todas.filter(f=>!(f.eliminada&&/^No es una factura/i.test(f.motivo_eliminacion||'')));
+      const propios=new Set(cuentan.map(f=>f.documento_recibido_id));
       const puestos=new Set();
-      todas.forEach(f=>(Array.isArray(f.adj)?f.adj:[]).forEach(a=>a&&a.documento_id&&puestos.add(a.documento_id)));
+      cuentan.forEach(f=>(Array.isArray(f.adj)?f.adj:[]).forEach(a=>a&&a.documento_id&&puestos.add(a.documento_id)));
       state.sueltos=docs.filter(d=>!propios.has(d.id)&&!puestos.has(d.id));
     }
   }catch(e){console.error(e);state.sueltos=null;}

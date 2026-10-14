@@ -150,11 +150,13 @@ body.side-off .sidebar{display:none}
 .tbl-ed tr.cambiada td{background:var(--amber-s)}
 .x-ayuda{padding:8px 18px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line-2)}
 .x-hoja{max-height:calc(100vh - 230px);overflow:auto}
+.x-tabla{width:max-content;min-width:100%}
+.x-hoja{overflow-x:auto;overflow-y:auto}
 .x-tabla thead tr{position:sticky;top:0;z-index:2}
 .x-tabla thead td,.x-tabla thead th{background:#fbfcfd}
 .x-tabla thead input{font-weight:700;text-transform:uppercase;font-size:11.5px}
 .x-tabla td{border-right:1px solid var(--line-2);border-bottom:1px solid var(--line-2);padding:0}
-.x-tabla input[type=text]{min-width:90px;border-radius:0}
+.x-tabla input[type=text]{min-width:0;max-width:none;border-radius:0}
 .x-tabla td.x-mal input{background:var(--rd-s);color:var(--rd);font-weight:700}
 .x-num{position:sticky;left:0;z-index:1;background:#fbfcfd;font-size:11px;color:var(--faint);padding:0 6px;white-space:nowrap;text-align:right;border-right:1px solid var(--line)}
 .x-num .x-acc{display:none;margin-left:4px}
@@ -3502,9 +3504,12 @@ function viewExcel(){
   const ancho=Math.max(1,...filas.map(f=>f.length));
   const iHom=(filas[0]||[]).findIndex(c=>HOM_COL.test(cabNorm(c)));
   const q=String(state.excelBuscar||'').toLowerCase().trim();
+  // Cada columna tan ancha como su texto más largo (como «autoajustar» en Excel),
+  // para que no se corte nada; la tabla se desliza a lo ancho si no cabe.
+  const anchoCol=Array.from({length:ancho},(_,c)=>Math.min(80,Math.max(5,...filas.map(f=>String(f[c]??'').length))));
   const celda=(r,c,v)=>{
     const mal=r>0&&c===iHom&&String(v||'').trim()&&!HOM_OK.test(String(v).toUpperCase().replace(/\s+/g,''));
-    return `<td${mal?' class="x-mal" title="La homologación va siempre con siglas: HNR, HNG, HLGV…"':''}><input type="text" data-x="${r}" data-c="${c}" value="${esc(v??'')}"></td>`;
+    return `<td${mal?' class="x-mal" title="La homologación va siempre con siglas: HNR, HNG, HLGV…"':''}><input type="text" data-x="${r}" data-c="${c}" value="${esc(v??'')}" style="width:${Math.ceil(anchoCol[c]*1.15)+2}ch" title="${esc(v??'')}"></td>`;
   };
   const filaHtml=(f,r)=>{
     const vis=!q||r===0||f.join(' ').toLowerCase().includes(q);

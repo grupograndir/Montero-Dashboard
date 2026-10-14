@@ -158,10 +158,8 @@ body.side-off .sidebar{display:none}
 .x-tabla td{border-right:1px solid var(--line-2);border-bottom:1px solid var(--line-2);padding:0}
 .x-tabla input[type=text]{min-width:0;max-width:none;border-radius:0}
 .x-tabla td.x-mal input{background:var(--rd-s);color:var(--rd);font-weight:700}
-.x-num{position:sticky;left:0;z-index:1;background:#fbfcfd;font-size:11px;color:var(--faint);padding:0 6px;white-space:nowrap;text-align:right;border-right:1px solid var(--line)}
-.x-num .x-acc{display:none;margin-left:4px}
-.x-num .x-acc .btn-s{height:20px;padding:0 6px;font-size:11px}
-.x-tabla tr:hover .x-acc{display:inline-flex;gap:3px}
+.x-eliminar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 18px;border-bottom:1px solid var(--line-2);background:var(--rd-s);font-size:13px}
+.x-eliminar input{flex:1 1 22rem;height:32px;padding:0 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit}
 .x-libro.x-completo{position:fixed;inset:0;z-index:300;margin:0;border-radius:0;display:flex;flex-direction:column}
 .x-libro.x-completo .x-hoja{max-height:none;flex:1}
 .x-libro:fullscreen{background:var(--card);display:flex;flex-direction:column}
@@ -3513,14 +3511,14 @@ function viewExcel(){
   };
   const filaHtml=(f,r)=>{
     const vis=!q||r===0||f.join(' ').toLowerCase().includes(q);
-    return `<tr data-xr="${r}" ${vis?'':'style="display:none"'}><th class="x-num">${r===0?'':r}${r===0?'':`<span class="x-acc"><button class="btn-s" data-xadd="${r}" title="Insertar un proveedor debajo">+</button><button class="btn-s" data-xdel="${r}" title="Quitar esta fila">×</button></span>`}</th>
-      ${Array.from({length:ancho},(_,c)=>celda(r,c,f[c])).join('')}</tr>`;
+    return `<tr data-xr="${r}" ${vis?'':'style="display:none"'}>${Array.from({length:ancho},(_,c)=>celda(r,c,f[c])).join('')}</tr>`;
   };
   return `<div class="card x-libro ${state.excelCompleto?'x-completo':''}" id="x-libro">
     <div class="filtros">
       ${hojas.map((x,i)=>`<button class="chip ${i===hi?'active':''}" data-xhoja="${i}">${esc(x.nombre)}</button>`).join('')}
       <div class="search" style="margin-left:6px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="x-buscar" placeholder="Buscar proveedor, código…" value="${esc(state.excelBuscar||'')}"></div>
       <button class="btn-s" id="x-fila">Añadir proveedor</button>
+      <button class="btn-s" id="x-quitar">Eliminar proveedor</button>
       <button class="btn-s" id="x-col">Añadir columna</button>
       <button class="btn-s" id="x-full">${state.excelCompleto?'Salir de pantalla completa':'Pantalla completa'}</button>
       <label class="btn-s" style="display:inline-flex;align-items:center">Subir otro Excel<input type="file" id="x-imp" accept=".xlsx,.xls" style="display:none"></label>
@@ -3528,6 +3526,19 @@ function viewExcel(){
       <span style="margin-left:auto;font-size:12px;color:var(--muted)">${esc(state.excel.fichero||'')}${state.excelFecha?` · guardado ${dtL(state.excelFecha)}`:''}${state.excelSucio?' · <b style="color:var(--amber)">cambios sin guardar</b>':''}</span>
       <button class="btn-s" id="x-deshacer" ${state.excelSucio?'':'disabled'}>Deshacer</button>
       <button class="btn-s ok" id="x-guardar" ${state.excelSucio?'':'disabled'}>Guardar cambios</button>
+    </div>
+    <div id="x-eliminar" class="x-eliminar" style="display:none">
+      <b>Eliminar proveedor de la hoja «${esc(h.nombre)}»</b>
+      <input id="x-eli-buscar" list="dl-xprov" placeholder="Escribe el nombre o el código y elígelo de la lista">
+      <datalist id="dl-xprov">${(()=>{
+        const cab=(filas[0]||[]).map(cabNorm);
+        const iN=cab.findIndex(c=>/^(PROVEEDORES|PROVEEDOR|HOMOLOGADOS ANTIGUOS|NOMBRE|RAZON SOCIAL)$/.test(c));
+        const iC=cab.findIndex(c=>/^(CODIGO|COD PROVEEDOR|CODIGO PROVEEDOR|COD)$/.test(c));
+        state.excelOpcEliminar=new Map();
+        return filas.slice(1).map((f,i)=>{const n=String(f[iN]??'').trim();if(!n)return '';
+          const et=`${n}${iC>=0&&String(f[iC]??'').trim()?' · '+String(f[iC]).trim():''} (fila ${i+1})`;
+          state.excelOpcEliminar.set(et,i+1);return `<option value="${esc(et)}"></option>`;}).join('');})()}</datalist>
+      <button class="btn-s rojo" id="x-eli-ok">Eliminar</button><button class="btn-s" id="x-eli-no">Cancelar</button>
     </div>
     <div class="x-ayuda">Es el Excel de proveedores homologados, igual que en Excel. Lo que guardes aquí lo usa el sistema al momento: homologación (siempre con siglas), código AS400, si lleva pedido y albarán, quién valida la factura (AUT FRA), forma de pago… Los proveedores nuevos se dan de alta solos al guardar.</div>
     <div class="tbl-wrap x-hoja"><table class="tbl-ed x-tabla"><thead>${filaHtml(filas[0]||[],0)}</thead>
@@ -3545,7 +3556,7 @@ function bindExcel(){
     const td=el.parentElement,ic=(f[0]||[]).findIndex(x=>HOM_COL.test(cabNorm(x)));
     if(r>0&&c===ic)td.classList.toggle('x-mal',!!el.value.trim()&&!HOM_OK.test(el.value.toUpperCase().replace(/\s+/g,'')));
   });
-  libro.querySelectorAll('[data-xhoja]').forEach(b=>b.onclick=()=>{state.excelHoja=+b.dataset.xhoja;render();});
+  libro.querySelectorAll('[data-xhoja]').forEach(b=>b.onclick=()=>{state.excelHoja=+b.dataset.xhoja;state.excelScroll=null;render();});
   const bu=$('#x-buscar');if(bu)bu.oninput=e=>{
     state.excelBuscar=e.target.value;const q=e.target.value.toLowerCase().trim();
     libro.querySelectorAll('tbody tr[data-xr]').forEach(tr=>{
@@ -3555,12 +3566,21 @@ function bindExcel(){
   const nuevaFila=r=>{const f=h().filas,ancho=Math.max(1,...f.map(x=>x.length));f.splice(r+1,0,Array(ancho).fill(''));sucio();
     state.excelBuscar='';render();
     const inp=document.querySelector(`#x-libro tr[data-xr="${r+1}"] input`);if(inp){inp.scrollIntoView({block:'center'});inp.focus();}};
-  libro.querySelectorAll('[data-xadd]').forEach(b=>b.onclick=()=>nuevaFila(+b.dataset.xadd));
-  libro.querySelectorAll('[data-xdel]').forEach(b=>b.onclick=()=>{
-    const r=+b.dataset.xdel,f=h().filas[r]||[];
-    const nom=f.filter(x=>String(x).trim()).slice(0,4).join(' · ')||'(fila vacía)';
-    if(!confirm(`¿Quitar esta fila del Excel?\n\n${nom}`))return;
-    h().filas.splice(r,1);sucio();render();});
+  // Eliminar: se busca el proveedor por nombre o código y se quita su fila.
+  const caja=$('#x-eliminar');
+  $('#x-quitar').onclick=()=>{caja.style.display=caja.style.display==='none'?'':'none';if(caja.style.display==='')$('#x-eli-buscar').focus();};
+  $('#x-eli-no').onclick=()=>{caja.style.display='none';};
+  $('#x-eli-ok').onclick=()=>{
+    const r=(state.excelOpcEliminar||new Map()).get($('#x-eli-buscar').value.trim());
+    if(!r){toast('Elige el proveedor de la lista','err');return;}
+    const f=h().filas[r]||[];
+    const nom=f.filter(x=>String(x).trim()).slice(0,4).join(' · ');
+    if(!confirm(`¿Eliminar este proveedor del Excel?\n\n${nom}\n\nNo se aplica hasta que pulses «Guardar cambios».`))return;
+    h().filas.splice(r,1);sucio();render();toast('Proveedor quitado. Pulsa «Guardar cambios» para aplicarlo');};
+  // La hoja no se mueve sola: al repintar se queda donde estaba.
+  const hoja=libro.querySelector('.x-hoja');
+  if(hoja){if(state.excelScroll){hoja.scrollTop=state.excelScroll.t;hoja.scrollLeft=state.excelScroll.l;}
+    hoja.onscroll=()=>{state.excelScroll={t:hoja.scrollTop,l:hoja.scrollLeft};};}
   $('#x-fila').onclick=()=>nuevaFila(h().filas.length-1);
   $('#x-col').onclick=()=>{const n=prompt('Título de la columna nueva');if(!n)return;
     const f=h().filas,ancho=Math.max(1,...f.map(x=>x.length));

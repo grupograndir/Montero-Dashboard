@@ -120,6 +120,35 @@ body.side-off .sidebar{display:none}
 .multi-op label:hover{background:var(--bg)}
 .multi-limpiar{margin:4px 8px 2px;font-size:12px;color:var(--rd);background:none;border:0;cursor:pointer;padding:0}
 .bdg.sincond{background:transparent;color:var(--amber);border:1px solid var(--amber);margin-left:5px}
+/* Incidencias de Paqui (14/10/2026): avisos, formularios y tablas editables */
+.bdg.alerta{background:var(--rd-s);color:var(--rd);margin-left:5px}
+.bdg.domic{background:var(--violet-s);color:var(--violet);margin-left:5px}
+.act-btn.neu{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.act-btn.neu:hover{border-color:var(--ink)}
+.btn-s{height:30px;padding:0 11px;font-size:12.5px;border-radius:8px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;white-space:nowrap;font-family:inherit}
+.btn-s:hover{border-color:var(--ink)}
+.btn-s.ok{background:var(--green);border-color:var(--green);color:#fff}
+.btn-s.rojo{background:var(--rd-s);border-color:var(--rd);color:var(--rd)}
+.btn-s:disabled{opacity:.5;cursor:default}
+.aviso-sen{margin:0 0 12px;padding:11px 13px;border-radius:10px;border:1px solid var(--rd);border-left:4px solid var(--rd);background:var(--rd-s);font-size:13px;line-height:1.5;color:var(--ink-2)}
+.aviso-sen.suave{border-color:var(--amber);background:var(--amber-s)}
+.aviso-sen.bien{border-color:var(--green);background:var(--gr-s,#e8f5ee)}
+.aviso-sen .acc{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:8px 0}
+.frm label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.frm input,.frm select,.frm textarea{height:34px;padding:0 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;color:var(--ink);background:var(--card)}
+.frm textarea{height:auto;padding:8px 9px}
+.frm .ancho{grid-column:1/-1}
+.caja-extra{margin:10px 0;padding:12px;border:1px dashed var(--line);border-radius:10px;background:var(--bg)}
+.caja-extra h4{margin:0 0 6px;font-size:13.5px}
+.filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:13px 18px;border-bottom:1px solid var(--line-2)}
+.filtros input{height:34px;padding:0 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;color:var(--ink);background:var(--card)}
+.tbl-ed td{padding:3px 4px}
+.tbl-ed input[type=text]{width:100%;min-width:70px;height:28px;padding:0 6px;border:1px solid transparent;border-radius:6px;font-size:12.5px;font-family:inherit;background:transparent;color:var(--ink)}
+.tbl-ed input[type=text]:hover{border-color:var(--line)}
+.tbl-ed input[type=text]:focus{border-color:var(--ink);background:var(--card);outline:none}
+.tbl-ed tr.cambiada td{background:var(--amber-s)}
+.pag-sep{display:flex;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px;margin-bottom:5px;background:var(--card);font-size:12.5px}
 .chips-row{display:flex;gap:8px;padding:13px 18px 0;flex-wrap:wrap}
 .chip{padding:6px 14px;border-radius:20px;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--bg);border:1px solid var(--line);transition:.12s}
 .chip:hover{border-color:var(--faint);color:var(--ink)}
@@ -358,6 +387,9 @@ details.raw pre{background:#0f172a;color:#cbd5e1;padding:14px;border-radius:10px
       <button class="nav-item" data-view="sueltos" title="Albaranes, pedidos y facturas que no están asignados a ninguna factura"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Sin asignar</span><span class="ct" id="nav-sueltos">0</span></button>
       <button class="nav-item" data-view="aprobadas" title="Facturas aprobadas a mano para pago, pendientes de pagar"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Aprobadas</span><span class="ct" id="nav-aprobadas">0</span></button>
       <button class="nav-item" data-view="pagadas" title="Facturas marcadas como pagadas manualmente por Montero"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg><span>Pagadas</span><span class="ct" id="nav-pagadas">0</span></button>
+      <div class="nav-lbl">Contabilidad</div>
+      <button class="nav-item" data-view="registro" title="Registro de IVA soportado del AS400: contabiliza solas las facturas que casan"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h4"/></svg><span>Registro IVA</span></button>
+      <button class="nav-item" data-view="maestro" title="El Excel de proveedores: código AS400, homologación, delegación, quién valida, importe fijo…"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg><span>Maestro proveedores</span></button>
     </nav>
     <div class="side-foot">
       <button class="logout-btn" id="btn-leyenda" title="Qué significa cada estado" style="margin:0 0 8px"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Leyenda</button>
@@ -535,15 +567,15 @@ async function cambiarClave(){
   finally{btn.disabled=false;btn.textContent='Guardar contraseña';}
 }
 
-const state={view:'resumen',dias:0,desde:'',hasta:'',verEliminadas:false,facturas:[],incidencias:[],proveedoresBD:[],search:'',fProv:'',fEstado:'',fPago:[],provSel:null,quickFilter:'',sort:{k:'fecha',dir:-1}};
+const state={view:'resumen',dias:0,desde:'',hasta:'',verEliminadas:false,facturas:[],incidencias:[],proveedoresBD:[],search:'',fProv:'',fEstado:'',fPago:[],fValida:'',provSel:null,quickFilter:'',sort:{k:'fecha',dir:-1},
+  apDesde:'',apHasta:'',pgDesde:'',pgHasta:'',pgProv:'',pgMin:'',pgMax:'',pgBuscar:'',pgDomic:false};
 let chartMes=null;
 const PEND=['ILEGIBLE','EN_REVISION','DUPLICADO_PENDIENTE','PENDIENTE_CRITERIO'];
 // Facturas que ya no requieren trabajo de revisión: dadas por buenas, exportadas
 // o ya asentadas en el AS400.
 // Qué significa cada aviso y qué hacer con él. Sin esto, quien revisa lee
-// "V31 · Falta el albarán" y lo único que puede hacer es preguntarle a Kike.
-// Con esto lo resuelve solo, y si no puede, el botón de abajo le prepara el
-// mensaje con el caso entero en vez de "hay una factura que no va".
+// "V31 · Falta el albarán" y lo único que puede hacer es preguntar.
+// Con esto lo resuelve solo, con el botón que lo arregla al lado.
 // Nada de esto llama a ninguna IA: la respuesta a cada código es siempre la
 // misma, así que está escrita una vez y acierta siempre.
 const AYUDA={
@@ -558,13 +590,13 @@ const AYUDA={
   V13:{q:'Base más IVA no da el total que pone la factura.',
        h:'Suele ser un concepto que va aparte: portes, suplidos o un descuento. Mira el cuadro de totales del PDF antes de reclamar nada.'},
   V20:{q:'El descuento no es el acordado con este proveedor.',
-       h:'Compara con las condiciones que tenéis firmadas. Si el acuerdo cambió, decídselo a Kike para actualizarlo.'},
+       h:'Compara con las condiciones que tenéis firmadas. Si el acuerdo cambió, actualízalo en «Maestro proveedores».'},
   V23:{q:'La factura no parece estar a nombre de Montero.',
        h:'Mira el NIF del cliente en el PDF. Si está mal leído es un aviso sin más; si va a nombre de otra empresa, devuélvesela al proveedor.'},
   V24:{q:'El proveedor sale como Montero, que sois vosotros.',
-       h:'Pueden ser dos cosas. Si el documento es un albarán o un pedido, no es una factura: quítalo con «Eliminar» y su papel se engancha solo a la factura que respalda. Si es una factura de verdad, es que se ha leído mal quién la emite porque vuestro nombre va en grande arriba: avisa a Kike para que corrija el proveedor.'},
+       h:'Pueden ser dos cosas. Si el documento es un albarán o un pedido, no es una factura: quítalo con «Eliminar» y su papel se engancha solo a la factura que respalda. Si es una factura de verdad, es que se ha leído mal quién la emite porque vuestro nombre va en grande arriba: corrígelo con «Editar datos».'},
   V30:{q:'Falta el pedido.',
-       h:'Si el pedido llegó en otro correo, dale a «Volver a emparejar». Si no ha llegado, pídeselo a quien lo hizo. Y si este proveedor nunca lleva pedido, decídselo a Kike para ponerlo en la lista.'},
+       h:'Si el pedido llegó en otro correo, dale a «Volver a emparejar». Si no ha llegado, pídeselo a quien lo hizo. Y si este proveedor nunca lleva pedido, quítale la casilla «Pedido» en «Maestro proveedores».'},
   V31:{q:'Falta el albarán, o falta saber si están todos.',
        h:'Si dice «faltan 2 de 7», el pedido se sirvió por partes y hay que reclamar los que faltan al proveedor. Si el albarán llegó suelto, prueba «Volver a emparejar».'},
   V32:{q:'El albarán no está firmado.',
@@ -586,11 +618,41 @@ const AYUDA={
   EX01:{q:'La lectura no es fiable: el documento se ve mal.',
         h:'Abre el PDF. Si tú lo lees bien, dale a «Releer». Si está borroso, pide una copia mejor.'},
   IA:{q:'Algo que ha visto la IA al leer el documento.',
-      h:'Léelo y decide: muchas veces es una observación, no un error. Si no lo entiendes, manda el caso a Kike.'},
+      h:'Léelo y decide: muchas veces es una observación, no un error. Si no lo entiendes, avisa a soporte.'},
+  NUM_ES_PEDIDO:{q:'Parece un pedido de Montero, no una factura.',
+       h:'Abre el PDF. Si es el pedido, pulsa «Es un pedido» arriba: sale del listado y queda en Sin asignar para ponerlo con su factura cuando llegue. Si es una factura de verdad, pulsa «Sí, es una factura» y no vuelve a avisar.'},
+  NUM_ES_ALBARAN:{q:'Parece un albarán, no una factura.',
+       h:'Abre el PDF. Si dice «Albarán» o «Nota de entrega», pulsa «Es un albarán» arriba. Si es la factura, pulsa «Sí, es una factura».'},
+  EMITE_MONTERO:{q:'Quien lo emite es Montero.',
+       h:'O es un pedido vuestro (pulsa «Es un pedido»), o es una factura en la que se ha leído el cliente en lugar del proveedor: corrige el proveedor con «Editar datos».'},
+  TIPO_NO_FACTURA:{q:'La lectura dice que no es una factura (proforma, presupuesto, albarán…).',
+       h:'Una proforma o un presupuesto no se contabilizan. Si es eso, pulsa «Es un pedido» u «otro papel» con «Volver a Sin asignar»; si es una factura, «Sí, es una factura».'},
+  POSIBLE_DUPLICADO:{q:'Puede ser la misma factura que otra, leída con otro número.',
+       h:'Abre las dos con «Ver la otra». Si es la misma, quita esta. Si una de las dos es su albarán o su pedido, márcala como tal. Si son distintas, pulsa «No es la misma».'},
+  VARIAS_FACTURAS:{q:'El PDF trae varias facturas.',
+       h:'Con «Separar documentos» marcas las páginas de cada una y creas su factura, o las pones como albarán o pedido de la que toque.'},
+  FALTA_PEDIDO_R:{q:'Falta el número de pedido y es obligatorio (homologación con R).',
+       h:'Busca el pedido en el PDF o pídelo a la delegación, y escríbelo con «Editar datos». Sin él la factura no se valida.'},
+  IMPORTE_FIJO_DISTINTO:{q:'No coincide con el importe fijo mensual del proveedor.',
+       h:'Compara con lo pactado. Si la cuota ha cambiado, actualízala en «Maestro proveedores».'},
+  PROVEEDOR_DUDOSO:{q:'No se sabe bien quién es el proveedor.',
+       h:'Mira en el PDF quién emite la factura (arriba, con su CIF) y elígelo en «Editar datos». Si es nuevo, dalo de alta en «Maestro proveedores».'},
+  CIF_DUDOSO:{q:'El CIF leído no es válido.',
+       h:'Suele ser una cifra mal leída. Corrígelo con «Editar datos»; en el Excel del AS400 ya va el del maestro si lo tiene.'},
+  CIF_FALTA:{q:'La factura no trae CIF legible.',
+       h:'Si el proveedor está en el maestro con su CIF, se usa ese. Si no, escríbelo con «Editar datos» o en «Maestro proveedores».'},
+  SIN_HOMOLOGACION:{q:'El proveedor no tiene homologación en el maestro.',
+       h:'Ponla en «Maestro proveedores», siempre con siglas (HNR, HNG, HLGV…).'},
+  SIN_DELEGACION:{q:'No se sabe la delegación.',
+       h:'Elígela con «Editar datos». Si este proveedor siempre es de la misma delegación, ponla en su fila del «Maestro proveedores».'},
+  TOTAL_NO_CUADRA:{q:'El total no cuadra con base + IVA.',
+       h:'Casi siempre es un importe mal leído (se toma la base por el total). Míralo en el PDF y corrígelo con «Editar datos». Si hay portes o suplidos aparte, es correcto.'},
   V07:{q:'Esta factura ya estaba registrada.',
        h:'Comprueba cuál de las dos tiene los papeles y quita la otra con «Eliminar».'},
 };
-const ACCION_DE={V30:'emparejar',V31:'emparejar',V24:'releer',V03:'releer',V05:'releer',EX01:'releer'};
+const ACCION_DE={V30:'emparejar',V31:'emparejar',V24:'editar',V03:'releer',V05:'releer',EX01:'releer',V13:'editar',
+  TOTAL_NO_CUADRA:'editar',PROVEEDOR_DUDOSO:'editar',CIF_DUDOSO:'editar',CIF_FALTA:'editar',SIN_DELEGACION:'editar',
+  VARIAS_FACTURAS:'separar',FALTA_PEDIDO_R:'editar'};
 const OK_CERRADAS=['VALIDADA','EXPORTADA','CONTABILIZADA'];
 // Si descargar el Excel de AS400 pasa las facturas a CONTABILIZADA por sí solo.
 // Apagado el 07/08/2026: el Excel se lleva a contabilidad, pero el asiento puede
@@ -609,7 +671,13 @@ const dt=d=>d?new Date(d).toLocaleDateString('es-ES',{day:'2-digit',month:'2-dig
 const dtL=d=>d?new Date(d).toLocaleString('es-ES',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const initials=n=>String(n||'?').replace(/[^a-zA-ZÀ-ÿ ]/g,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
-function nombreProv(f){const j=f.json_extraccion_ia||{};return j?.proveedor?.nombre||j?.datos_extraidos?.proveedor?.nombre||'Sin identificar';}
+// Si la factura ya está unida a su proveedor del maestro (por CIF, lo hace la
+// base), manda el nombre del maestro: «Racingoll s.l.» era RACING OIL mal leído.
+function nombreProv(f){
+  if(f.proveedor_id&&state.provPorId){const p=state.provPorId.get(f.proveedor_id);if(p&&p.nombre)return p.nombre;}
+  return nombreLeido(f);
+}
+function nombreLeido(f){const j=f.json_extraccion_ia||{};return j?.proveedor?.nombre||j?.datos_extraidos?.proveedor?.nombre||'Sin identificar';}
 // Un mismo proveedor se escribe distinto según la factura ("RB Components, S.L"
 // y "RB Components, S.L."), y así salía partido en dos fichas: quien miraba qué
 // se le había comprado a SECODI veía 3 facturas en una y 1 en otra. Se agrupa por
@@ -711,14 +779,14 @@ async function api1(path,_reintento){
 }
 // La URL firmada de un documento del bucket privado. La usan openPdf (para
 // abrirlo en una pestaña) y la descarga masiva (para bajarse el PDF).
-async function urlFirmada(docUrl){
+async function urlFirmada(docUrl,segundos){
   const m=docUrl.match(/\/object\/(?:public\/|authenticated\/)?([^/]+)\/(.+)$/);
   const bucket=m?m[1]:'facturas';
   const filePath=m?m[2]:docUrl.split('/').pop();
   const r=await fetch(`${SB_URL}/storage/v1/object/sign/${bucket}/${filePath}`,{
     method:'POST',
     headers:{apikey:SB_ANON,Authorization:`Bearer ${getToken()}`,'Content-Type':'application/json'},
-    body:JSON.stringify({expiresIn:3600})
+    body:JSON.stringify({expiresIn:segundos||3600})
   });
   if(!r.ok)throw new Error(await r.text());
   const d=await r.json();
@@ -820,12 +888,17 @@ async function loadAll(){
   try{
     state.proveedoresBD=await api(`proveedores?select=id,nombre,nif_cif,codigo_proveedor,cuenta_contable,tipo_hoja,actividad`);
   }catch(e){console.error(e);state.proveedoresBD=[];}
-  _codCache.clear();
+  state.provPorId=new Map((state.proveedoresBD||[]).map(p=>[p.id,p]));
+  limpiarCaches();
   // Documentos que han llegado y no están puestos con ninguna factura: ni son la
   // factura ni figuran como su respaldo. Es lo que antes solo se veía leyendo un
   // log en el ordenador donde corre el proceso.
   try{
-    const docs=await api(`documentos_recibidos?select=id,nombre_archivo,email_asunto,fecha_recepcion,tipo_documento_ia,resumen_ia,hash_archivo&order=fecha_recepcion.desc&limit=20000`);
+    const docsTodos=await api(`documentos_recibidos?select=id,nombre_archivo,email_asunto,fecha_recepcion,tipo_documento_ia,tipo_ia_original,resumen_ia,hash_archivo,descartado,descartado_motivo,clasificado_por,clasificado_en&order=fecha_recepcion.desc&limit=20000`);
+    // Lo descartado a mano (logos, capturas) no está sin asignar: está fuera,
+    // en su propia lista, por si hay que recuperarlo.
+    state.descartados=docsTodos.filter(d=>d.descartado);
+    const docs=docsTodos.filter(d=>!d.descartado);
     // Cero filas no significa "no hay documentos": si falta el permiso de lectura,
     // la base no da error, devuelve una lista vacía. El panel decía "0 sin asignar"
     // habiendo 25. Se distingue con lo que ya sabemos: si hay facturas, tiene que
@@ -894,9 +967,15 @@ async function loadAll(){
     const r=await api(`configuracion?select=valor&clave=eq.proveedores_condiciones`);
     state.condiciones=r&&r[0]?JSON.parse(r[0].valor)||[]:[];
   }catch(e){state.condiciones=[];}
+  try{
+    const r=await api(`configuracion?select=valor&clave=eq.departamentos_envio`);
+    state.departamentos=r&&r[0]?JSON.parse(r[0].valor)||[]:[];
+  }catch(e){state.departamentos=[];}
+  limpiarCaches();
   recalcularGruposProv();          // antes de pintar nada: de ahí sale quién es quién
   state.incidencias=deriveIncidencias(state.facturas);
-  updateNav();render();
+  // El refresco automático no puede borrar lo que se está escribiendo en el maestro.
+  updateNav();if(!(state.view==='maestro'&&state.maestroSucio))render();
 }
 function cuentaContablePorNombre(nombre){
   if(!nombre)return null;
@@ -912,6 +991,7 @@ function codigoProveedorPorNombre(nombre){
 // El proveedor del maestro para una factura: por nombre y, si no casa, por NIF
 // (una sola candidata, por lo mismo que en proveedorBD).
 function proveedorDeFactura(f){
+  if(f.proveedor_id&&state.provPorId&&state.provPorId.has(f.proveedor_id))return state.provPorId.get(f.proveedor_id);
   const p=proveedorBD(nombreProv(f));
   if(p)return p;
   const nif=nifLimpio(nifProv(f)||'');
@@ -922,11 +1002,14 @@ function proveedorDeFactura(f){
 // Código AS400 de la factura. Se guarda por nombre+NIF: la tabla lo pide en cada
 // fila y buscar en el maestro cada vez es lento con mil facturas.
 const _codCache=new Map();
+// Orden (Paqui, 14/10/2026): el del pedido de Montero si se leyó, luego el del
+// maestro (por CIF o nombre) y por último el del Excel de condiciones.
 function codigoProv(f){
   const ia=f.json_extraccion_ia||{};
   if((ia.proveedor||{}).codigo_si_aparece)return String(ia.proveedor.codigo_si_aparece);
-  const k=nombreProv(f)+'|'+(nifProv(f)||'');
-  if(!_codCache.has(k))_codCache.set(k,String((proveedorDeFactura(f)||{}).codigo_proveedor||''));
+  if((ia.pedido||{}).codigo_proveedor)return String(ia.pedido.codigo_proveedor);
+  const k=f.id||(nombreProv(f)+'|'+(nifProv(f)||''));
+  if(!_codCache.has(k))_codCache.set(k,String((proveedorDeFactura(f)||{}).codigo_proveedor||(condicionDe(f)||{}).codigo||''));
   return _codCache.get(k);
 }
 function badgeSinCodigo(f){
@@ -939,9 +1022,14 @@ function badgeSinCodigo(f){
 // contabilizarla—, y el peligro es el mismo: que acabe en una remesa y se pague
 // dos veces. Manda la lista que pone Montero, no lo que diga la factura: el mismo
 // proveedor escribe su forma de pago de mil maneras.
+// También los recibos domiciliados (Paqui, 14/10/2026): el banco los paga solo,
+// así que cuentan como pagados y no pueden entrar en una remesa.
 function esDeGiro(f){
   const k=normProv(nombreProv(f));
-  return !!(k&&(state.giro||[]).some(x=>x&&(x===k||k.includes(x)||x.includes(k))));
+  if(k&&(state.giro||[]).some(x=>x&&(x===k||k.includes(x)||x.includes(k))))return true;
+  const c=condicionDe(f);
+  if(c&&/GIRO|DOMICIL|RECIBO/i.test(String(c.forma_pago||'')))return true;
+  return /\bGIRO\b|RECIBO|DOMICILI|\bSEPA\b|ADEUDO/i.test(String(f.forma_pago_factura||''));
 }
 // La forma de pago en pocas palabras y escrita siempre igual. Cada proveedor la
 // pone a su manera —hay 97 formas distintas: "CONFIRMING A 60 DIAS", "Confirming
@@ -993,21 +1081,23 @@ function ciudadDe(txt){
   const cp=t.match(/\b(\d{2})\d{3}\b/);
   return cp&&DELEG_CP[cp[1]]||'';
 }
+// Siempre una ciudad, nunca números ni direcciones (Paqui, 14/10/2026). Orden:
+// lo que una persona puso a mano, lo leído del pedido o la factura, la letra de
+// la homologación local y, para los nacionales, la delegación del maestro.
 function delegacionCiudad(f){
   const ia=f.json_extraccion_ia||{};
+  const m=String((ia._manual||{}).delegacion||'').trim();
+  if(m)return ciudadDe(m)||m.toUpperCase();
   const cli=ia.cliente||ia.factura?.cliente||{};
-  for(const t of [ia._delegacion,f.delegacion_detectada,cli.delegacion,f.direccion_envio_detectada,cli.direccion_envio]){
+  for(const t of [ia._delegacion,(ia.pedido||{}).delegacion,f.delegacion_detectada,cli.delegacion,f.direccion_envio_detectada,cli.direccion_envio]){
     const c=ciudadDe(t); if(c) return c;
   }
-  const prov_ia=(ia.proveedor||{});
-  const cod=codigoProv(f);
-  const nom=normProv(nombreProv(f));
-  const cs=state.condiciones||[];
-  const cond=(cod&&cs.find(c=>String(c.codigo)===cod))||cs.find(c=>c.nombre&&normProv(c.nombre)===nom);
-  // Siglas desde condiciones, luego desde tipo_hoja (que ahora tiene el código real)
-  const hom=(String(cond&&cond.homologacion||'')||homologacionPorNIF(nifProv(f))||homologacionPorNombre(nombreProv(f))||'').toUpperCase().trim();
-  // HL__ y HS__ son locales: última letra indica delegación. HN__ son nacionales (sin ciudad).
-  return /^H[LS][A-Z]{2}$/.test(hom)&&DELEG_LETRA[hom[3]]||'';
+  // HL__ y HS__ son locales: la última letra es la delegación. HN__ son nacionales.
+  const hom=homologacionDe(f);
+  if(/^H[LS][A-Z]{2}$/.test(hom)&&DELEG_LETRA[hom[3]])return DELEG_LETRA[hom[3]];
+  const c=condicionDe(f);
+  const d=String(c&&c.delegacion||'').trim();
+  return d?(ciudadDe(d)||d.toUpperCase()):'';
 }
 function numeroPedido(f){
   const ia=f.json_extraccion_ia||{};
@@ -1026,8 +1116,7 @@ function numeroPedido(f){
 // homologarlo (Paqui, 25/09/2026). Lo decide el proceso al recalcular: cuando
 // encuentra al proveedor en el Excel, le pone su código del AS400.
 function sinCondiciones(f){
-  const p=proveedorBD(nombreProv(f));
-  return !p||!p.tipo_hoja;
+  return !condicionDe(f);
 }
 // Cuándo se validó. A mano: la fecha de la persona. Automática: el día en que el
 // sistema la dio por buena (_validada_en); las antiguas, el día en que entró.
@@ -1042,39 +1131,29 @@ function fechaContabilizada(f){
   const ia=f.json_extraccion_ia||{};
   return (ia._contabilizacion||{}).fecha||f.fecha_exportacion_as400||null;
 }
-function homologacionPorNombre(nombre){
-  const p=proveedorBD(nombre);
-  return p?(p.tipo_hoja||null):null;
-}
-function homologacionPorNIF(nif){
-  const n=nifLimpio(nif||'');
-  if(!n)return null;
-  const p=(state.proveedoresBD||[]).find(x=>nifLimpio(x.nif_cif||'')===n);
-  return p?(p.tipo_hoja||null):null;
-}
+// Siempre siglas (HNR, HLGV…), nunca el nombre de la hoja del Excel: en el
+// maestro, tipo_hoja guardaba «HOMOL. NAC» o «HOM LOCALES» en 54 proveedores.
+// Lo que no tiene forma de sigla no es una homologación y sale en blanco, con
+// su aviso, para que se complete en el maestro.
+const HOM_OK=/^H[NLS][A-Z]{1,2}$/;
 function homologacionDe(f){
-  const ia=f.json_extraccion_ia||{};
-  const prov=ia.proveedor||{};
-  const cs=state.condiciones||[];
-  // 1. Código AS400 directo (del pedido/factura o por nombre en BD)
-  const cod=codigoProv(f);
-  if(cod){const c=cs.find(x=>String(x.codigo||'')===cod);if(c&&c.homologacion)return String(c.homologacion).toUpperCase().trim();}
-  // 2. NIF → código en proveedoresBD → condiciones
-  const nif=nifLimpio(nifProv(f)||'');
-  if(nif){
-    const bd=(state.proveedoresBD||[]).find(x=>nifLimpio(x.nif_cif||'')===nif);
-    const cod2=String(bd&&bd.codigo_proveedor||'');
-    if(cod2){const c=cs.find(x=>String(x.codigo||'')===cod2);if(c&&c.homologacion)return String(c.homologacion).toUpperCase().trim();}
-  }
-  // 3. Nombre normalizado en condiciones
-  const nom=normProv(nombreProv(f));
-  const cn=cs.find(c=>c.nombre&&normProv(c.nombre)===nom);
-  if(cn&&cn.homologacion)return String(cn.homologacion).toUpperCase().trim();
-  // 4. Fallback: tipo_hoja de proveedoresBD
-  return homologacionPorNIF(nifProv(f))||homologacionPorNombre(nombreProv(f))||'';
+  const c=condicionDe(f);
+  const h1=String(c&&c.homologacion||'').toUpperCase().replace(/\s+/g,'');
+  if(HOM_OK.test(h1))return h1;
+  const p=proveedorDeFactura(f);
+  const h2=String(p&&p.tipo_hoja||'').toUpperCase().replace(/\s+/g,'');
+  return HOM_OK.test(h2)?h2:'';
 }
 // El albarán con su fecha detrás, que es como lo quieren para cuadrarlo:
 // "10281548 · 12/06/2026". La fecha sale de lo que la IA leyó de cada albarán.
+// Cada albarán con su fecha por separado, para el Excel: una columna para el
+// número y otra al lado para su fecha.
+function albaranesDe(ia){
+  const nums=Array.isArray(ia._albaranes)?ia._albaranes:[];
+  const det=Array.isArray(ia.albaranes)?ia.albaranes:[];
+  const k=n=>String(n||'').replace(/\D/g,'').replace(/^0+/,'');
+  return nums.map(n=>{const m=det.find(a=>a&&k(a.numero)===k(n));return {num:String(n||''),fecha:m&&m.fecha?dt(m.fecha):''};});
+}
 function albaranesConFecha(ia){
   const nums=Array.isArray(ia._albaranes)?ia._albaranes:[];
   const det=Array.isArray(ia.albaranes)?ia.albaranes:[];
@@ -1140,9 +1219,15 @@ function deriveIncidencias(ff){
   const out=[];
   ff.forEach(f=>{
     const ia=f.json_extraccion_ia||{};
-    // Si el workflow ya registró sus validaciones, son la fuente autoritativa
+    // Las señales de la base y del panel (¿es un pedido?, posible duplicado, falta
+    // la homologación…) van como incidencias de la factura, con su ayuda debajo.
+    if(!f.eliminada&&(PEND.includes(f.estado)||f.estado==='VALIDADA'||f.estado==='RECIBIDA'))
+      senalesDe(f).forEach(x=>out.push({factura_id:f.id,codigo_validacion:x.codigo,tipo:x.bloquea?'INCIDENCIA':'AVISO',estado:'ABIERTA',descripcion:x.texto}));
+    // Si el workflow ya registró sus validaciones, son la fuente autoritativa.
+    // Con importe fijo mensual que cuadra no se piden pedido ni albarán.
     if(Array.isArray(ia._validaciones)){
-      ia._validaciones.forEach(x=>out.push({factura_id:f.id,codigo_validacion:x.codigo,tipo:x.tipo||'INCIDENCIA',estado:'ABIERTA',descripcion:x.texto,dato_esperado:x.esperado,dato_recibido:x.recibido}));
+      ia._validaciones.filter(x=>!(ia._importe_fijo_ok!=null&&/^V3[0-3]$/.test(x.codigo||'')))
+        .forEach(x=>out.push({factura_id:f.id,codigo_validacion:x.codigo,tipo:x.tipo||'INCIDENCIA',estado:'ABIERTA',descripcion:x.texto,dato_esperado:x.esperado,dato_recibido:x.recibido}));
       return;
     }
     const dif=f.diferencia_importe!=null?+f.diferencia_importe:null;
@@ -1183,8 +1268,11 @@ function updateNav(){
 function aprobadaPago(f){return !!(f.json_extraccion_ia?._aprobada_pago&&!f.json_extraccion_ia?._pago);}
 
 /* ---------- router ---------- */
-const TITLES={resumen:['Resumen','Vista general de la facturación'],facturas:['Facturas','Listado completo de facturas procesadas'],incidencias:['Incidencias','Validaciones, avisos y bloqueos detectados'],proveedores:['Proveedores','Actividad y ranking de proveedores'],sueltos:['Sin asignar','Documentos que han llegado y no están puestos con ninguna factura'],pagadas:['Facturas Pagadas','Facturas abonadas manualmente por Montero'],aprobadas:['Aprobadas para pago','Facturas aprobadas a mano, pendientes de pagar']};
+const TITLES={resumen:['Resumen','Vista general de la facturación'],facturas:['Facturas','Listado completo de facturas procesadas'],incidencias:['Incidencias','Validaciones, avisos y bloqueos detectados'],proveedores:['Proveedores','Actividad y ranking de proveedores'],sueltos:['Sin asignar','Documentos que han llegado y no están puestos con ninguna factura'],pagadas:['Facturas Pagadas','Facturas abonadas manualmente por Montero'],aprobadas:['Aprobadas para pago','Facturas aprobadas a mano, pendientes de pagar'],registro:['Registro IVA soportado','Lo que ya está contabilizado en el AS400'],maestro:['Maestro de proveedores','El Excel de proveedores de Montero, editable']};
 function setView(v){
+  if(state.view==='maestro'&&v!=='maestro'&&state.maestroSucio&&!confirm('Hay cambios del maestro sin guardar. ¿Salir sin guardarlos?'))return;
+  if(v==='maestro'&&state.view!=='maestro'&&!state.maestroSucio)state.maestro=null;
+  if(v==='registro')state.registro=null;
   state.view=v;state.provSel=null;state.quickFilter='';
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   document.title=`${TITLES[v][0]} · Montero`;
@@ -1199,7 +1287,11 @@ function render(){
   else if(state.view==='sueltos')c.innerHTML=viewSueltos();
   else if(state.view==='pagadas')c.innerHTML=viewPagadas();
   else if(state.view==='aprobadas')c.innerHTML=viewAprobadas();
+  else if(state.view==='registro')c.innerHTML=viewRegistro();
+  else if(state.view==='maestro')c.innerHTML=viewMaestro();
   bindContent();
+  if(state.view==='registro')bindRegistro();
+  if(state.view==='maestro')bindMaestro();
   if(state.view==='resumen')drawCharts();
 }
 
@@ -1252,7 +1344,13 @@ function viewSueltos(){
       :`<div class="rev-note" style="margin-top:10px">Petición enviada · se ejecuta en la próxima pasada (como mucho 10 minutos). Recarga para ver el resultado.</div>`):''}
     ${!enCurso&&ultima?`<div class="rev-note" style="margin-top:10px">Última ejecución (${esc(ultima.evento.replace('TAREA: ',''))}) · ${dtL(ultima.creado_en)} · <b>${(ultima.detalle||{}).estado==='HECHO'?'correcta':'con error'}</b><br><span style="font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted);white-space:pre-wrap">${esc(String((ultima.detalle||{}).resultado||'').split('\n').slice(-3).join('\n'))}</span></div>`:''}
   </div>`;
-  if(!ds.length) return cab+`<div class="card"><div class="empty">No hay nada suelto: todo lo que ha llegado está puesto con su factura.</div></div>`;
+  // Lo descartado a mano, aparte y recuperable.
+  const desc=state.descartados||[];
+  const descHtml=desc.length?`<div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:13px;font-weight:600">Descartados (${desc.length}): logos, capturas y copias</summary>
+    <div class="tbl-wrap" style="margin-top:8px"><table><tbody>${desc.map(d=>`<tr><td><button class="doc-link" data-pdf="${SB_URL}/storage/v1/object/facturas/${esc(d.hash_archivo)}.pdf" style="background:none;border:none;padding:0;font:inherit;color:var(--rd);cursor:pointer;text-decoration:underline">${esc(d.nombre_archivo||'(sin nombre)')}</button></td>
+      <td style="font-size:12px;color:var(--muted)">${esc(d.descartado_motivo||'')} · ${esc(d.clasificado_por||'')} · ${dtL(d.clasificado_en)}</td>
+      <td><button class="btn-s" data-recuperar="${d.id}">Recuperar</button></td></tr>`).join('')}</tbody></table></div></details></div>`:'';
+  if(!ds.length) return cab+`<div class="card"><div class="empty">No hay nada suelto: todo lo que ha llegado está puesto con su factura.</div></div>`+descHtml;
   // Para elegir la factura: todas las del listado, no solo las del mes que se
   // está mirando. El albarán de una factura de julio llega a veces en septiembre.
   state.opcionesFac=new Map();
@@ -1291,7 +1389,20 @@ function viewSueltos(){
     return `<tr data-suelto="${d.id}">
       <td style="${W};min-width:14rem;max-width:22rem"><button class="doc-link" data-pdf="${pdf}" title="Abrir el documento" style="background:none;border:none;padding:0;font:inherit;color:var(--rd);cursor:pointer;text-align:left;text-decoration:underline">${esc(d.nombre_archivo||'(sin nombre)')}</button></td>
       <td style="${W};max-width:12rem">${accion}</td>
-      <td style="${W};max-width:12rem">${esFactura?'<span class="bdg" style="background:var(--rd-s);color:var(--rd)">Parece una factura</span> ':''}${esc(tipo||'sin identificar')}</td>
+      <td style="${W};min-width:13rem;max-width:16rem">${(()=>{
+        // Una «factura» suelta cuyo número ya está registrado suele ser la misma
+        // que llegó dos veces: se dice, para descartarla en vez de darla de alta.
+        const n1=cifras(String(d.resumen_ia||'').split('|')[0]);
+        const copia=esFactura&&n1.length>=4&&(state.todasFacturas||[]).find(x=>cifras(x.numero_factura)===n1);
+        const marca=d.clasificado_por?`<div style="font-size:11.5px;color:var(--muted);margin-top:3px">Marcado como ${esc(tipo.toLowerCase())} por ${esc(d.clasificado_por)}</div>`:'';
+        return `${esFactura?'<span class="bdg" style="background:var(--rd-s);color:var(--rd)">Parece una factura</span> ':''}${esc(tipo||'sin identificar')}${marca}
+          ${copia?`<div style="font-size:11.5px;color:var(--amber);margin-top:3px">Ya está registrada como factura <b>${esc(copia.numero_factura)}</b> (${esc(copia.prov||'')}): seguramente es una copia.</div>
+            <button class="btn-s" data-descartar="${d.id}" data-motivo="Copia de la factura ${esc(copia.numero_factura)}" style="margin-top:4px">Es una copia: descartar</button>`:''}
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">
+            <button class="btn-s" data-docfac="${d.id}" title="Es una factura: recuperar o dar de alta su ficha">Es factura</button>
+            <button class="btn-s" data-doctipo="PEDIDO" data-doc="${d.id}">Es pedido</button>
+            <button class="btn-s" data-doctipo="ALBARAN" data-doc="${d.id}">Es albarán</button>
+            <button class="btn-s rojo" data-descartar="${d.id}" title="Logos, capturas de pantalla, firmas… No se borra: se puede recuperar">Descartar</button></div>`;})()}</td>
       <td style="${W};font-size:12px;color:var(--muted);min-width:12rem;max-width:22rem">${esc(d.resumen_ia||'—')}</td>
       <td style="white-space:nowrap">${dtL(d.fecha_recepcion)}</td>
       <td style="${W};font-size:12px;color:var(--muted);max-width:14rem">${esc((d.email_asunto||'').slice(0,60))}</td>
@@ -1311,7 +1422,7 @@ function viewSueltos(){
     <datalist id="dl-facturas">${opciones}</datalist>
     <div class="tbl-wrap"><table>
     <thead><tr><th>Archivo</th><th></th><th>Qué es</th><th>Qué trae dentro</th><th>Llegó</th><th>Correo</th></tr></thead>
-    <tbody>${filas}</tbody></table></div></div>`;
+    <tbody>${filas}</tbody></table></div></div>`+descHtml;
 }
 async function asignarDocumento(docId,boton){
   const form=document.querySelector(`tr[data-form="${docId}"]`);
@@ -1350,6 +1461,15 @@ function viewResumen(){
     ${kpi(ICN.file,'blue',m.total,'Facturas en el periodo')}
     ${kpi(ICN.euro,'green',eurS(m.importe),'Importe total')}
   </div>
+  ${(()=>{
+    // Las domiciliadas cuentan como pagadas y lo dudoso, a la vista (Paqui, 14/10/2026).
+    const dom=state.facturas.filter(f=>esDeGiro(f)&&!f.json_extraccion_ia?._pago);
+    const sos=state.facturas.filter(f=>esSospechosa(f)&&f.estado!=='CONTABILIZADA');
+    if(!dom.length&&!sos.length)return '';
+    return `<div class="card" style="margin-bottom:18px;display:flex;gap:22px;flex-wrap:wrap;font-size:13px">
+      ${dom.length?`<div data-go="domic" style="cursor:pointer"><span class="bdg domic" style="margin:0 6px 0 0">PAGADAS</span><b>${dom.length}</b> domiciliadas (giro o recibo) por <b>${eur(dom.reduce((s,f)=>s+(+f.total_factura||0),0))}</b>: el banco las paga solas, no van a remesa →</div>`:''}
+      ${sos.length?`<div data-go="sospecha" style="cursor:pointer"><span class="bdg alerta" style="margin:0 6px 0 0">REVISAR</span><b>${sos.length}</b> parecen un pedido o un albarán, no una factura →</div>`:''}
+    </div>`;})()}
   <div class="card" style="margin-bottom:18px">
     <div class="card-h"><div class="card-t">${svg(ICN.alert)}Requieren tu atención</div>${pend.length?`<span class="card-meta" data-go="revision" style="cursor:pointer;color:var(--red)">Ver todas →</span>`:''}</div>
     ${colaTrabajo(pend)}
@@ -1367,7 +1487,7 @@ function colaTrabajo(ff){
       <td class="mono">${dt(f.fecha_factura)}</td>
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
-      <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg" style="background:var(--violet-s);color:var(--violet);margin-left:5px" title="Ya está pagada (giro, tarjeta o contado). Solo hay que contabilizarla, NO pagarla otra vez">YA PAGADA</span>':''}</td>
+      <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${badgesSenales(f)}</td>
       <td style="max-width:300px;color:var(--muted);font-size:12.5px"><div class="trunc" style="max-width:300px">${esc(motivoDe(f.id))}</div></td>
     </tr>`).join('');
   return`<div class="tbl-wrap"><table><thead><tr><th>Proveedor</th><th>Nº Factura</th><th>Fecha fra.</th><th>Cargada</th><th class="r">Total</th><th>Estado</th><th>Motivo</th></tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -1393,6 +1513,14 @@ function filtradas(){
   else if(state.quickFilter==='contabilizadas')ff=ff.filter(f=>f.estado==='CONTABILIZADA');
   else if(state.quickFilter==='sincond')ff=ff.filter(sinCondiciones);
   else if(state.quickFilter==='sincodigo')ff=ff.filter(f=>!codigoProv(f));
+  else if(state.quickFilter==='sospecha')ff=ff.filter(f=>esSospechosa(f)&&f.estado!=='CONTABILIZADA');
+  else if(state.quickFilter==='posdup')ff=ff.filter(f=>posDuplicado(f)&&f.estado!=='CONTABILIZADA');
+  else if(state.quickFilter==='sinhomol')ff=ff.filter(f=>!homologacionDe(f));
+  else if(state.quickFilter==='sindeleg')ff=ff.filter(f=>!delegacionCiudad(f));
+  else if(state.quickFilter==='dudoso')ff=ff.filter(f=>tieneSenal(f,'PROVEEDOR_DUDOSO')||tieneSenal(f,'CIF_DUDOSO')||tieneSenal(f,'CIF_FALTA'));
+  else if(state.quickFilter==='faltapedido')ff=ff.filter(f=>tieneSenal(f,'FALTA_PEDIDO_R'));
+  else if(state.quickFilter==='domic')ff=ff.filter(esDeGiro);
+  if(state.fValida)ff=ff.filter(f=>(validadorDe(f)||'(nadie)')===state.fValida);
   else if(state.quickFilter==='mes'){const n=new Date();ff=ff.filter(f=>{const d=new Date(f.fecha_factura||f.fecha_recepcion);return !isNaN(d)&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();});}
   // El desplegable guarda la clave agrupada, no el nombre suelto: filtrar por
   // "SECODI" tiene que traer sus 4 facturas, no las 3 de una de las dos formas.
@@ -1409,8 +1537,8 @@ function filtradas(){
     const q=state.search.toLowerCase(), qn=q.replace(/[^a-z0-9]/g,'');
     const pega=(v)=>{const s=String(v||'').toLowerCase();
       return s.includes(q)||(!!qn&&s.replace(/[^a-z0-9]/g,'').includes(qn));};
-    ff=ff.filter(f=>pega(f.numero_factura)||pega(nombreProv(f))||pega(nifProv(f))||
-      pega(formaPago(f).texto)||pega(f.forma_pago_factura));
+    ff=ff.filter(f=>pega(f.numero_factura)||pega(nombreProv(f))||pega(nombreLeido(f))||pega(nifProv(f))||pega(cifDe(f))||
+      pega(formaPago(f).texto)||pega(f.forma_pago_factura)||pega(codigoProv(f)));
   }
   const {k,dir}=state.sort;
   ff.sort((a,b)=>{
@@ -1423,6 +1551,7 @@ function filtradas(){
     else if(k==='validada'){va=((validacion(a)||{}).fecha)||'';vb=((validacion(b)||{}).fecha)||'';}
     else if(k==='contab'){va=fechaContabilizada(a)||'';vb=fechaContabilizada(b)||'';}
     else if(k==='conf'){va=+a.confianza_extraccion||0;vb=+b.confianza_extraccion||0;}
+    else if(k==='valida'){va=validadorDe(a);vb=validadorDe(b);}
     else{va=a[k];vb=b[k];}
     return va<vb?-dir:va>vb?dir:0;
   });
@@ -1435,7 +1564,8 @@ function viewFacturas(){
   const hay=new Set(state.facturas.map(f=>formaPago(f).tipo));
   const pagos=FORMAS_PAGO.filter(p=>hay.has(p));
   const ff=filtradas();
-  const chips=[['','Todas'],['revision','Requieren revisión'],['duplicados','Duplicados'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['sincond','Sin condiciones'],['sincodigo','Sin código proveedor'],['mes','Este mes']];
+  const chips=[['','Todas'],['revision','Requieren revisión'],['sospecha','¿Pedido o albarán?'],['duplicados','Duplicados'],['posdup','Posible duplicado'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['domic','Domiciliadas'],['sincond','Sin condiciones'],['sincodigo','Sin código proveedor'],['sinhomol','Sin homologación'],['sindeleg','Sin delegación'],['faltapedido','Falta pedido (R)'],['dudoso','Proveedor o CIF dudoso'],['mes','Este mes']];
+  const validadores=[...new Set(state.facturas.map(f=>validadorDe(f)||'(nadie)'))].sort();
   const chipElim=`<button class="chip ${state.verEliminadas?'active':''}" data-elim="1" title="Facturas quitadas del listado">Eliminadas</button>`;
   // Cuántas facturas están a medio comprobar. Sale aquí y no en un log del
   // servidor: si el proceso que las lee se para, el atasco se ve crecer solo. Un
@@ -1480,6 +1610,7 @@ function viewFacturas(){
       <div class="search">${svg(ICN.list).replace(ICN.list,'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>')}<input id="f-search" placeholder="Buscar nº factura, proveedor, NIF o forma de pago…" value="${esc(state.search)}"></div>
       <select class="sel" id="f-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.fProv?'selected':''}>${esc(p.n)}</option>`).join('')}</select>
       <select class="sel" id="f-estado"><option value="">Todos los estados</option>${estados.map(e=>`<option value="${esc(e)}" ${e===state.fEstado?'selected':''}>${esc(estadoLbl(e))}</option>`).join('')}</select>
+      <select class="sel" id="f-valida" title="Quién tiene que validarla (Excel de condiciones)"><option value="">Valide quien valide</option>${validadores.map(v=>`<option value="${esc(v)}" ${v===state.fValida?'selected':''}>${esc(v)}</option>`).join('')}</select>
       <details class="multi" id="f-pago"><summary class="sel">${state.fPago.length?`Pago: ${esc(state.fPago.join(', '))}`:'Todas las formas de pago'}</summary>
         <div class="multi-op">${pagos.map(p=>`<label><input type="checkbox" value="${esc(p)}" ${state.fPago.includes(p)?'checked':''}> ${esc(p)}</label>`).join('')}
         ${state.fPago.length?'<button type="button" class="multi-limpiar" id="f-pago-limpiar">Quitar filtro</button>':''}</div></details>
@@ -1512,11 +1643,12 @@ function tablaFacturas(ff,full){
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
       <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
       ${full?(()=>{const p=formaPago(f);return `<td style="font-size:12.5px" title="${esc(p.original?'La factura dice: '+p.original:'La factura no dice cómo se paga')}${p.acordado?' · días según lo acordado con el proveedor':''}">${esc(p.texto)}</td>`;})():''}
-      <td class="r cell-strong">${eur(f.total_factura)} ${warn?`<span title="Diferencia ${eur(dif)}" style="color:var(--rd)">${svg(ICN.alert).replace('viewBox','width="13" height="13" style="vertical-align:-2px" viewBox')}</span>`:''}</td>
+      <td class="r cell-strong">${eur(f.total_factura)} ${warn?`<span title="El total no cuadra: base + IVA = ${esc(eur(f.total_calculado))} y se ha leído ${esc(eur(f.total_factura))} (diferencia ${esc(eur(dif))}). Casi siempre es un importe mal leído: ábrela y corrígelo." style="color:var(--rd);cursor:help">${svg(ICN.alert).replace('viewBox','width="13" height="13" style="vertical-align:-2px" viewBox')}</span>`:''}</td>
+      ${full?`<td style="font-size:12.5px;white-space:nowrap">${esc(validadorDe(f)||'—')}</td>`:''}
       ${full?(()=>{const v=validacion(f),c=fechaContabilizada(f);
         return `<td class="mono" style="white-space:nowrap" title="${v?esc('Validada '+v.como+(v.por?' por '+v.por:'')):''}">${v?(v.fecha?dt(v.fecha):'<span style="color:var(--muted)">auto</span>'):'—'}</td>
       <td class="mono" style="white-space:nowrap">${c?`<b title="Contabilizada">C</b> ${dt(c)}`:'—'}</td>`;})():''}
-      <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg" style="background:var(--violet-s);color:var(--violet);margin-left:5px" title="Ya está pagada (giro, tarjeta o contado). Solo hay que contabilizarla, NO pagarla otra vez">YA PAGADA</span>':''}${sinCondiciones(f)?'<span class="bdg sincond" title="Este proveedor no está en el Excel de condiciones: hay que homologarlo">SIN CONDICIONES</span>':''}</td>
+      <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${sinCondiciones(f)?'<span class="bdg sincond" title="Este proveedor no está en el Excel de condiciones: hay que homologarlo">SIN CONDICIONES</span>':''}${badgesSenales(f)}</td>
     </tr>`;
   }).join('');
   return `<div class="tbl-wrap"><table><thead><tr>
@@ -1526,16 +1658,26 @@ function tablaFacturas(ff,full){
     ${full?th('prov','Proveedor'):'<th>Proveedor</th>'}
     ${full?th('pago','Forma de pago'):''}
     ${full?th('total','Total',1):'<th class="r">Total</th>'}
+    ${full?th('valida','Valida'):''}
     ${full?th('validada','Validada')+th('contab','Contab.'):''}
     <th>Estado</th>
   </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 /* ---------- APROBADAS PARA PAGO ---------- */
-function viewAprobadas(){
-  const ff=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada)
+// Por fecha de APROBACIÓN, no de factura: lo que se aprobó para pagar en un
+// periodo y cuánto suma (Paqui, 14/10/2026).
+function aprobadasFiltradas(){
+  return state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada&&enRango(f.json_extraccion_ia._aprobada_pago.fecha,state.apDesde,state.apHasta))
     .sort((a,b)=>(new Date(a.json_extraccion_ia._aprobada_pago.fecha||0)-new Date(b.json_extraccion_ia._aprobada_pago.fecha||0))||String(a.fecha_factura||'').localeCompare(String(b.fecha_factura||'')));
-  if(!ff.length)return`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">No hay facturas aprobadas pendientes de pago</p><small>Cuando pulses «APROBADA PAGAR» en una factura, aparecerá aquí</small></div></div>`;
+}
+function viewAprobadas(){
+  const ff=aprobadasFiltradas();
+  const filtro=`<div class="card" style="margin-bottom:14px"><div class="filtros" style="border:0;padding:0">
+    <b style="font-size:13px">Aprobadas entre el</b><input type="date" id="ap-desde" value="${esc(state.apDesde)}"><span>y el</span><input type="date" id="ap-hasta" value="${esc(state.apHasta)}">
+    <span style="font-size:13px;margin-left:8px">Total a pagar del periodo: <b>${eur(ff.reduce((s,f)=>s+(+f.total_factura||0),0))}</b> (${ff.length} factura${ff.length===1?'':'s'})</span>
+    <button class="btn-s" id="ap-excel" style="margin-left:auto" ${ff.length?'':'disabled'}>Excel del periodo</button></div></div>`;
+  if(!ff.length)return filtro+`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">No hay facturas aprobadas pendientes de pago</p><small>Cuando pulses «APROBADA PAGAR» en una factura, aparecerá aquí</small></div></div>`;
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
   const rows=ff.map(f=>{const a=f.json_extraccion_ia._aprobada_pago;return `<tr data-id="${f.id}">
       <td class="mono cell-strong" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)} <span style="color:var(--faint);font-weight:400">${a.fecha?new Date(a.fecha).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):''}</span></td>
@@ -1548,9 +1690,9 @@ function viewAprobadas(){
       <td style="text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">${svg(ICN.card)}Pagada</button>
         <button class="act-btn del" data-desaprobar-fila="${f.id}" title="Vuelve a su sitio en el listado de facturas" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">Deshacer aprobación</button></div></td>
     </tr>`;}).join('');
-  return`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
-    <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${svg(ICN.check)}</div></div><div class="kpi-val">${ff.length}</div><div class="kpi-lbl">Aprobadas pendientes de pago</div></div>
-    <div class="kpi"><div class="kpi-top"><div class="kpi-ic blue">${svg(ICN.euro)}</div></div><div class="kpi-val">${eurS(total)}</div><div class="kpi-lbl">Total a pagar</div></div>
+  return filtro+`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
+    <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${svg(ICN.check)}</div></div><div class="kpi-val">${ff.length}</div><div class="kpi-lbl">Aprobadas pendientes de pago${state.apDesde||state.apHasta?' (en el periodo)':''}</div></div>
+    <div class="kpi"><div class="kpi-top"><div class="kpi-ic blue">${svg(ICN.euro)}</div></div><div class="kpi-val">${eurS(total)}</div><div class="kpi-lbl">Total a pagar${state.apDesde||state.apHasta?' del periodo':''}</div></div>
   </div>
   <div class="card"><div class="tbl-wrap"><table><thead><tr>
     <th>Aprobada ▲</th><th>Fecha fra.</th><th>Nº Factura</th><th>Proveedor</th><th>Forma de pago</th><th class="r">Total</th><th>Estado</th><th></th>
@@ -1558,13 +1700,31 @@ function viewAprobadas(){
 }
 
 /* ---------- FACTURAS PAGADAS ---------- */
+// Con los mismos filtros que el listado (Paqui, 14/10/2026): proveedor, importe,
+// fechas de pago y búsqueda. Las domiciliadas se paga solas: se pueden ver aquí.
 function viewPagadas(){
-  const ff=state.facturas
-    .filter(f=>f.json_extraccion_ia?._pago&&!f.eliminada)
-    .sort((a,b)=>{const da=new Date(a.fecha_factura||a.fecha_recepcion),db=new Date(b.fecha_factura||b.fecha_recepcion);return db-da;});
-  if(!ff.length)return`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">Sin facturas pagadas todavía</p><small>Cuando marques una factura como pagada, aparecerá aquí</small></div></div>`;
+  const todas=state.facturas.filter(f=>!f.eliminada&&(f.json_extraccion_ia?._pago||(state.pgDomic&&esDeGiro(f))));
+  const provs=[...new Set(todas.map(claveProv))].map(k=>({k,n:nombreCanonico(k)})).sort((a,b)=>a.n.localeCompare(b.n,'es'));
+  const q=String(state.pgBuscar||'').toLowerCase(), qn=q.replace(/[^a-z0-9]/g,'');
+  const min=numES(state.pgMin), max=numES(state.pgMax);
+  const ff=todas.filter(f=>{
+    const pago=(f.json_extraccion_ia||{})._pago;
+    if((state.pgDesde||state.pgHasta)&&!enRango(pago?pago.fecha:f.fecha_factura,state.pgDesde,state.pgHasta))return false;
+    if(state.pgProv&&claveProv(f)!==state.pgProv)return false;
+    const t=+f.total_factura||0; if(min!=null&&t<min)return false; if(max!=null&&t>max)return false;
+    if(q){const s=`${f.numero_factura} ${nombreProv(f)} ${cifDe(f)} ${formaPago(f).texto}`.toLowerCase();
+      if(!s.includes(q)&&!(qn&&s.replace(/[^a-z0-9]/g,'').includes(qn)))return false;}
+    return true;
+  }).sort((a,b)=>{const da=new Date(a.fecha_factura||a.fecha_recepcion),db=new Date(b.fecha_factura||b.fecha_recepcion);return db-da;});
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
-  return`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
+  const filtros=`<div class="card" style="margin-bottom:14px"><div class="filtros" style="border:0;padding:0">
+    <input id="pg-buscar" placeholder="Nº factura, proveedor, CIF… (Intro)" value="${esc(state.pgBuscar)}" style="flex:1 1 14rem">
+    <select class="sel" id="pg-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.pgProv?'selected':''}>${esc(p.n)}</option>`).join('')}</select>
+    <input id="pg-min" inputmode="decimal" placeholder="Importe desde" value="${esc(state.pgMin)}" style="width:110px"><input id="pg-max" inputmode="decimal" placeholder="hasta" value="${esc(state.pgMax)}" style="width:90px">
+    <span style="font-size:12.5px">Pagadas del</span><input type="date" id="pg-desde" value="${esc(state.pgDesde)}"><span style="font-size:12.5px">al</span><input type="date" id="pg-hasta" value="${esc(state.pgHasta)}">
+    <label style="font-size:12.5px;display:flex;gap:5px;align-items:center"><input type="checkbox" id="pg-domic" ${state.pgDomic?'checked':''}> Incluir domiciliadas</label></div></div>`;
+  if(!ff.length)return filtros+`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">${todas.length?'Ninguna pagada con estos filtros':'Sin facturas pagadas todavía'}</p><small>Cuando marques una factura como pagada, aparecerá aquí</small></div></div>`;
+  return filtros+`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
     <div class="kpi"><div class="kpi-top"><div class="kpi-ic blue">${svg(ICN.card)}</div></div><div class="kpi-val">${ff.length}</div><div class="kpi-lbl">Facturas pagadas</div></div>
     <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${svg(ICN.euro)}</div></div><div class="kpi-val">${eurS(total)}</div><div class="kpi-lbl">Total pagado</div></div>
   </div>
@@ -1700,6 +1860,7 @@ async function openDrawer(id){
         ${f.forma_pago_factura?`<br><span style="color:var(--muted);font-size:12.5px">La factura dice: «${esc(f.forma_pago_factura)}»</span>`:''}
       </div></div>`:''}
     ${avisoElim}
+    ${bannerSenales(f)}
     ${!f.eliminada?`<div class="dr-actions">
       ${esPend?`<button class="act-btn ok" data-act="VALIDADA" data-id="${f.id}">${svg(ICN.check)}Validar</button>
       <button class="act-btn no" data-act="RECHAZADA" data-id="${f.id}">${svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>')}Rechazar</button>`:''}
@@ -1711,8 +1872,10 @@ async function openDrawer(id){
         :`<button class="act-btn cont" data-aprobar="${f.id}" style="white-space:nowrap" title="Aprobarla para pago: pasa a la sección «Aprobadas»">${svg(ICN.check)}APROBADA PAGAR</button>`):''}
       ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Marcar como pagada por transferencia bancaria">${svg(ICN.card)}Pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
       <button class="act-btn cont" data-manual="${f.id}" title="Subir un albarán, un pedido u otro papel que esté guardado en otro sitio y ponerlo con esta factura">${svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>')}Añadir manualmente</button>
+      ${botonesExtraFicha(f)}
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>
-    </div>`:''}
+    </div>
+    <div id="panel-extra"></div>`:''}
     ${!f.eliminada?`<div id="manual-form" style="display:none;margin:10px 0;padding:12px;border:1px dashed var(--line);border-radius:10px;background:var(--bg)">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">Añadir un documento a esta factura</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -1741,8 +1904,12 @@ async function openDrawer(id){
     <div class="dr-sec">
       <div class="dr-sec-t">${svg('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/>')}Proveedor</div>
       <div class="kv">
-        <div class="kv-item"><div class="k">Nombre</div><div class="v">${esc(nombreProv(f))}</div></div>
-        <div class="kv-item"><div class="k">NIF / CIF</div><div class="v mono">${esc(nifProv(f)||'—')}</div></div>
+        <div class="kv-item"><div class="k">Nombre</div><div class="v">${esc(nombreProv(f))}${nombreLeido(f)!==nombreProv(f)?`<div style="font-size:11.5px;color:var(--muted);font-weight:400">En la factura se leyó «${esc(nombreLeido(f))}»</div>`:''}</div></div>
+        <div class="kv-item"><div class="k">NIF / CIF</div><div class="v mono">${esc(cifDe(f)||'—')}${nifLimpio(nifProv(f)||'')&&nifLimpio(nifProv(f)||'')!==cifDe(f)?`<div style="font-size:11.5px;color:var(--amber);font-weight:400">Leído: ${esc(nifProv(f))}</div>`:''}</div></div>
+        <div class="kv-item"><div class="k">Homologación</div><div class="v mono">${homologacionDe(f)?esc(homologacionDe(f)):'<span style="color:var(--rd)">FALTA</span>'}</div></div>
+        <div class="kv-item"><div class="k">Delegación</div><div class="v">${delegacionCiudad(f)?esc(delegacionCiudad(f)):'<span style="color:var(--rd)">SIN DELEGACIÓN</span>'}</div></div>
+        <div class="kv-item"><div class="k">Valida</div><div class="v">${esc(validadorDe(f)||'—')}</div></div>
+        <div class="kv-item"><div class="k">Nº pedido</div><div class="v mono">${esc(numeroPedido(f)||'—')}</div></div>
         <div class="kv-item" style="grid-column:1/-1"><div class="k">Código de proveedor (AS400)</div>
           ${codigoProv(f)?'':`<div style="margin:4px 0 6px;padding:8px 10px;border-radius:8px;background:var(--amber-s);color:var(--amber);font-size:12px;font-weight:600">Proveedor sin código AS400: en el Excel del AS400 saldrá en blanco. Escríbelo aquí una vez y valdrá para todas sus facturas.</div>`}
           <div class="v" style="display:flex;gap:8px;align-items:center;margin-top:2px">
@@ -1772,10 +1939,19 @@ async function openDrawer(id){
         ${ir?kv('Retención IRPF',`${esc(String(ir.pct??'?'))} % · ${eur(ir.importe)}`):''}
         ${j._autoriza_pedido?kv('Autoriza el pedido',esc(j._autoriza_pedido)):''}
       </div></div>`;})()}
-    ${(f.direccion_fiscal_detectada||f.delegacion_detectada)?`<div class="dr-sec"><div class="dr-sec-t">${svg(ICN.pin)}Direcciones</div><div class="kv one"><div class="kv-item"><div class="k">Dirección fiscal detectada</div><div class="v" style="font-weight:500;font-size:13px">${esc(f.direccion_fiscal_detectada||'—')}</div></div>${f.delegacion_detectada?`<div class="kv-item"><div class="k">Delegación</div><div class="v">${esc(f.delegacion_detectada)}</div></div>`:''}</div></div>`:''}
+    ${(f.direccion_fiscal_detectada||f.delegacion_detectada)?`<div class="dr-sec"><div class="dr-sec-t">${svg(ICN.pin)}Direcciones</div><div class="kv one"><div class="kv-item"><div class="k">Dirección fiscal detectada</div><div class="v" style="font-weight:500;font-size:13px">${esc(f.direccion_fiscal_detectada||'—')}</div></div>${f.delegacion_detectada?`<div class="kv-item"><div class="k">Delegación (texto leído)</div><div class="v" style="font-weight:500;font-size:13px">${esc(f.delegacion_detectada)}</div></div>`:''}</div></div>`:''}
     ${(()=>{
       const vd=(j._descuento_validacion||j?.datos_extraidos?._descuento_validacion)||null;
       if(!vd)return '';
+      // La comprobación del descuento la hizo la lectura buscando el proveedor por
+      // parecido de nombre: a la notaría de Ramón Marín Casanova le aplicó las
+      // condiciones de Carlos Casanova (Alcitex). Si el proveedor que usó no es el
+      // de esta factura, esa comprobación no vale y no se enseña como si valiera.
+      if(vd.proveedor_nombre_bd){
+        const a=normProv(vd.proveedor_nombre_bd), b=normProv(nombreProv(f)), c=normProv(nombreLeido(f));
+        const casa=x=>x&&(x===a||x.startsWith(a+' ')||a.startsWith(x+' '));
+        if(!casa(b)&&!casa(c))return `<div class="dr-sec"><div class="dr-sec-t">Validación de descuento</div><div style="font-size:12.5px;color:var(--muted)">La lectura comparó el descuento con las condiciones de otro proveedor («${esc(vd.proveedor_nombre_bd)}»), así que esa comprobación no sirve para esta factura. Compruébalo con las condiciones de ${esc(nombreProv(f))}.</div></div>`;
+      }
       const VMAP={OK:'Correcto',DESCUENTO_INCORRECTO:'Descuento incorrecto',DESCUENTO_NO_APLICADO:'Descuento no aplicado',DESCUENTO_NO_ESPERADO:'Descuento no esperado',DESCUENTO_FUERA_RANGO:'Descuento fuera de rango',PROVEEDOR_NO_ENCONTRADO:'Proveedor no encontrado en BD',NO_NUMERICO:'Tipo especial (rappel/precio fijo)',SIN_DATOS:'Sin datos de descuento'};
       const ok=vd.validacion==='OK';
       const warn=['DESCUENTO_INCORRECTO','DESCUENTO_NO_APLICADO','DESCUENTO_NO_ESPERADO','DESCUENTO_FUERA_RANGO'].includes(vd.validacion);
@@ -1961,11 +2137,10 @@ async function openDrawer(id){
   document.querySelectorAll('#dr-body [data-desaprobar]').forEach(b=>b.onclick=()=>aprobarPago(b.dataset.desaprobar,false));
   // Los botones de la ayuda: el que lanza la acción que arregla el aviso y el que
   // prepara el mensaje cuando la acción no lo arregla.
-  document.querySelectorAll('#dr-body [data-ayuda-accion]').forEach(b=>b.onclick=()=>pedirTarea(b.dataset.ayudaAccion,b));
-  document.querySelectorAll('#dr-body [data-escalar]').forEach(b=>b.onclick=()=>{
-    const fa=state.facturas.find(x=>x.id===b.dataset.escalar);
-    if(fa)escalar(fa,b.dataset.cod);
-  });
+  document.querySelectorAll('#dr-body [data-ayuda-accion]').forEach(b=>b.onclick=()=>{
+    const a=b.dataset.ayudaAccion;
+    if(a==='releer')abrirReleer(f.id);else if(a==='editar')abrirEdicion(f.id);else if(a==='separar')abrirSeparar(f.id);else pedirTarea(a,b);});
+  bindExtrasFicha(f);
   document.querySelectorAll('#dr-body [data-restaurar]').forEach(b=>b.onclick=()=>restaurarFactura(b.dataset.restaurar));
   document.querySelectorAll('#dr-body [data-pdf]').forEach(b=>b.onclick=()=>openPdf(b.dataset.pdf));
   // Tambien fuera del cajon: la tabla de Sin asignar abre PDF igual, y el
@@ -1977,11 +2152,11 @@ async function openDrawer(id){
     openPdfsJuntos(urls);
   });
 }
-async function eliminarFactura(id){
+async function eliminarFactura(id,motivoFijo){
   const f=state.facturas.find(x=>x.id===id);if(!f)return;
   const ref=`${f.numero_factura||'(sin número)'} · ${nombreProv(f)} · ${eur(f.total_factura)}`;
   if(!confirm(`¿Quitar esta factura del listado?\n\n${ref}\n\nDejará de aparecer en el panel y en el Excel de contabilidad. El documento se conserva y se puede recuperar.`))return;
-  const motivo=prompt('Motivo (opcional): p. ej. "duplicada", "no es nuestra"…')||null;
+  const motivo=motivoFijo||prompt('Motivo (opcional): p. ej. "duplicada", "no es nuestra"…')||null;
   try{
     const tok=getToken()||SB_ANON;
     const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',
@@ -2094,41 +2269,13 @@ async function anadirManual(facId,boton){
   if(!/pdf|jpe?g|png/i.test(archivo.type+archivo.name)){toast('Solo PDF, JPG o PNG','err');return;}
   if(archivo.size>25*1024*1024){toast('El archivo pasa de 25 MB','err');return;}
   const antes=boton.textContent;boton.disabled=true;boton.textContent='Subiendo…';
-  const tok=getToken()||SB_ANON, quien=(_session?.user?.email||'panel');
-  const H={apikey:SB_ANON,Authorization:`Bearer ${tok}`};
   try{
     const pdf=await aPdf(archivo);
-    const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',pdf))].map(b=>b.toString(16).padStart(2,'0')).join('');
     const nombre=archivo.name.replace(/\.(jpe?g|png)$/i,'.pdf');
-    // 1) el PDF. Si ya estaba (mismo contenido), vale el que hay.
-    const up=await fetch(`${SB_URL}/storage/v1/object/facturas/${hash}.pdf`,{method:'POST',
-      headers:{...H,'Content-Type':'application/pdf'},body:pdf});
-    if(!up.ok){const t=await up.text();if(!/Duplicate|already exists|409/i.test(t+up.status))throw new Error('No se ha podido subir el archivo: '+t.slice(0,120));}
-    // 2) el documento: el mismo papel no se registra dos veces
-    let doc=(await api(`documentos_recibidos?select=id&hash_archivo=eq.${hash}&limit=1`))[0];
-    if(!doc){
-      const r=await fetch(`${SB_URL}/rest/v1/documentos_recibidos`,{method:'POST',
-        headers:{...H,'Content-Type':'application/json',Prefer:'return=representation'},
-        body:JSON.stringify({origen:'MANUAL',nombre_archivo:nombre,hash_archivo:hash,
-          ruta_almacenamiento:`facturas/${hash}.pdf`,estado_procesamiento:'COMPLETADO',
-          email_remitente:quien,email_asunto:`Añadido a mano a la factura ${f.numero_factura||''}`,
-          tipo_documento_ia:tipo})});
-      const d=await r.json().catch(()=>[]);
-      if(!r.ok||!Array.isArray(d)||!d.length)throw new Error('No se ha podido registrar el documento');
-      doc=d[0];
-    }
-    // 3) ponerlo con la factura, ya
-    const ia=Object.assign({},f.json_extraccion_ia||{});
-    const adj=(Array.isArray(ia._adjuntos)?ia._adjuntos:[]).filter(a=>a.documento_id!==doc.id);
-    adj.push({nombre,tipo,documento_id:doc.id,como:`añadido a mano por ${quien}`,leido:true,a_mano:true,
-              url:`${SB_URL}/storage/v1/object/public/facturas/${hash}.pdf`});
-    ia._adjuntos=adj;
-    await guardarIA(facId,ia);
-    // 4) y que el emparejado lo respete y recalcule la factura
-    await fetch(`${SB_URL}/rest/v1/auditoria_workflow`,{method:'POST',headers:{...H,'Content-Type':'application/json'},
-      body:JSON.stringify({evento:'TAREA: asignar',nivel:'INFO',n8n_execution_id:'panel',
-        detalle:{documento_id:doc.id,factura_id:facId,tipo,accion:'asignar',estado:'PENDIENTE',
-                 pedido_por:quien,cuando:new Date().toISOString()}})}).catch(()=>{});
+    // El PDF a Storage y registrado como documento (el mismo papel no se registra
+    // dos veces); luego, puesto con la factura y avisado el emparejado.
+    const doc=await subirDocumento(pdf,nombre,tipo,`Añadido a mano a la factura ${f.numero_factura||''}`);
+    await ponerAdjunto(facId,doc,tipo);
     toast(`${tipo==='ALBARAN'?'Albarán':tipo==='PEDIDO'?'Pedido':'Documento'} añadido a la factura`);
     await loadAll();openDrawer(facId);
   }catch(e){
@@ -2184,7 +2331,8 @@ async function guardarCodigoProveedor(id){
   const data=await r.json().catch(()=>null);
   if(!r.ok||!data||!data.id){toast(data&&data.message||'No se pudo guardar — vuelve a iniciar sesión','err');return;}
   try{state.proveedoresBD=await api(`proveedores?select=id,nombre,nif_cif,codigo_proveedor,cuenta_contable,tipo_hoja,actividad`);}catch(e){console.error(e);}
-  _codCache.clear();
+  state.provPorId=new Map((state.proveedoresBD||[]).map(p=>[p.id,p]));
+  limpiarCaches();
   toast(data.otros?`Código ${val} guardado. Ojo: ${data.otros} también tiene ese código`:`Código ${val} guardado para todas las facturas de ${data.nombre}`);
   refreshTabla();openDrawer(id);
 }
@@ -2206,14 +2354,15 @@ function toast(msg,tipo){
 }
 function closeDrawer(){$('#ov').classList.remove('open');$('#drawer').classList.remove('open');}
 // La ayuda de cada aviso, debajo del aviso: qué es, qué hacer y el botón que lo
-// hace. Y si no se arregla, el que prepara el mensaje para Kike con el caso ya
-// montado — número, códigos y lo que se ha intentado— en vez de «no va una».
+// hace. El botón de «mensaje para Kike» se quitó el 14/10/2026 (Paqui): cada
+// aviso tiene ya su arreglo desde el panel.
 function ayudaDe(i,f){
   const cod=i.codigo_validacion||'';
   const a=AYUDA[cod]||AYUDA[cod.replace(/[0-9]+$/,'')];
   if(!a)return '';
   const accion=ACCION_DE[cod];
-  const btn=accion?`<button class="act-btn" data-ayuda-accion="${accion}" style="margin-top:8px;font-size:12px;padding:5px 10px">${accion==='emparejar'?'Volver a emparejar':'Releer esta factura'}</button>`:'';
+  const ETQ={emparejar:'Volver a emparejar',releer:'Releer esta factura',editar:'Editar datos',separar:'Separar documentos'};
+  const btn=accion?`<button class="btn-s" data-ayuda-accion="${accion}" style="margin-top:8px">${ETQ[accion]||accion}</button>`:'';
   const esc2=x=>esc(String(x||''));
   return `<details style="margin-top:8px">
     <summary style="cursor:pointer;font-size:12.5px;color:var(--blue);list-style:none">¿Qué hago con esto?</summary>
@@ -2221,30 +2370,7 @@ function ayudaDe(i,f){
       <div style="font-weight:600;margin-bottom:3px">${esc2(a.q)}</div>
       <div>${esc2(a.h)}</div>
       ${btn}
-      <div style="margin-top:9px;padding-top:8px;border-top:1px solid var(--line-2);color:var(--muted);font-size:12px">
-        ¿No se arregla así?
-        <button class="act-btn" data-escalar="${f.id}" data-cod="${esc2(cod)}" style="margin-left:6px;font-size:12px;padding:4px 9px">Preparar mensaje para Kike</button>
-      </div>
     </div></details>`;
-}
-
-// Copia al portapapeles el caso entero. Lo que llega por WhatsApp suele ser «hay
-// una factura que da error»; con esto llega el número, el proveedor, el importe,
-// los códigos y lo que ya se ha intentado, que es la diferencia entre mirarlo en
-// dos minutos o en media hora.
-function escalar(f,cod){
-  const inc=state.incidencias.filter(x=>x.factura_id===f.id);
-  const t=[`Factura ${f.numero_factura||'(sin número)'} — ${nombreProv(f)}`,
-    `${eur(f.total_factura)} · ${dt(f.fecha_factura)} · estado ${estadoLbl(f.estado)}`,
-    ``,
-    `Avisos: ${inc.map(x=>x.codigo_validacion).filter(Boolean).join(', ')||'ninguno'}`,
-    `El que no sé resolver: ${cod}`,
-    inc.filter(x=>x.codigo_validacion===cod).map(x=>`  "${x.descripcion}"`).join('\n'),
-    ``,
-    `Panel: ${location.origin}${location.pathname}`].join('\n');
-  navigator.clipboard.writeText(t).then(
-    ()=>toast('Mensaje copiado: pégalo en el WhatsApp de Kike'),
-    ()=>toast('No he podido copiarlo','err'));
 }
 
 function openLegend(){
@@ -2335,6 +2461,20 @@ function bindContent(){
   document.querySelectorAll('[data-asig-ok]').forEach(b=>b.onclick=()=>asignarDocumento(b.dataset.asigOk,b));
   document.querySelectorAll('[data-sug-doc]').forEach(b=>b.onclick=()=>pedirTarea('asignar',b,
     {documento_id:b.dataset.sugDoc,factura_id:b.dataset.sugFac,tipo:b.dataset.sugTipo}));
+  // Sin asignar: decir qué es cada documento, descartarlo o recuperarlo
+  document.querySelectorAll('#content [data-docfac]').forEach(b=>b.onclick=()=>docEsFactura(b.dataset.docfac,b));
+  document.querySelectorAll('#content [data-doctipo]').forEach(b=>b.onclick=()=>clasificarDoc(b.dataset.doc,b.dataset.doctipo,null,b));
+  document.querySelectorAll('#content [data-descartar]').forEach(b=>b.onclick=()=>{
+    const m=b.dataset.motivo||prompt('¿Por qué se descarta? (opcional: «logo», «captura de pantalla»…)','');
+    if(m===null)return; clasificarDoc(b.dataset.descartar,'DESCARTADO',m||null,b);});
+  document.querySelectorAll('#content [data-recuperar]').forEach(b=>b.onclick=()=>clasificarDoc(b.dataset.recuperar,'RESTAURAR',null,b));
+  // Aprobadas y pagadas: filtros
+  const ap=(id,k)=>{const el=$('#'+id);if(el)el.onchange=e=>{state[k]=e.target.value;render();};};
+  ap('ap-desde','apDesde');ap('ap-hasta','apHasta');
+  ap('pg-desde','pgDesde');ap('pg-hasta','pgHasta');ap('pg-prov','pgProv');ap('pg-min','pgMin');ap('pg-max','pgMax');ap('pg-buscar','pgBuscar');
+  const pgd=$('#pg-domic');if(pgd)pgd.onchange=e=>{state.pgDomic=e.target.checked;render();};
+  const apx=$('#ap-excel');if(apx)apx.onclick=()=>excelAprobadas(aprobadasFiltradas(),state.apDesde,state.apHasta);
+  const fv=$('#f-valida');if(fv)fv.onchange=e=>{state.fValida=e.target.value;refreshTabla();};
   const ss=$('#s-search');
   if(ss)ss.oninput=e=>{
     const q=e.target.value.toLowerCase().trim(), qn=q.replace(/[^a-z0-9]/g,'');
@@ -2349,7 +2489,7 @@ function bindContent(){
   };
   document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));
   document.querySelectorAll('.inc[data-id]').forEach(el=>el.onclick=()=>openDrawer(el.dataset.id));
-  document.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{const g=el.dataset.go;if(['revision','cerradas','validadas','contabilizadas'].includes(g)){setView('facturas');state.quickFilter=g;render();}else setView(g);});
+  document.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{const g=el.dataset.go;if(['revision','cerradas','validadas','contabilizadas','domic','sospecha'].includes(g)){setView('facturas');state.quickFilter=g;render();}else setView(g);});
   document.querySelectorAll('[data-chip]').forEach(el=>el.onclick=()=>{
     state.quickFilter=el.dataset.chip;
     if(state.verEliminadas){state.verEliminadas=false;loadAll();}else render();});
@@ -2429,32 +2569,32 @@ function exportExcel(){
   if(!ff.length){toast(base.length?'Las facturas que ves están eliminadas: no se exportan':'No hay facturas para exportar','err');return;}
   const head=['Cod. Proveedor','Proveedor','NIF','Homologación','Cuenta Contable','Nº Factura','Fecha Factura','Nº Pedido',
     'Ámbito IVA','Delegación','Base Imponible IVA','Tipo IVA','Cuota IVA','Total Factura','Estado',
-    'Validada el','Validación','Contabilizada el','Condiciones'];
-  for(let i=1;i<=20;i++) head.push('Albarán '+i);
+    'Validada el','Validación','Contabilizada el','Condiciones','Valida'];
+  // Una columna de fecha al lado de cada albarán (Paqui, 14/10/2026)
+  for(let i=1;i<=20;i++) head.push('Albarán '+i,'Fecha albarán '+i);
   const rows=ff.map(f=>{
     const ia=f.json_extraccion_ia||{};
-    const prov=ia.proveedor||{};
-    const albs=albaranesConFecha(ia);
+    const albs=albaranesDe(ia);
     let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva:[];
     if(!d.length) d=[{tipo:f.porcentaje_iva||0, base:f.base_imponible, cuota:f.importe_iva}];
     const iva=d[0]||{};
     const row=[
-      codigoProv(f), nombreProv(f), nifLimpio(nifProv(f)),
-      homologacionPorNIF(nifProv(f))||homologacionPorNombre(nombreProv(f))||'', cuentaContablePorNombre(nombreProv(f))||'',
+      codigoProv(f), nombreProv(f), cifDe(f),
+      homologacionDe(f), (proveedorDeFactura(f)||{}).cuenta_contable||cuentaContablePorNombre(nombreProv(f))||'',
       f.numero_factura||'', dt(f.fecha_factura||f.fecha_recepcion),
       numeroPedido(f),
-      ia._ambito_iva||'NACIONAL', ia._delegacion||f.delegacion_detectada||'',
+      ia._ambito_iva||'NACIONAL', delegacionCiudad(f),
       iva.base||'', (Math.round(+iva.tipo)||0)+'%', iva.cuota||'',
       f.total_factura||'', f.estado||'',
       ...(()=>{const v=validacion(f),c=fechaContabilizada(f);
-        return [v&&v.fecha?dt(v.fecha):'', v?v.como:'', c?dt(c):'', sinCondiciones(f)?'SIN CONDICIONES':''];})()
+        return [v&&v.fecha?dt(v.fecha):'', v?v.como:'', c?dt(c):'', sinCondiciones(f)?'SIN CONDICIONES':'', validadorDe(f)];})()
     ];
-    for(let i=0;i<20;i++) row.push(albs[i]||'');
+    for(let i=0;i<20;i++) row.push(albs[i]?albs[i].num:'',albs[i]?albs[i].fecha:'');
     return row;
   });
   const ws=XLSX.utils.aoa_to_sheet([head,...rows]);
   ws['!cols']=[{wch:14},{wch:20},{wch:12},{wch:13},{wch:14},{wch:13},{wch:14},{wch:12},
-              {wch:14},{wch:14},{wch:15},{wch:10},{wch:12},{wch:13},{wch:12},{wch:12},{wch:11},{wch:14},{wch:16},...Array(20).fill({wch:22})];
+              {wch:14},{wch:14},{wch:15},{wch:10},{wch:12},{wch:13},{wch:12},{wch:12},{wch:11},{wch:14},{wch:16},{wch:14},...Array(40).fill({wch:13})];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Facturas');
   XLSX.writeFile(wb,`AS400_facturas_montero_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -2480,7 +2620,12 @@ async function exportAS400(){
     return;
   }
   const sinCod=ff.filter(f=>!codigoProv(f)).length;
-  const avisoCod=sinCod?`\n\nOjo: ${sinCod} factura${sinCod!==1?'s':''} sin código de proveedor (saldrá en blanco). Filtro "Sin código proveedor" para completarlas.`:'';
+  const sinHom=ff.filter(f=>!homologacionDe(f)).length, sinDel=ff.filter(f=>!delegacionCiudad(f)).length;
+  const sinPedR=ff.filter(f=>tieneSenal(f,'FALTA_PEDIDO_R')).length;
+  const avisoCod=(sinCod?`\n\nOjo: ${sinCod} factura${sinCod!==1?'s':''} sin código de proveedor (saldrá en blanco). Filtro "Sin código proveedor" para completarlas.`:'')
+    +(sinHom?`\nOjo: ${sinHom} sin homologación (filtro "Sin homologación").`:'')
+    +(sinDel?`\nOjo: ${sinDel} sin delegación (filtro "Sin delegación").`:'')
+    +(sinPedR?`\nOjo: ${sinPedR} con homologación R sin nº de pedido (filtro "Falta pedido (R)").`:'');
   if(!confirm((rehacer
       ?`Se volverá a descargar el Excel de ${ff.length} factura${ff.length!==1?'s':''} ya contabilizada${ff.length!==1?'s':''}, con el ZIP de sus PDF.\nNo cambia nada: es solo una copia del mismo fichero.\n\n¿Continuar?`
       :`Se exportarán ${ff.length} factura${ff.length!==1?'s':''} al AS400${AUTO_CONTABILIZAR?' y pasarán a CONTABILIZADAS':'. Seguirán como validadas hasta que las marques como contabilizadas'}.\nCon el Excel se descarga un ZIP con el PDF de cada factura (solo las hojas de factura, sin pedido ni albarán) para el registro de IVA soportado.${excluidas?`\nSe excluyen ${excluidas} (duplicadas, rechazadas o en revisión).`:''}\n\nPodrás volver a descargar este Excel cuando quieras desde el filtro "Contabilizadas".\n\n¿Continuar?`)+avisoCod))return;
@@ -2497,7 +2642,8 @@ async function exportAS400(){
     'Nº Factura','Nº Pedido Montero','Ámbito IVA','Delegación',
     'Base Imponible','Tipo IVA (0%)','Cuota IVA','Tipo IVA (10%)','Cuota IVA','Tipo IVA (21%)','Cuota IVA',
     'Total Factura','Estado','Validada el','Descargado el','Contabilizada el','Forma de pago','IRPF %','IRPF importe'];
-  for(let i=1;i<=10;i++) head.push('Albarán '+i);
+  // Paqui, 14/10/2026: la fecha de cada albarán en la columna de al lado.
+  for(let i=1;i<=10;i++) head.push('Albarán '+i,'Fecha albarán '+i);
   const rows=[];
   ff.forEach(f=>{
     const ia=f.json_extraccion_ia||{};
@@ -2523,7 +2669,7 @@ async function exportAS400(){
     const col=t=>ivaMap[t].on?[t+'%',ivaMap[t].cuota]:['',''];
     const base=[
       dt(f.fecha_factura||f.fecha_recepcion),
-      codigoProv(f),nombreProv(f),nifLimpio(nifProv(f)),
+      codigoProv(f),nombreProv(f),cifDe(f),
       homologacionDe(f),
       String(f.numero_factura||'').replace(/[^A-Za-z0-9]/g,''),numeroPedido(f),
       ia._ambito_iva||'NACIONAL',delegacionCiudad(f),
@@ -2540,8 +2686,8 @@ async function exportAS400(){
     ];
     // Paqui, 07/10/2026: el albarán va solo con sus cifras, sin prefijo, símbolos
     // ni fecha, porque cada delegación lo graba a su manera en el AS400.
-    const albNum=(Array.isArray(ia._albaranes)?ia._albaranes:[]).map(n=>String(n||'').replace(/\D/g,'')).filter(Boolean);
-    for(let i=0;i<10;i++) base.push(albNum[i]||'');
+    const albNum=albaranesDe(ia).map(a=>({num:a.num.replace(/\D/g,''),fecha:a.fecha})).filter(a=>a.num);
+    for(let i=0;i<10;i++) base.push(albNum[i]?albNum[i].num:'',albNum[i]?albNum[i].fecha:'');
     // Paqui, 06/10/2026: vacía y numérica → 0; vacía y de texto → en blanco.
     // Numéricas son los importes y los tipos (base, IVA, total, IRPF); los
     // códigos y números de documento (pedido, albaranes…) son texto.
@@ -2551,7 +2697,7 @@ async function exportAS400(){
   const ws=XLSX.utils.aoa_to_sheet([head,...rows]);
   ws['!cols']=[{wch:12},{wch:12},{wch:28},{wch:12},{wch:13},{wch:16},{wch:14},{wch:12},{wch:12},
     {wch:12},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:12},{wch:7},{wch:12},{wch:13},{wch:15},{wch:22},{wch:7},{wch:11},
-    ...Array(10).fill({wch:12})];
+    ...Array(20).fill({wch:12})];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'AS400');
   XLSX.writeFile(wb,`AS400_asientos_montero_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -2742,6 +2888,777 @@ async function descargarDocumentos(){
   }finally{
     if(btn){btn.disabled=false;btn.innerHTML=txt;}
   }
+}
+
+/* ======================================================================
+   INCIDENCIAS DE PAQUI (14/10/2026)
+   Lo que la base marca (señales en _senales, migración 016) y lo que el panel
+   comprueba con el maestro, más las herramientas para corregirlo a mano:
+   editar datos, decir qué es cada documento, releer, enviar, separar un PDF,
+   el maestro de proveedores editable y el registro de IVA soportado.
+   ====================================================================== */
+const _senCache=new Map(), _condCache=new Map();
+function limpiarCaches(){_codCache.clear();_senCache.clear();_condCache.clear();}
+const ES_MONTERO=n=>String(n||'').replace(/\D/g,'')==='48558803';
+const DELEGACIONES=['MADRID','VALENCIA','ALICANTE','CASTELLON','MURCIA','MALAGA','SEVILLA','ZARAGOZA','BARCELONA','BILBAO','CENTRAL'];
+// Lo que no es una factura aunque se haya leído como tal.
+const SOSPECHA=['NUM_ES_PEDIDO','NUM_ES_ALBARAN','EMITE_MONTERO','TIPO_NO_FACTURA'];
+// Las cifras de un número de documento, como cifras_factura de la base.
+const cifras=n=>String(n||'').toUpperCase().replace(/O/g,'0').replace(/\D/g,'').replace(/^0+/,'');
+// Importes escritos a la española ("1.234,56") o con punto decimal.
+function numES(v){
+  if(v==null)return null; let s=String(v).trim().replace(/\s|€/g,''); if(!s)return null;
+  if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s); return isNaN(n)?null:Math.round(n*100)/100;
+}
+const quienSoy=()=>(_session?.user?.email||'Panel');
+
+// CIF/NIF/NIE con su letra o dígito de control bien: la misma regla que cif_valido de la base.
+function cifValido(n){
+  const k=nifLimpio(n);
+  if(!k||k.length!==9)return false;
+  const L='TRWAGMYFPDXBNJZSQVHLCKE';
+  if(/^\d{8}[A-Z]$/.test(k))return L[+k.slice(0,8)%23]===k[8];
+  if(/^[XYZ]\d{7}[A-Z]$/.test(k))return L[+('XYZ'.indexOf(k[0])+k.slice(1,8))%23]===k[8];
+  if(/^[ABCDEFGHJKLMNPQRSUVW]\d{7}[0-9A-J]$/.test(k)){
+    let s=0;for(let i=1;i<=7;i++){let d=+k[i];if(i%2===0)s+=d;else{d*=2;s+=Math.floor(d/10)+d%10;}}
+    const c=(10-s%10)%10;return k[8]===String(c)||k[8]==='JABCDEFGHI'[c];
+  }
+  return false;
+}
+// La fila del Excel de condiciones de un proveedor: por su código del AS400, por
+// CIF o por nombre, y solo si hay UNA candidata.
+function condicionDe(f){
+  if(_condCache.has(f.id))return _condCache.get(f.id);
+  const cs=state.condiciones||[]; let r=null;
+  if(cs.length){
+    const p=proveedorDeFactura(f);
+    const cod=String(p&&p.codigo_proveedor||'');
+    if(cod)r=cs.find(x=>String(x.codigo||'')===cod)||null;
+    if(!r){const cif=nifLimpio(nifProv(f)||'');
+      if(cif&&cifValido(cif)){const c=cs.filter(x=>nifLimpio(x.cif||'')===cif);if(c.length===1)r=c[0];}}
+    if(!r){const k=normProv(nombreProv(f));
+      if(k){let c=cs.filter(x=>normProv(x.nombre)===k||normProv(x.clave)===k);
+        if(c.length!==1)c=cs.filter(x=>{const o=normProv(x.nombre);return o&&(o.startsWith(k+' ')||k.startsWith(o+' '));});
+        if(c.length===1)r=c[0];}}
+  }
+  if(f.id)_condCache.set(f.id,r);
+  return r;
+}
+// El CIF del proveedor: el leído si es válido y no es el de Montero; si no, el
+// del maestro o el del Excel de condiciones (Paqui: «que se cojan todos los CIF»).
+function cifDe(f){
+  const l=nifLimpio(nifProv(f)||'');
+  if(l&&cifValido(l)&&!ES_MONTERO(l))return l;
+  const p=proveedorDeFactura(f); if(p&&cifValido(p.nif_cif))return nifLimpio(p.nif_cif);
+  const c=condicionDe(f); if(c&&cifValido(c.cif))return nifLimpio(c.cif);
+  return ES_MONTERO(l)?'':l;
+}
+// Quién tiene que dar el visto bueno (columna «validador» del Excel de condiciones).
+function validadorDe(f){
+  const c=condicionDe(f);
+  if(!c)return '';
+  return String(c.validador||'').trim()||(c.validar_manual?'A mano':'');
+}
+// Todas las señales de una factura: las que deja la base y las que se ven aquí
+// cruzando con el maestro.
+function senalesDe(f){
+  if(_senCache.has(f.id))return _senCache.get(f.id);
+  const ia=f.json_extraccion_ia||{};
+  const s=(Array.isArray(ia._senales)?ia._senales:[]).map(x=>({...x}));
+  if(!f.eliminada){
+    const tiene=c=>s.some(x=>x.codigo===c);
+    if(!proveedorDeFactura(f)&&!condicionDe(f)&&!tiene('EMITE_MONTERO'))
+      s.push({codigo:'PROVEEDOR_DUDOSO',bloquea:false,texto:`«${nombreLeido(f)}» no está ni en el maestro ni en el Excel de condiciones: comprueba en el PDF quién emite la factura y corrígelo con «Editar datos», o dalo de alta en «Maestro proveedores».`});
+    const leido=nifLimpio(nifProv(f)||''), bueno=cifDe(f);
+    if(!leido&&!tiene('EMITE_MONTERO'))s.push({codigo:'CIF_FALTA',bloquea:false,texto:bueno?`La factura no trae CIF legible: se usa el del maestro (${bueno}).`:'La factura no trae CIF y el proveedor no lo tiene en el maestro: escríbelo con «Editar datos».'});
+    else if(leido&&!ES_MONTERO(leido)&&!cifValido(leido))s.push({codigo:'CIF_DUDOSO',bloquea:false,texto:`El CIF leído (${leido}) no es válido, seguramente está mal leído.${bueno&&bueno!==leido?` Se usa el del maestro: ${bueno}.`:' Corrígelo con «Editar datos».'}`});
+    if(!homologacionDe(f))s.push({codigo:'SIN_HOMOLOGACION',bloquea:false,texto:'Este proveedor no tiene homologación (HNR, HLGV…) en el maestro: complétala en «Maestro proveedores».'});
+    if(!delegacionCiudad(f))s.push({codigo:'SIN_DELEGACION',bloquea:false,texto:'No se sabe la delegación: ni el pedido ni la homologación la dicen. Ponla con «Editar datos» o, si siempre es la misma, en el maestro.'});
+    const dif=f.diferencia_importe!=null?+f.diferencia_importe:null;
+    if(dif!=null&&Math.abs(dif)>TOL)s.push({codigo:'TOTAL_NO_CUADRA',bloquea:false,texto:`El total no cuadra: base + IVA = ${eur(f.total_calculado)} y se ha leído ${eur(f.total_factura)}. Casi siempre es un importe mal leído: míralo en el PDF y corrígelo con «Editar datos» o «Releer».`});
+    if(!tiene('FALTA_PEDIDO_R')&&/^H[NLS]R/.test(homologacionDe(f))&&!numeroPedido(f)&&(+f.total_factura||0)>=0
+       &&!(Array.isArray(ia._adjuntos)?ia._adjuntos:[]).some(a=>a&&a.tipo==='PEDIDO'))
+      s.push({codigo:'FALTA_PEDIDO_R',bloquea:true,texto:`Su homologación (${homologacionDe(f)}) lleva R: el nº de pedido es obligatorio y no aparece.`});
+  }
+  _senCache.set(f.id,s);
+  return s;
+}
+const esSospechosa=f=>senalesDe(f).some(x=>SOSPECHA.includes(x.codigo));
+const posDuplicado=f=>senalesDe(f).find(x=>x.codigo==='POSIBLE_DUPLICADO');
+const tieneSenal=(f,c)=>senalesDe(f).some(x=>x.codigo===c);
+// Las alertas en la columna de estado del listado (Paqui: «que se vea en el
+// resumen general, no al entrar en la factura»).
+function badgesSenales(f){
+  if(f.eliminada||f.estado==='CONTABILIZADA')return '';
+  const s=senalesDe(f);
+  const b=(txt,tit)=>`<span class="bdg alerta" title="${esc(tit)}">${txt}</span>`;
+  let h='';
+  const sos=s.filter(x=>SOSPECHA.includes(x.codigo));
+  if(sos.length)h+=b('¿PEDIDO/ALBARÁN?',sos.map(x=>x.texto).join(' '));
+  const d=s.find(x=>x.codigo==='POSIBLE_DUPLICADO');if(d)h+=b('¿DUPLICADA?',d.texto);
+  const r=s.find(x=>x.codigo==='FALTA_PEDIDO_R');if(r)h+=b('FALTA PEDIDO',r.texto);
+  const v=s.find(x=>x.codigo==='VARIAS_FACTURAS');if(v)h+=`<span class="bdg sincond" title="${esc(v.texto)}">VARIAS EN EL PDF</span>`;
+  const p=s.find(x=>x.codigo==='PROVEEDOR_DUDOSO');if(p)h+=`<span class="bdg sincond" title="${esc(p.texto)}">PROVEEDOR DUDOSO</span>`;
+  return h;
+}
+
+/* ---------- llamadas a la base ---------- */
+async function rpc(fn,args){
+  const tok=getToken()||SB_ANON;
+  const r=await fetch(`${SB_URL}/rest/v1/rpc/${fn}`,{method:'POST',
+    headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},body:JSON.stringify(args||{})});
+  const t=await r.text(); let d=null; try{d=t?JSON.parse(t):null;}catch(_){d=t;}
+  if(!r.ok)throw new Error((d&&d.message)||t||('Error '+r.status));
+  return d;
+}
+async function patchFactura(id,body){
+  const tok=getToken()||SB_ANON;
+  const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',
+    headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>[]);
+  if(!r.ok||!Array.isArray(d)||!d.length)throw new Error('No se ha guardado — vuelve a iniciar sesión');
+  return d[0];
+}
+// La ficha entera de una factura aunque no esté en el periodo que se está viendo.
+async function facturaPorId(id){
+  const f=state.facturas.find(x=>x.id===id); if(f)return f;
+  return (await api1(`facturas_procesadas?select=*&id=eq.${id}`))[0]||null;
+}
+
+/* ---------- panel libre en el cajón ---------- */
+function abrirCajon(titulo,sub,html){
+  $('#ov').classList.add('open');$('#drawer').classList.add('open');
+  $('#dr-head').innerHTML=`<div><div class="dr-title">${esc(titulo)}</div><div class="dr-sub">${esc(sub||'')}</div></div><button class="x" id="dr-close">${svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>')}</button>`;
+  $('#dr-close').onclick=closeDrawer;
+  $('#dr-body').innerHTML=html; $('#dr-body').scrollTop=0;
+}
+// Proveedores para elegir: el maestro (con su código) y lo que solo está en el
+// Excel de condiciones. La etiqueta es lo que se escribe; el mapa da el dato.
+function opcionesProveedor(){
+  const mapa=new Map(), vistos=new Set();
+  (state.proveedoresBD||[]).forEach(p=>{
+    const et=`${p.nombre}${p.codigo_proveedor?' · '+p.codigo_proveedor:''}`;
+    mapa.set(et,{id:p.id,nombre:p.nombre,nif:cifValido(p.nif_cif)?nifLimpio(p.nif_cif):'',codigo:p.codigo_proveedor||''});
+    if(p.codigo_proveedor)vistos.add(String(p.codigo_proveedor));
+  });
+  (state.condiciones||[]).forEach(c=>{
+    if(c.codigo&&vistos.has(String(c.codigo)))return;
+    const et=`${c.nombre}${c.codigo?' · '+c.codigo:''}`;
+    if(!mapa.has(et))mapa.set(et,{id:null,nombre:c.nombre,nif:cifValido(c.cif)?nifLimpio(c.cif):'',codigo:c.codigo||''});
+  });
+  state.opcionesProv=mapa;
+  return `<datalist id="dl-prov">${[...mapa.keys()].sort((a,b)=>a.localeCompare(b,'es')).map(k=>`<option value="${esc(k)}"></option>`).join('')}</datalist>`;
+}
+const selDeleg=(id,val)=>`<select id="${id}"><option value="">(la que diga el pedido o la homologación)</option>${DELEGACIONES.map(d=>`<option ${String(val||'').toUpperCase()===d?'selected':''}>${d}</option>`).join('')}</select>`;
+// Al elegir un proveedor de la lista, su CIF se rellena solo si está vacío.
+function enlazarProveedor(idProv,idNif){
+  const p=$('#'+idProv), n=$('#'+idNif); if(!p||!n)return;
+  p.oninput=()=>{const o=(state.opcionesProv||new Map()).get(p.value.trim());if(o&&o.nif&&!n.value.trim())n.value=o.nif;};
+}
+// Si se escribe la base y el % de IVA, se calculan cuota y total (si están vacíos).
+function enlazarImportes(pre){
+  const b=$('#'+pre+'base'),p=$('#'+pre+'piva'),c=$('#'+pre+'cuota'),t=$('#'+pre+'total');
+  if(!b||!p||!c||!t)return;
+  const calc=()=>{const vb=numES(b.value),vp=numES(p.value);if(vb==null||vp==null)return;
+    if(!c.value.trim())c.value=String((Math.round(vb*vp)/100).toFixed(2)).replace('.',',');
+    if(!t.value.trim())t.value=String((vb+numES(c.value)).toFixed(2)).replace('.',',');};
+  b.onchange=calc;p.onchange=calc;
+}
+
+/* ---------- avisos de la ficha ---------- */
+function bannerSenales(f){
+  if(f.eliminada)return '';
+  const ia=f.json_extraccion_ia||{};
+  const s=senalesDe(f);
+  const sosp=s.filter(x=>SOSPECHA.includes(x.codigo));
+  const dup=s.find(x=>x.codigo==='POSIBLE_DUPLICADO');
+  const varias=s.find(x=>x.codigo==='VARIAS_FACTURAS');
+  const otras=s.filter(x=>['FALTA_PEDIDO_R','IMPORTE_FIJO_DISTINTO'].includes(x.codigo));
+  let h='';
+  if(sosp.length)h+=`<div class="aviso-sen"><b>¿Es de verdad una factura?</b>${sosp.map(x=>`<div>· ${esc(x.texto)}</div>`).join('')}
+    <div class="acc"><button class="btn-s rojo" data-es="PEDIDO">Es un pedido</button><button class="btn-s rojo" data-es="ALBARAN">Es un albarán</button>
+    <button class="btn-s ok" data-es="FACTURA">Sí, es una factura</button></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:6px">Pedido o albarán: sale del listado y su PDF pasa a «Sin asignar» como respaldo, a la espera de la factura de verdad.</div></div>`;
+  if(dup)h+=`<div class="aviso-sen"><b>Posible duplicado.</b> ${esc(dup.texto)}
+    <div class="acc"><button class="btn-s" data-abrir="${dup.factura_id}">Ver la otra</button><button class="btn-s" data-nodup="${dup.factura_id}">No es la misma</button>
+    <button class="btn-s rojo" data-quitar-dup="${f.id}">Es la misma: quitar esta</button></div></div>`;
+  if(varias)h+=`<div class="aviso-sen suave">${esc(varias.texto)}<div class="acc"><button class="btn-s" data-separar-ya="${f.id}">Separar documentos</button></div></div>`;
+  otras.forEach(x=>{h+=`<div class="aviso-sen suave">${esc(x.texto)}</div>`;});
+  if(ia._importe_fijo_ok!=null)h+=`<div class="aviso-sen bien">Importe fijo mensual de este proveedor (${eur(+ia._importe_fijo_ok)}): cuadra, así que se valida sin pedido ni albarán.</div>`;
+  if(ia._tipo_confirmado==='FACTURA'&&ia._tipo_confirmado_por)h+=`<div class="rev-note">Confirmada como factura por ${esc(ia._tipo_confirmado_por.por||'')} · ${dtL(ia._tipo_confirmado_por.fecha)}</div>`;
+  if(ia._alta_manual)h+=`<div class="rev-note">Dada de alta a mano por ${esc(ia._alta_manual.por||'')} · ${dtL(ia._alta_manual.fecha)}</div>`;
+  if(ia._releer)h+=`<div class="rev-note">Pendiente de releer página a página (pedido por ${esc(ia._releer.por||'')} · ${dtL(ia._releer.fecha)})</div>`;
+  return h;
+}
+function bindExtrasFicha(f){
+  const q=s=>document.querySelectorAll('#dr-body '+s);
+  q('[data-es]').forEach(b=>b.onclick=()=>b.dataset.es==='FACTURA'?confirmarFactura(f.id,b):fichaNoEsFactura(f.id,b.dataset.es,b));
+  q('[data-abrir]').forEach(b=>b.onclick=async()=>{const o=await facturaPorId(b.dataset.abrir);
+    if(o&&!state.facturas.some(x=>x.id===o.id))state.facturas.push(o);openDrawer(b.dataset.abrir);});
+  q('[data-nodup]').forEach(b=>b.onclick=()=>noEsDuplicada(f.id,b.dataset.nodup,b));
+  q('[data-quitar-dup]').forEach(b=>b.onclick=()=>eliminarFactura(f.id,'Duplicada: es la misma factura que otra ya registrada (leída con otro número)'));
+  q('[data-separar-ya],[data-separar]').forEach(b=>b.onclick=()=>abrirSeparar(f.id));
+  q('[data-editar]').forEach(b=>b.onclick=()=>abrirEdicion(f.id));
+  q('[data-releer]').forEach(b=>b.onclick=()=>abrirReleer(f.id));
+  q('[data-enviar]').forEach(b=>b.onclick=()=>abrirEnviar(f.id));
+  q('[data-sinasignar]').forEach(b=>b.onclick=()=>abrirVolverSinAsignar(f.id));
+}
+function botonesExtraFicha(f){
+  if(f.eliminada)return '';
+  const cerrada=f.estado==='CONTABILIZADA'||!!(f.json_extraccion_ia||{})._pago;
+  return `<button class="act-btn neu" data-editar="${f.id}" title="Corregir proveedor, CIF, número, fecha, delegación, pedido e importes">Editar datos</button>
+    <button class="act-btn neu" data-releer="${f.id}" title="Que se vuelva a leer el documento">Releer</button>
+    <button class="act-btn neu" data-enviar="${f.id}" title="Mandarla a un departamento sin descargarla">Enviar</button>
+    <button class="act-btn neu" data-separar="${f.id}" title="El PDF trae varias facturas o papeles: separarlos">Separar documentos</button>
+    ${cerrada?'':`<button class="act-btn del" data-sinasignar="${f.id}" title="No es una factura (es un pedido, un albarán…): sale del listado y su PDF vuelve a Sin asignar">Volver a Sin asignar</button>`}`;
+}
+
+/* ---------- qué es cada documento ---------- */
+async function confirmarFactura(facId,boton){
+  if(boton)boton.disabled=true;
+  try{await rpc('confirmar_factura',{p_factura:facId,p_doc:null});toast('Confirmada como factura: ya no se la tratará como pedido o albarán');
+    await loadAll();openDrawer(facId);}
+  catch(e){toast(e.message,'err');if(boton)boton.disabled=false;}
+}
+async function fichaNoEsFactura(facId,tipo,boton){
+  const f=await facturaPorId(facId);if(!f)return;
+  const nombre={PEDIDO:'un pedido',ALBARAN:'un albarán',OTRO:'otro papel'}[tipo]||'otro papel';
+  if(!confirm(`¿${f.numero_factura||'Este documento'} es ${nombre}?\n\nSale del listado de facturas y su PDF pasa a «Sin asignar» como respaldo, para ponerlo con su factura cuando llegue.`))return;
+  if(boton)boton.disabled=true;
+  try{
+    if(f.documento_recibido_id)await rpc('clasificar_documento',{p_doc:f.documento_recibido_id,p_tipo:tipo,p_motivo:null});
+    else await patchFactura(facId,{eliminada:true,eliminada_en:new Date().toISOString(),eliminada_por:quienSoy(),
+      motivo_eliminacion:`No es una factura: ${quienSoy()} la ha marcado como ${nombre}.`});
+    closeDrawer();toast(`Marcado como ${nombre}: está en «Sin asignar»`);await loadAll();
+  }catch(e){toast(e.message,'err');if(boton)boton.disabled=false;}
+}
+function abrirVolverSinAsignar(facId){
+  const box=$('#panel-extra');if(!box)return;
+  box.innerHTML=`<div class="caja-extra"><h4>Volver a «Sin asignar»</h4>
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">La ficha sale del listado de facturas y su PDF queda en «Sin asignar». ¿Qué es este documento?</div>
+    <div class="acc" style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-s" data-vsa="PEDIDO">Un pedido</button><button class="btn-s" data-vsa="ALBARAN">Un albarán</button><button class="btn-s" data-vsa="OTRO">Otro papel</button></div></div>`;
+  box.querySelectorAll('[data-vsa]').forEach(b=>b.onclick=()=>fichaNoEsFactura(facId,b.dataset.vsa,b));
+  box.scrollIntoView({block:'nearest'});
+}
+async function noEsDuplicada(facId,otraId,boton){
+  if(boton)boton.disabled=true;
+  try{
+    for(const [a,b] of [[facId,otraId],[otraId,facId]]){
+      const f=await facturaPorId(a);if(!f)continue;
+      const ia=Object.assign({},f.json_extraccion_ia||{});
+      const l=Array.isArray(ia._no_es_duplicado)?ia._no_es_duplicado.slice():[];
+      if(!l.includes(b))l.push(b);
+      ia._no_es_duplicado=l;await guardarIA(a,ia);
+    }
+    toast('Anotado: son facturas distintas');await loadAll();openDrawer(facId);
+  }catch(e){toast(e.message,'err');if(boton)boton.disabled=false;}
+}
+// Documento de Sin asignar
+async function clasificarDoc(docId,tipo,motivo,boton){
+  if(boton)boton.disabled=true;
+  try{await rpc('clasificar_documento',{p_doc:docId,p_tipo:tipo,p_motivo:motivo||null});
+    toast(tipo==='DESCARTADO'?'Descartado: ya no sale en Sin asignar':tipo==='RESTAURAR'?'Recuperado en Sin asignar':'Anotado');await loadAll();}
+  catch(e){toast(e.message,'err');if(boton)boton.disabled=false;}
+}
+async function docEsFactura(docId,boton){
+  if(boton)boton.disabled=true;
+  try{
+    const r=await rpc('confirmar_factura',{p_factura:null,p_doc:docId});
+    if(r&&r.id){toast(r.accion==='recuperada'?'Factura recuperada en el listado':'Confirmada como factura');await loadAll();openDrawer(r.id);return;}
+    const d=(state.sueltos||[]).find(x=>x.id===docId)||{};
+    const num=String(d.resumen_ia||'').split('|')[0].trim();
+    formAltaManual(docId,{numero_factura:/\d/.test(num)?num:''},`Sin asignar · ${d.nombre_archivo||''}`,d);
+  }catch(e){toast(e.message,'err');}
+  if(boton)boton.disabled=false;
+}
+
+/* ---------- alta manual de una factura ---------- */
+function formAltaManual(docId,pre,origen,doc){
+  pre=pre||{};
+  const pdf=doc&&doc.hash_archivo?`${SB_URL}/storage/v1/object/facturas/${doc.hash_archivo}.pdf`:'';
+  abrirCajon('Dar de alta una factura',origen||'',`
+    <div class="dr-sec">
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:8px">La lectura no creó la ficha de esta factura. Escribe los datos tal como vienen en el papel. Quedará «en revisión» y el sistema la mirará página a página en la próxima lectura.</div>
+      ${pdf?`<button class="btn-s" data-pdf="${esc(pdf)}">Abrir el PDF</button>`:''}
+      ${opcionesProveedor()}
+      <div class="frm">
+        <label class="ancho">Proveedor<input id="al-prov" list="dl-prov" value="${esc(pre.proveedor||'')}" placeholder="Escribe y elige de la lista"></label>
+        <label>CIF<input id="al-nif" value="${esc(pre.nif||'')}"></label>
+        <label>Nº factura<input id="al-num" value="${esc(pre.numero_factura||'')}"></label>
+        <label>Fecha factura<input id="al-fecha" type="date" value="${esc(pre.fecha_factura||'')}"></label>
+        <label>Base imponible<input id="al-base" inputmode="decimal" value="${esc(pre.base_imponible??'')}"></label>
+        <label>% IVA<input id="al-piva" inputmode="decimal" value="${esc(pre.porcentaje_iva??'21')}"></label>
+        <label>Cuota IVA<input id="al-cuota" inputmode="decimal" value="${esc(pre.importe_iva??'')}"></label>
+        <label>Total factura<input id="al-total" inputmode="decimal" value="${esc(pre.total_factura??'')}"></label>
+        <label>Nº pedido Montero<input id="al-pedido" value="${esc(pre.numero_pedido||'')}"></label>
+        <label>Delegación${selDeleg('al-deleg',pre.delegacion)}</label>
+      </div>
+      <button class="btn-s ok" id="al-ok">Crear la factura</button>
+    </div>`);
+  enlazarProveedor('al-prov','al-nif');enlazarImportes('al-');
+  document.querySelectorAll('#dr-body [data-pdf]').forEach(b=>b.onclick=()=>openPdf(b.dataset.pdf));
+  $('#al-ok').onclick=async()=>{
+    const v=k=>(($('#al-'+k)||{}).value||'').trim();
+    const o=(state.opcionesProv||new Map()).get(v('prov'));
+    const datos={proveedor:o?o.nombre:v('prov'),proveedor_id:o&&o.id||'',nif:v('nif'),numero_factura:v('num'),fecha_factura:v('fecha'),
+      base_imponible:numES(v('base')),porcentaje_iva:numES(v('piva')),importe_iva:numES(v('cuota')),total_factura:numES(v('total')),
+      numero_pedido:v('pedido'),delegacion:v('deleg'),origen:origen||'',paginas:pre.paginas||null};
+    if(!datos.proveedor||!datos.numero_factura){toast('Faltan el proveedor y el número de factura','err');return;}
+    if(datos.total_factura==null){toast('Falta el total de la factura','err');return;}
+    $('#al-ok').disabled=true;
+    try{const id=await rpc('crear_factura_manual',{p_doc:docId,p_datos:datos});
+      toast('Factura creada');await loadAll();openDrawer(id);}
+    catch(e){toast(e.message,'err');$('#al-ok').disabled=false;}
+  };
+}
+
+/* ---------- editar los datos de una factura ---------- */
+function abrirEdicion(facId){
+  const f=state.facturas.find(x=>x.id===facId);if(!f)return;
+  const ia=f.json_extraccion_ia||{};
+  const box=$('#panel-extra');if(!box)return;
+  const p=proveedorDeFactura(f);
+  const etProv=p?`${p.nombre}${p.codigo_proveedor?' · '+p.codigo_proveedor:''}`:nombreLeido(f);
+  const n=x=>x==null?'':String(x).replace('.',',');
+  box.innerHTML=`<div class="caja-extra"><h4>Editar los datos de la factura</h4>
+    <div style="font-size:12px;color:var(--muted)">Lo que cambies aquí manda sobre lo leído y queda anotado quién lo cambió. Para el código AS400, la homologación o el validador del proveedor, usa «Maestro proveedores».</div>
+    ${opcionesProveedor()}
+    <div class="frm">
+      <label class="ancho">Proveedor<input id="ed-prov" list="dl-prov" value="${esc(etProv)}"></label>
+      <label>CIF<input id="ed-nif" value="${esc(nifProv(f)||cifDe(f)||'')}"></label>
+      <label>Nº factura<input id="ed-num" value="${esc(f.numero_factura||'')}"></label>
+      <label>Fecha factura<input id="ed-fecha" type="date" value="${esc(f.fecha_factura||'')}"></label>
+      <label>Delegación${selDeleg('ed-deleg',(ia._manual||{}).delegacion||'')}</label>
+      <label>Nº pedido Montero<input id="ed-pedido" value="${esc(f.numero_pedido_montero||numeroPedido(f)||'')}"></label>
+      <label>Base imponible<input id="ed-base" inputmode="decimal" value="${esc(n(f.base_imponible))}"></label>
+      <label>% IVA<input id="ed-piva" inputmode="decimal" value="${esc(n(f.porcentaje_iva))}"></label>
+      <label>Cuota IVA<input id="ed-cuota" inputmode="decimal" value="${esc(n(f.importe_iva))}"></label>
+      <label>Total factura<input id="ed-total" inputmode="decimal" value="${esc(n(f.total_factura))}"></label>
+    </div>
+    <div style="display:flex;gap:8px"><button class="btn-s ok" id="ed-ok">Guardar cambios</button><button class="btn-s" id="ed-no">Cancelar</button></div></div>`;
+  enlazarProveedor('ed-prov','ed-nif');
+  $('#ed-no').onclick=()=>{box.innerHTML='';};
+  $('#ed-ok').onclick=()=>guardarEdicion(facId);
+  box.scrollIntoView({block:'nearest'});
+}
+async function guardarEdicion(facId){
+  const f=state.facturas.find(x=>x.id===facId);if(!f)return;
+  const v=k=>(($('#ed-'+k)||{}).value||'').trim();
+  const ia=JSON.parse(JSON.stringify(f.json_extraccion_ia||{}));
+  const o=(state.opcionesProv||new Map()).get(v('prov'));
+  const cambios={}, body={};
+  const pon=(campo,antes,despues)=>{if(String(antes??'')!==String(despues??'')){cambios[campo]=[antes??null,despues??null];return true;}return false;};
+  const provNombre=o?o.nombre:v('prov');
+  if(pon('proveedor',nombreProv(f),provNombre)){
+    ia.proveedor=Object.assign({},ia.proveedor||{},{nombre:provNombre});
+    body.proveedor_id=o&&o.id?o.id:null;
+  }else if(o&&o.id&&f.proveedor_id!==o.id)body.proveedor_id=o.id;
+  if(pon('cif',nifProv(f)||'',v('nif')))ia.proveedor=Object.assign({},ia.proveedor||{},{nif_cif:v('nif')||null});
+  if(pon('numero_factura',f.numero_factura||'',v('num')))body.numero_factura=v('num')||null;
+  if(pon('fecha_factura',f.fecha_factura||'',v('fecha')))body.fecha_factura=v('fecha')||null;
+  if(pon('delegacion',(ia._manual||{}).delegacion||'',v('deleg')))ia._manual=Object.assign({},ia._manual||{},{delegacion:v('deleg')||null});
+  if(pon('numero_pedido',f.numero_pedido_montero||'',v('pedido')))body.numero_pedido_montero=v('pedido')||null;
+  const imp={base_imponible:numES(v('base')),porcentaje_iva:numES(v('piva')),importe_iva:numES(v('cuota')),total_factura:numES(v('total'))};
+  let tocaImportes=false;
+  for(const k of Object.keys(imp)){if(pon(k,f[k]!=null?+f[k]:null,imp[k])){body[k]=imp[k];tocaImportes=true;}}
+  if(tocaImportes){
+    const base=imp.base_imponible??+f.base_imponible??0, iva=imp.importe_iva??+f.importe_iva??0, tot=imp.total_factura??(f.total_factura!=null?+f.total_factura:null);
+    body.total_calculado=Math.round((base+iva+(+f.recargo_equivalencia||0))*100)/100;
+    body.diferencia_importe=tot!=null?Math.round((tot-body.total_calculado)*100)/100:null;
+  }
+  if(!Object.keys(cambios).length){toast('No has cambiado nada');return;}
+  ia._ediciones=(Array.isArray(ia._ediciones)?ia._ediciones:[]).concat([{por:quienSoy(),fecha:new Date().toISOString(),cambios}]);
+  body.json_extraccion_ia=ia;
+  try{await patchFactura(facId,body);toast('Datos guardados');await loadAll();openDrawer(facId);}
+  catch(e){toast(e.message,'err');}
+}
+
+/* ---------- releer ---------- */
+function abrirReleer(facId){
+  const box=$('#panel-extra');if(!box)return;
+  box.innerHTML=`<div class="caja-extra"><h4>Releer la factura</h4>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div><button class="btn-s ok" id="rl-pag">Releer las páginas</button>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">Se vuelve a mirar qué es cada hoja, si están el pedido y los albaranes y si vienen firmados. En la próxima pasada (unos 10 minutos).</div></div>
+      <div><button class="btn-s" id="rl-todo">Leerla otra vez desde cero</button>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">Para cuando están mal el proveedor, el número o los importes. Esta ficha se aparta y se crea una nueva en la lectura del día (a partir de las 14:00). Lo corregido a mano en esta ficha se pierde.</div></div>
+    </div></div>`;
+  $('#rl-pag').onclick=async()=>{$('#rl-pag').disabled=true;
+    try{await rpc('releer_factura',{p_factura:facId,p_modo:'paginas'});await pedirTarea('releer',null);openDrawer(facId);}
+    catch(e){toast(e.message,'err');$('#rl-pag').disabled=false;}};
+  $('#rl-todo').onclick=async()=>{
+    if(!confirm('¿Leerla otra vez desde cero?\n\nEsta ficha sale del listado y en la lectura del día se crea una nueva con lo que se lea del PDF.'))return;
+    $('#rl-todo').disabled=true;
+    try{await rpc('releer_factura',{p_factura:facId,p_modo:'completa'});closeDrawer();toast('Se leerá de nuevo en la lectura del día');await loadAll();}
+    catch(e){toast(e.message,'err');$('#rl-todo').disabled=false;}};
+  box.scrollIntoView({block:'nearest'});
+}
+
+/* ---------- enviar a un departamento ---------- */
+function abrirEnviar(facId){
+  const f=state.facturas.find(x=>x.id===facId);if(!f)return;
+  const box=$('#panel-extra');if(!box)return;
+  const deps=state.departamentos||[];
+  box.innerHTML=`<div class="caja-extra"><h4>Enviar la factura</h4>
+    <div style="font-size:12px;color:var(--muted)">Se abre tu correo con el mensaje escrito y los enlaces a los documentos (valen 7 días). No hace falta descargar nada.</div>
+    <div class="frm">
+      <label class="ancho">Para<input id="en-para" list="dl-deps" placeholder="correo@montero.es o elige un departamento"></label>
+      <datalist id="dl-deps">${deps.map(d=>`<option value="${esc(d.email)}">${esc(d.nombre||'')}</option>`).join('')}</datalist>
+      <label class="ancho">Mensaje<textarea id="en-msg" rows="3" placeholder="Opcional: qué necesitas que hagan"></textarea></label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-s ok" id="en-ok">Abrir el correo</button>
+      <button class="btn-s" id="en-guardar">Guardar este destinatario</button></div></div>`;
+  $('#en-guardar').onclick=async()=>{
+    const email=$('#en-para').value.trim(); if(!/@/.test(email)){toast('Escribe primero el correo','err');return;}
+    const nombre=prompt('¿Qué departamento es? (p. ej. «Taller Valencia»)')||'';
+    const l=(state.departamentos||[]).filter(d=>d.email!==email).concat([{email,nombre}]);
+    try{await rpc('guardar_departamentos',{p_lista:l});state.departamentos=l;toast('Destinatario guardado');abrirEnviar(facId);}
+    catch(e){toast(e.message,'err');}
+  };
+  $('#en-ok').onclick=async()=>{
+    const para=$('#en-para').value.trim(); if(!/@/.test(para)){toast('Falta el correo del destinatario','err');return;}
+    const win=window.open('about:blank','_blank');
+    try{
+      const j=f.json_extraccion_ia||{};
+      const docs=[];
+      if(j._documento_url)docs.push(['Factura',j._documento_url]);
+      (Array.isArray(j._adjuntos)?j._adjuntos:[]).filter(a=>a&&a.url).forEach(a=>{if(!docs.some(d=>d[1]===a.url))docs.push([`${({ALBARAN:'Albarán',PEDIDO:'Pedido',TRANSPORTE:'Transporte'})[a.tipo]||'Documento'} ${a.nombre||''}`.trim(),a.url]);});
+      const enl=[];for(const [et,u] of docs){try{enl.push(`- ${et}: ${await urlFirmada(u,7*24*3600)}`);}catch(_){}}
+      const asunto=`Factura ${f.numero_factura||''} · ${nombreProv(f)} · ${eur(f.total_factura)}`;
+      const cuerpo=[`Hola,`,``,`Te paso la factura ${f.numero_factura||'(sin número)'} de ${nombreProv(f)}, de ${eur(f.total_factura)} y fecha ${dt(f.fecha_factura)}.`,
+        $('#en-msg').value.trim(),``,`Documentos (los enlaces valen 7 días):`,...enl,``,`Un saludo.`].filter((x,i)=>x!==''||i!==3).join('\n');
+      const url=`mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+      if(win)win.location.href=url;else location.href=url;
+      const ia=Object.assign({},j);ia._envios=(Array.isArray(ia._envios)?ia._envios:[]).concat([{a:para,por:quienSoy(),fecha:new Date().toISOString()}]);
+      guardarIA(facId,ia).catch(()=>{});
+    }catch(e){if(win)win.close();toast('No se pudo preparar el correo: '+e.message,'err');}
+  };
+  box.scrollIntoView({block:'nearest'});
+}
+
+/* ---------- subir un PDF y ponerlo con una factura ---------- */
+async function subirDocumento(pdf,nombre,tipo,asunto){
+  const tok=getToken()||SB_ANON, H={apikey:SB_ANON,Authorization:`Bearer ${tok}`};
+  const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',pdf))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  const up=await fetch(`${SB_URL}/storage/v1/object/facturas/${hash}.pdf`,{method:'POST',headers:{...H,'Content-Type':'application/pdf'},body:pdf});
+  if(!up.ok){const t=await up.text();if(!/Duplicate|already exists|409/i.test(t+up.status))throw new Error('No se ha podido subir el archivo: '+t.slice(0,120));}
+  let doc=(await api(`documentos_recibidos?select=id,hash_archivo&hash_archivo=eq.${hash}&limit=1`))[0];
+  if(!doc){
+    const r=await fetch(`${SB_URL}/rest/v1/documentos_recibidos`,{method:'POST',headers:{...H,'Content-Type':'application/json',Prefer:'return=representation'},
+      body:JSON.stringify({origen:'MANUAL',nombre_archivo:nombre,hash_archivo:hash,ruta_almacenamiento:`facturas/${hash}.pdf`,
+        estado_procesamiento:'COMPLETADO',email_remitente:quienSoy(),email_asunto:asunto,tipo_documento_ia:tipo})});
+    const d=await r.json().catch(()=>[]);
+    if(!r.ok||!Array.isArray(d)||!d.length)throw new Error('No se ha podido registrar el documento');
+    doc=d[0];
+  }
+  return {id:doc.id,hash,nombre};
+}
+async function ponerAdjunto(facId,doc,tipo){
+  const f=await facturaPorId(facId);if(!f)throw new Error('No se encuentra la factura');
+  const ia=Object.assign({},f.json_extraccion_ia||{});
+  const adj=(Array.isArray(ia._adjuntos)?ia._adjuntos:[]).filter(a=>a.documento_id!==doc.id);
+  adj.push({nombre:doc.nombre,tipo,documento_id:doc.id,como:`añadido a mano por ${quienSoy()}`,leido:true,a_mano:true,
+            url:`${SB_URL}/storage/v1/object/public/facturas/${doc.hash}.pdf`});
+  ia._adjuntos=adj;
+  await guardarIA(facId,ia);
+  // Y que el emparejado del ordenador del proceso lo respete y recalcule la factura
+  const tok=getToken()||SB_ANON;
+  await fetch(`${SB_URL}/rest/v1/auditoria_workflow`,{method:'POST',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+    body:JSON.stringify({evento:'TAREA: asignar',nivel:'INFO',n8n_execution_id:'panel',
+      detalle:{documento_id:doc.id,factura_id:facId,tipo,accion:'asignar',estado:'PENDIENTE',pedido_por:quienSoy(),cuando:new Date().toISOString()}})}).catch(()=>{});
+}
+
+/* ---------- separar un PDF que trae varios documentos ---------- */
+async function abrirSeparar(facId){
+  const f=state.facturas.find(x=>x.id===facId);if(!f)return;
+  const j=f.json_extraccion_ia||{};
+  const box=$('#panel-extra');if(!box)return;
+  if(!j._documento_url){toast('Esta factura no tiene el PDF guardado','err');return;}
+  box.innerHTML=`<div class="caja-extra">Abriendo el PDF…</div>`;box.scrollIntoView({block:'nearest'});
+  let n=0;
+  try{
+    const r=await fetch(await urlFirmada(j._documento_url));
+    state._sepBytes=await r.arrayBuffer();
+    n=(await PDFLib.PDFDocument.load(state._sepBytes,{ignoreEncryption:true})).getPageCount();
+  }catch(e){box.innerHTML=`<div class="caja-extra">No se ha podido abrir el PDF: ${esc(e.message)}</div>`;return;}
+  const pp=((j._respaldo_verificado||{}).por_pagina||j.por_pagina||[]).filter(p=>p&&!p.archivo);
+  const info=i=>pp.find(p=>+p.pagina===i)||{};
+  const prop=j._paginas_propias||{};
+  state.opcionesFac=new Map();
+  const opts=(state.todasFacturas||[]).map(x=>{const et=`${x.numero_factura||'(sin número)'} · ${x.prov||'?'} · ${eur(x.total_factura)}`;state.opcionesFac.set(et,x.id);return `<option value="${esc(et)}"></option>`;}).join('');
+  const esta=[...state.opcionesFac.entries()].find(([,id])=>id===facId);
+  box.innerHTML=`<div class="caja-extra"><h4>Separar documentos (${n} página${n===1?'':'s'})</h4>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Marca las páginas y elige qué hacer con ellas. Lo que dice cada página es lo que leyó el sistema; ábrelo para comprobarlo.
+      <button class="btn-s" data-pdf="${esc(j._documento_url)}" style="margin-left:6px">Abrir el PDF</button></div>
+    ${Array.from({length:n},(_,k)=>{const i=k+1,p=info(i);return `<label class="pag-sep"><input type="checkbox" data-pag="${i}"><b>Pág. ${i}</b>
+      <span>${esc(p.que_es||'—')}</span><span style="color:var(--muted)">${esc([p.emisor,p.numero?'nº '+p.numero:'',p.total!=null?eur(p.total):''].filter(Boolean).join(' · '))}</span></label>`;}).join('')}
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+      <div><button class="btn-s ok" id="sp-fac">Crear una factura nueva con las páginas marcadas</button></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="btn-s" id="sp-adj">Ponerlas como</button>
+        <select class="sel" id="sp-tipo" style="height:30px"><option value="ALBARAN">albarán</option><option value="PEDIDO">pedido</option><option value="OTRO">otro papel</option></select>
+        <span style="font-size:12.5px">de la factura</span>
+        <input class="sel" id="sp-dest" list="dl-sep" value="${esc(esta?esta[0]:'')}" style="flex:1 1 14rem;height:30px">
+        <datalist id="dl-sep">${opts}</datalist></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px">Esta factura son solo las páginas
+        <input id="sp-desde" type="number" min="1" max="${n}" value="${esc(prop.desde||'')}" style="width:60px;height:30px"> a
+        <input id="sp-hasta" type="number" min="1" max="${n}" value="${esc(prop.hasta||'')}" style="width:60px;height:30px">
+        <button class="btn-s" id="sp-prop">Guardar</button></div>
+    </div></div>`;
+  box.querySelectorAll('[data-pdf]').forEach(b=>b.onclick=()=>openPdf(b.dataset.pdf));
+  const marcadas=()=>[...box.querySelectorAll('[data-pag]:checked')].map(c=>+c.dataset.pag);
+  const cortar=async pags=>{
+    const src=await PDFLib.PDFDocument.load(state._sepBytes,{ignoreEncryption:true});
+    const out=await PDFLib.PDFDocument.create();
+    (await out.copyPages(src,pags.map(p=>p-1))).forEach(p=>out.addPage(p));
+    return await out.save();
+  };
+  const base=(f.numero_factura||'factura').replace(/[^\w.-]+/g,'_');
+  $('#sp-fac').onclick=async()=>{
+    const pags=marcadas(); if(!pags.length){toast('Marca primero las páginas','err');return;}
+    $('#sp-fac').disabled=true;
+    try{
+      const doc=await subirDocumento(await cortar(pags),`${base}_pags_${pags.join('-')}.pdf`,'FACTURA',`Separado de la factura ${f.numero_factura||''}`);
+      const p=pags.map(info).find(x=>/FACTURA/i.test(x.que_es||''))||info(pags[0]);
+      formAltaManual(doc.id,{proveedor:p.emisor||'',numero_factura:p.numero||'',total_factura:p.total!=null?String(p.total).replace('.',','):''},
+        `Separada de la factura ${f.numero_factura||''} (págs. ${pags.join(', ')})`,{hash_archivo:doc.hash});
+    }catch(e){toast(e.message,'err');$('#sp-fac').disabled=false;}
+  };
+  $('#sp-adj').onclick=async()=>{
+    const pags=marcadas(); if(!pags.length){toast('Marca primero las páginas','err');return;}
+    const dest=(state.opcionesFac||new Map()).get($('#sp-dest').value.trim());
+    if(!dest){toast('Elige la factura de la lista','err');return;}
+    const tipo=$('#sp-tipo').value;
+    $('#sp-adj').disabled=true;
+    try{
+      const doc=await subirDocumento(await cortar(pags),`${base}_${tipo.toLowerCase()}_pags_${pags.join('-')}.pdf`,tipo,`Separado de la factura ${f.numero_factura||''}`);
+      await ponerAdjunto(dest,doc,tipo);
+      toast('Páginas puestas con la factura');await loadAll();openDrawer(facId);
+    }catch(e){toast(e.message,'err');$('#sp-adj').disabled=false;}
+  };
+  $('#sp-prop').onclick=async()=>{
+    const d=+$('#sp-desde').value, h=+$('#sp-hasta').value;
+    const ia=Object.assign({},j);
+    if(!d&&!h)delete ia._paginas_propias;
+    else{if(!d||!h||d>h||h>n){toast('Las páginas no son correctas','err');return;}
+      ia._paginas_propias={desde:d,hasta:h,nota:`Páginas de esta factura, puestas a mano por ${quienSoy()}.`};}
+    try{await guardarIA(facId,ia);toast('Guardado');await loadAll();openDrawer(facId);}catch(e){toast(e.message,'err');}
+  };
+}
+
+/* ---------- aprobadas y pagadas: filtros ---------- */
+function enRango(fecha,desde,hasta){
+  const d=String(fecha||'').slice(0,10);
+  return !((desde&&(!d||d<desde))||(hasta&&(!d||d>hasta)));
+}
+function excelAprobadas(ff,desde,hasta){
+  const head=['Aprobada el','Aprobada por','Fecha factura','Nº factura','Cod. proveedor','Proveedor','CIF','Forma de pago','Total'];
+  const rows=ff.map(f=>{const a=f.json_extraccion_ia._aprobada_pago||{};
+    return [dt(a.fecha),a.por||'',dt(f.fecha_factura),f.numero_factura||'',codigoProv(f),nombreProv(f),cifDe(f),formaPago(f).texto,+f.total_factura||0];});
+  rows.push(['','','','','','','','TOTAL',Math.round(ff.reduce((s,f)=>s+(+f.total_factura||0),0)*100)/100]);
+  const ws=XLSX.utils.aoa_to_sheet([head,...rows]);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Aprobadas');
+  XLSX.writeFile(wb,`aprobadas_para_pago_${desde||'inicio'}_${hasta||'hoy'}.xlsx`);
+}
+
+/* ---------- MAESTRO DE PROVEEDORES (el Excel de condiciones, editable) ---------- */
+const MAESTRO_COLS=[['codigo','Código AS400'],['nombre','Proveedor'],['cif','CIF'],['homologacion','Homologación'],['delegacion','Delegación'],
+  ['validador','Valida'],['importe_fijo','Importe fijo mensual'],['pedido','Pedido'],['albaran','Albarán'],['validar_manual','Validar a mano'],
+  ['forma_pago','Forma de pago'],['descuento','Descuento'],['portes','Portes'],['autoriza_pedido','Autoriza pedido']];
+const MAESTRO_BOOL=new Set(['pedido','albaran','validar_manual','portes']);
+function columnasMaestro(){
+  const fijas=new Set(MAESTRO_COLS.map(c=>c[0]).concat(['clave']));
+  const extra=new Set();(state.maestro||[]).forEach(r=>Object.keys(r).forEach(k=>{if(!fijas.has(k)&&!k.startsWith('_'))extra.add(k);}));
+  (state.maestroColsNuevas||[]).forEach(k=>extra.add(k));
+  return MAESTRO_COLS.concat([...extra].sort().map(k=>[k,k.replace(/_/g,' ')]));
+}
+function viewMaestro(){
+  if(!state.maestro||!state.maestroSucio){state.maestro=JSON.parse(JSON.stringify(state.condiciones||[]));state.maestroSucio=false;state.maestroCambiadas=new Set();}
+  const cols=columnasMaestro();
+  const q=normProv(state.maestroBuscar||'');
+  const filas=state.maestro.map((r,i)=>({r,i})).filter(({r})=>!q||normProv(Object.values(r).join(' ')).includes(q));
+  const celda=(r,i,k)=>MAESTRO_BOOL.has(k)
+    ?`<td style="text-align:center"><input type="checkbox" data-m="${i}" data-k="${k}" ${r[k]?'checked':''}></td>`
+    :`<td><input type="text" data-m="${i}" data-k="${k}" value="${esc(r[k]??'')}" ${k==='nombre'?'style="min-width:180px"':''}></td>`;
+  return `<div class="card" style="margin-bottom:14px"><div style="font-size:12.5px;color:var(--muted);line-height:1.6">
+      El Excel de proveedores de Montero, aquí mismo: de aquí salen el código AS400, la homologación, la delegación de los locales, quién valida,
+      si llevan pedido y albarán y el importe fijo mensual. Cambia lo que haga falta y pulsa «Guardar cambios». Se guarda una copia de cómo estaba antes.
+      <b>La homologación va siempre con siglas</b> (HNR, HLGV…); si lleva R, el nº de pedido es obligatorio.</div></div>
+    <div class="card"><div class="filtros">
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="m-buscar" placeholder="Buscar proveedor, código, CIF…" value="${esc(state.maestroBuscar||'')}"></div>
+      <button class="btn-s" id="m-fila">Añadir proveedor</button><button class="btn-s" id="m-col">Añadir columna</button>
+      <label class="btn-s" style="display:inline-flex;align-items:center">Importar Excel<input type="file" id="m-imp" accept=".xlsx,.xls,.csv" style="display:none"></label>
+      <button class="btn-s" id="m-exp">Exportar Excel</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--muted)">${state.maestro.length} proveedores${state.maestroSucio?` · <b style="color:var(--amber)">${state.maestroCambiadas.size||'hay'} cambio(s) sin guardar</b>`:''}</span>
+      <button class="btn-s" id="m-deshacer" ${state.maestroSucio?'':'disabled'}>Deshacer</button>
+      <button class="btn-s ok" id="m-guardar" ${state.maestroSucio?'':'disabled'}>Guardar cambios</button></div>
+    <div class="tbl-wrap"><table class="tbl-ed"><thead><tr>${cols.map(([k,l])=>`<th>${esc(l)}${MAESTRO_COLS.some(c=>c[0]===k)?'':` <button class="btn-s" data-mcol-del="${esc(k)}" title="Quitar esta columna" style="height:20px;padding:0 5px">×</button>`}</th>`).join('')}<th></th></tr></thead>
+    <tbody>${filas.map(({r,i})=>`<tr class="${state.maestroCambiadas.has(i)?'cambiada':''}">${cols.map(([k])=>celda(r,i,k)).join('')}<td><button class="btn-s" data-mdel="${i}" title="Quitar este proveedor">×</button></td></tr>`).join('')}</tbody></table></div></div>`;
+}
+function bindMaestro(){
+  const marca=i=>{state.maestroSucio=true;state.maestroCambiadas.add(i);};
+  document.querySelectorAll('[data-m]').forEach(el=>el.onchange=()=>{
+    const i=+el.dataset.m,k=el.dataset.k;
+    state.maestro[i][k]=el.type==='checkbox'?el.checked:el.value.trim();
+    if(k==='homologacion')state.maestro[i][k]=el.value.toUpperCase().replace(/\s+/g,'');
+    marca(i);el.closest('tr').classList.add('cambiada');
+    const g=$('#m-guardar'),d=$('#m-deshacer');if(g)g.disabled=false;if(d)d.disabled=false;});
+  const b=$('#m-buscar');if(b)b.onchange=e=>{state.maestroBuscar=e.target.value;render();};
+  const fila=$('#m-fila');if(fila)fila.onclick=()=>{const n=prompt('Nombre del proveedor');if(!n)return;
+    state.maestro.unshift({nombre:n.trim(),clave:n.trim().toUpperCase(),codigo:'',pedido:true,albaran:true});
+    state.maestroCambiadas=new Set([...state.maestroCambiadas].map(x=>x+1).concat([0]));state.maestroSucio=true;state.maestroBuscar='';render();};
+  const col=$('#m-col');if(col)col.onclick=()=>{const n=prompt('Nombre de la columna nueva');if(!n)return;
+    const k=n.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+    if(!k)return;state.maestroColsNuevas=(state.maestroColsNuevas||[]).concat([k]);state.maestroSucio=true;render();};
+  document.querySelectorAll('[data-mcol-del]').forEach(el=>el.onclick=()=>{const k=el.dataset.mcolDel;
+    if(!confirm(`¿Quitar la columna «${k}» de todos los proveedores?`))return;
+    state.maestro.forEach(r=>delete r[k]);state.maestroColsNuevas=(state.maestroColsNuevas||[]).filter(x=>x!==k);state.maestroSucio=true;render();});
+  document.querySelectorAll('[data-mdel]').forEach(el=>el.onclick=()=>{const i=+el.dataset.mdel;
+    if(!confirm(`¿Quitar a ${state.maestro[i].nombre} del maestro?`))return;
+    state.maestro.splice(i,1);state.maestroCambiadas=new Set();state.maestroSucio=true;render();});
+  const des=$('#m-deshacer');if(des)des.onclick=()=>{state.maestroSucio=false;state.maestro=null;state.maestroColsNuevas=[];render();};
+  const gu=$('#m-guardar');if(gu)gu.onclick=guardarMaestro;
+  const ex=$('#m-exp');if(ex)ex.onclick=()=>{const cols=columnasMaestro();
+    const ws=XLSX.utils.aoa_to_sheet([cols.map(c=>c[1]),...state.maestro.map(r=>cols.map(([k])=>MAESTRO_BOOL.has(k)?(r[k]?'SI':'NO'):(r[k]??'')))]);
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Proveedores');XLSX.writeFile(wb,`maestro_proveedores_${new Date().toISOString().slice(0,10)}.xlsx`);};
+  const imp=$('#m-imp');if(imp)imp.onchange=()=>importarMaestro(imp.files[0]);
+}
+async function guardarMaestro(){
+  const malos=state.maestro.filter(r=>!String(r.nombre||'').trim());
+  if(malos.length){toast('Hay proveedores sin nombre','err');return;}
+  const homMal=state.maestro.filter(r=>r.homologacion&&!HOM_OK.test(String(r.homologacion)));
+  if(homMal.length&&!confirm(`${homMal.length} homologación(es) no tienen forma de siglas (p. ej. ${homMal[0].homologacion}). ¿Guardar igualmente?`))return;
+  const lista=state.maestro.map(r=>{const o={...r};if(!o.clave)o.clave=String(o.nombre).toUpperCase();return o;});
+  const g=$('#m-guardar');if(g)g.disabled=true;
+  try{const r=await rpc('guardar_condiciones',{p_lista:lista});toast(`Maestro guardado: ${r.filas} proveedores`);
+    state.maestroSucio=false;state.maestro=null;state.maestroColsNuevas=[];await loadAll();}
+  catch(e){toast(e.message,'err');if(g)g.disabled=false;}
+}
+// Importa el Excel de proveedores (el de Montero o el que saca el AS400). Las
+// columnas se reconocen por su título; las que no se conocen entran como
+// columnas nuevas. Se casa por código AS400 y, si no hay, por nombre.
+const MAESTRO_ALIAS=[[/^(cod|codigo|cod.?proveedor|codigo.?proveedor|n.?proveedor|proveedor.?n)/,'codigo'],
+  [/^(nombre|proveedor|razon.?social|denominacion)/,'nombre'],[/^(cif|nif|cif.?nif|nif.?cif|dni)/,'cif'],[/^homol/,'homologacion'],
+  [/^deleg/,'delegacion'],[/^(valida|validador|quien.?valida|responsable)/,'validador'],[/^(importe.?fijo|cuota.?fija|fijo)/,'importe_fijo'],
+  [/^pedido/,'pedido'],[/^albar/,'albaran'],[/^(forma.?pago|forma.?de.?pago|dias|plazo)/,'forma_pago'],[/^descuento/,'descuento'],[/^portes/,'portes']];
+async function importarMaestro(archivo){
+  if(!archivo)return;
+  try{
+    const wb=XLSX.read(await archivo.arrayBuffer(),{type:'array'});
+    const filas=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+    const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+    const iCab=filas.findIndex(r=>r.filter(c=>MAESTRO_ALIAS.some(([re])=>re.test(norm(c).replace(/ /g,'.')))).length>=2);
+    if(iCab<0){toast('No encuentro la fila de títulos (código, nombre…)','err');return;}
+    const cab=filas[iCab].map(c=>{const n=norm(c);const a=MAESTRO_ALIAS.find(([re])=>re.test(n.replace(/ /g,'.')));return a?a[1]:(n?n.replace(/ /g,'_'):null);});
+    const si=v=>/^(si|sí|s|x|true|1|yes)$/i.test(String(v).trim());
+    let nuevos=0,cambiados=0;
+    const m=state.maestro||JSON.parse(JSON.stringify(state.condiciones||[]));
+    filas.slice(iCab+1).forEach(r=>{
+      const o={};cab.forEach((k,i)=>{if(k&&String(r[i]).trim()!=='')o[k]=MAESTRO_BOOL.has(k)?si(r[i]):String(r[i]).trim();});
+      if(!o.nombre&&!o.codigo)return;
+      if(o.homologacion)o.homologacion=o.homologacion.toUpperCase().replace(/\s+/g,'');
+      if(o.cif)o.cif=nifLimpio(o.cif);
+      let i=o.codigo?m.findIndex(x=>String(x.codigo||'')===String(o.codigo)):-1;
+      if(i<0&&o.nombre)i=m.findIndex(x=>normProv(x.nombre)===normProv(o.nombre));
+      if(i<0){m.push({clave:String(o.nombre||'').toUpperCase(),...o});nuevos++;}
+      else{Object.assign(m[i],o);cambiados++;}
+    });
+    state.maestro=m;state.maestroSucio=true;state.maestroCambiadas=new Set();
+    toast(`Importado: ${cambiados} actualizados y ${nuevos} nuevos. Revisa y pulsa «Guardar cambios».`);render();
+  }catch(e){toast('No se pudo leer el Excel: '+e.message,'err');}
+}
+
+/* ---------- REGISTRO DE IVA SOPORTADO ---------- */
+// El orden importa: primero las fechas y el CIF, para que «fecha factura» no se
+// tome por el nº de factura ni «NIF proveedor» por el nombre.
+const REG_CAMPOS=[['fecha_registro','Fecha registro',/fecha.?(reg|asiento|contab|apunte)/],
+  ['fecha_factura','Fecha factura',/fecha.?(fra|fac|doc|exp|emision)|^fecha$/],['nif','CIF / NIF',/nif|cif/],
+  ['numero_registro','Nº registro / asiento',/^(?!fecha).*(registro|asiento|apunte)|^n.?reg/],
+  ['numero_factura','Nº factura',/^(?!fecha).*(factura|fra|documento|\bdoc\b)/],
+  ['proveedor','Proveedor',/^(?!cod).*(proveedor|nombre|razon|tercero)/],['base','Base imponible',/base/],['cuota','Cuota IVA',/cuota|^iva|importe.?iva/],['total','Total',/total|importe/]];
+async function cargarRegistro(){
+  try{state.registro=await api(`registro_iva?select=*&order=cargado_en.desc&limit=20000`);}catch(e){console.error(e);state.registro=[];}
+}
+function viewRegistro(){
+  if(!state.registro){cargarRegistro().then(render);return `<div class="card"><div class="empty">Cargando…</div></div>`;}
+  const R=state.registro, fil=state.regFiltro||'';
+  const casadas=R.filter(r=>r.factura_id).length;
+  const ver=R.filter(r=>fil==='sin'?!r.factura_id:fil==='casadas'?!!r.factura_id:true)
+    .filter(r=>!state.regBuscar||(`${r.numero_factura} ${r.proveedor} ${r.nif} ${r.numero_registro}`).toLowerCase().includes(state.regBuscar.toLowerCase()));
+  const porId=new Map((state.todasFacturas||[]).map(f=>[f.id,f]));
+  const kpi=(cls,v,l)=>`<div class="kpi"><div class="kpi-top"><div class="kpi-ic ${cls}">${svg(ICN.file)}</div></div><div class="kpi-val">${v}</div><div class="kpi-lbl">${l}</div></div>`;
+  return `<div class="kpis">${kpi('blue',R.length,'Líneas del registro')}${kpi('green',casadas,'Casadas con su factura (contabilizadas)')}${kpi('amber',R.length-casadas,'Sin casar')}${kpi('green',eurS(R.reduce((s,r)=>s+(+r.cuota||0),0)),'IVA soportado')}</div>
+    <div class="card" style="margin-bottom:14px"><div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">
+      Sube el Excel del registro de IVA soportado que saca el AS400 después de contabilizar. Cada línea se guarda con su número de registro y se busca
+      su factura en la plataforma (mismo número y además mismo CIF o mismo total): la que casa pasa sola a <b>contabilizada</b>, con su PDF enlazado.
+      Si una factura llega después que su asiento, se casa sola al entrar. Subir el mismo Excel dos veces no duplica nada.</div>
+      <label class="btn-s ok" style="display:inline-flex;align-items:center">Subir Excel del AS400<input type="file" id="r-subir" accept=".xlsx,.xls,.csv" style="display:none"></label>
+      <div id="r-mapa"></div></div>
+    <div class="card"><div class="filtros">
+      ${[['','Todas'],['sin','Sin casar'],['casadas','Casadas']].map(([k,l])=>`<button class="chip ${fil===k?'active':''}" data-regf="${k}">${l}</button>`).join('')}
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="r-buscar" placeholder="Buscar…" value="${esc(state.regBuscar||'')}"></div>
+      <span class="card-meta" style="margin-left:auto">${ver.length} línea${ver.length===1?'':'s'}</span></div>
+    ${ver.length?`<div class="tbl-wrap"><table><thead><tr><th>Nº registro</th><th>Fecha reg.</th><th>Proveedor</th><th>CIF</th><th>Nº factura</th><th class="r">Base</th><th class="r">Cuota IVA</th><th class="r">Total</th><th>Factura en la plataforma</th></tr></thead><tbody>
+      ${ver.slice(0,1500).map(r=>{const f=r.factura_id&&porId.get(r.factura_id);return `<tr ${f?`data-reg-fac="${r.factura_id}" style="cursor:pointer"`:''}>
+        <td class="mono">${esc(r.numero_registro||'—')}</td><td class="mono">${dt(r.fecha_registro)}</td><td>${esc(r.proveedor||'')}</td><td class="mono">${esc(r.nif||'')}</td>
+        <td class="mono cell-strong">${esc(r.numero_factura||'')}</td><td class="r">${eur(r.base)}</td><td class="r">${eur(r.cuota)}</td><td class="r">${eur(r.total)}</td>
+        <td>${f?`<b>${esc(f.numero_factura||'')}</b> <span style="color:var(--muted);font-size:12px">${esc(r.casado_como||'')}</span>`:'<span class="bdg alerta" style="margin:0">sin casar</span>'}</td></tr>`;}).join('')}
+    </tbody></table></div>`:'<div class="empty">Todavía no se ha subido ningún registro.</div>'}</div>`;
+}
+function bindRegistro(){
+  document.querySelectorAll('[data-regf]').forEach(b=>b.onclick=()=>{state.regFiltro=b.dataset.regf;render();});
+  const bu=$('#r-buscar');if(bu)bu.onchange=e=>{state.regBuscar=e.target.value;render();};
+  document.querySelectorAll('[data-reg-fac]').forEach(tr=>tr.onclick=async()=>{const id=tr.dataset.regFac;
+    const f=await facturaPorId(id);if(f&&!state.facturas.some(x=>x.id===id))state.facturas.push(f);openDrawer(id);});
+  const s=$('#r-subir');if(s)s.onchange=()=>leerRegistro(s.files[0]);
+}
+async function leerRegistro(archivo){
+  if(!archivo)return;
+  const caja=$('#r-mapa');
+  try{
+    const wb=XLSX.read(await archivo.arrayBuffer(),{type:'array',cellDates:true});
+    const filas=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:true});
+    const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+    const iCab=filas.slice(0,25).findIndex(r=>r.filter(c=>REG_CAMPOS.some(([,,re])=>re.test(norm(c)))).length>=3);
+    if(iCab<0){toast('No encuentro la fila de títulos del registro','err');return;}
+    const cab=filas[iCab].map(norm);
+    const usado=new Set(), mapa={};
+    REG_CAMPOS.forEach(([k,,re])=>{const i=cab.findIndex((c,j)=>!usado.has(j)&&re.test(c));if(i>=0){mapa[k]=i;usado.add(i);}});
+    const datos=filas.slice(iCab+1).filter(r=>r.some(c=>String(c).trim()!==''));
+    state._regLeido={archivo:archivo.name,cab:filas[iCab],datos};
+    caja.innerHTML=`<div class="caja-extra" style="margin-top:12px"><h4>${esc(archivo.name)} · ${datos.length} filas</h4>
+      <div style="font-size:12px;color:var(--muted)">Comprueba qué columna es cada dato (lo he adivinado por el título) y pulsa «Cargar».</div>
+      <div class="frm">${REG_CAMPOS.map(([k,l])=>`<label>${l}<select data-rmap="${k}"><option value="">(no está)</option>${filas[iCab].map((c,i)=>`<option value="${i}" ${mapa[k]===i?'selected':''}>${esc(c||'columna '+(i+1))}</option>`).join('')}</select></label>`).join('')}</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Primeras filas: ${datos.slice(0,3).map(r=>esc(r.slice(0,8).map(x=>x instanceof Date?x.toLocaleDateString('es-ES'):x).join(' | '))).join('<br>')}</div>
+      <button class="btn-s ok" id="r-cargar">Cargar ${datos.length} filas</button></div>`;
+    $('#r-cargar').onclick=cargarRegistroLeido;
+  }catch(e){toast('No se pudo leer el Excel: '+e.message,'err');}
+}
+function fechaISO(v){
+  if(v instanceof Date&&!isNaN(v))return new Date(v.getTime()-v.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return d.toISOString().slice(0,10);}
+  const s=String(v||'').trim();let m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+  if(m)return `${m[3].length===2?'20'+m[3]:m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?m[0]:null;
+}
+async function cargarRegistroLeido(){
+  const L=state._regLeido;if(!L)return;
+  const mapa={};document.querySelectorAll('[data-rmap]').forEach(s=>{if(s.value!=='')mapa[s.dataset.rmap]=+s.value;});
+  if(mapa.numero_factura==null){toast('Falta decir qué columna es el nº de factura','err');return;}
+  const val=(r,k)=>mapa[k]==null?null:r[mapa[k]];
+  const num=v=>typeof v==='number'?Math.round(v*100)/100:numES(v);
+  const filas=L.datos.map(r=>({numero_registro:val(r,'numero_registro')!=null?String(val(r,'numero_registro')).trim():null,
+    fecha_registro:fechaISO(val(r,'fecha_registro')),fecha_factura:fechaISO(val(r,'fecha_factura')),nif:val(r,'nif')!=null?String(val(r,'nif')):null,
+    proveedor:val(r,'proveedor')!=null?String(val(r,'proveedor')):null,numero_factura:val(r,'numero_factura')!=null?String(val(r,'numero_factura')).trim():null,
+    base:num(val(r,'base')),cuota:num(val(r,'cuota')),total:num(val(r,'total')),
+    fila:Object.fromEntries(L.cab.map((c,i)=>[c||('col'+(i+1)),r[i] instanceof Date?fechaISO(r[i]):r[i]]))}))
+    .filter(x=>x.numero_factura);
+  const b=$('#r-cargar');if(b)b.disabled=true;
+  try{const r=await rpc('cargar_registro_iva',{p_filas:filas,p_fichero:L.archivo});
+    toast(`${r.nuevas} líneas nuevas (${r.repetidas} ya estaban) · ${r.casadas} facturas contabilizadas · ${r.sin_casar} sin casar`);
+    state.registro=null;state._regLeido=null;await loadAll();}
+  catch(e){toast(e.message,'err');if(b)b.disabled=false;}
 }
 
 /* ---------- init ---------- */

@@ -2657,7 +2657,8 @@ async function exportAS400(){
   // que toca pagarla, que es lo que sirve para ordenar una remesa.
   const head=['Fecha Factura','Cod. Proveedor','Proveedor','NIF','Homologación',
     'Nº Factura','Nº Pedido Montero','Ámbito IVA','Delegación',
-    'Base Imponible','Tipo IVA (0%)','Cuota IVA','Tipo IVA (10%)','Cuota IVA','Tipo IVA (21%)','Cuota IVA',
+    // Paqui, 15/10/2026: con varios tipos de IVA, la base de cada tipo en su columna.
+    'Base Imponible','Tipo IVA (0%)','Base Imponible (0%)','Cuota IVA','Tipo IVA (10%)','Base Imponible (10%)','Cuota IVA','Tipo IVA (21%)','Base Imponible (21%)','Cuota IVA',
     'Total Factura','Estado','Validada el','Descargado el','Contabilizada el','Forma de pago','IRPF %','IRPF importe'];
   // Paqui, 14/10/2026: la fecha de cada albarán en la columna de al lado.
   for(let i=1;i<=10;i++) head.push('Albarán '+i,'Fecha albarán '+i);
@@ -2675,15 +2676,17 @@ async function exportAS400(){
       d=tiposEnBD.length?tiposEnBD:[{tipo:f.porcentaje_iva||0,base:f.base_imponible,cuota:f.importe_iva}];
     }
     // Construir arrays de IVA por tipo
-    const ivaMap={0:{on:false,cuota:0},10:{on:false,cuota:0},21:{on:false,cuota:0}};
+    const ivaMap={0:{on:false,cuota:0,base:0},10:{on:false,cuota:0,base:0},21:{on:false,cuota:0,base:0}};
     d.forEach(item=>{
       const tipo=/EXENT/i.test(String(item.tipo))?0:Math.round(parseFloat(String(item.tipo).replace(',','.'))||0);
       if(ivaMap[tipo]){
         ivaMap[tipo].on=true;
         ivaMap[tipo].cuota=Math.round((ivaMap[tipo].cuota+(parseFloat(item.cuota)||0))*100)/100;
+        ivaMap[tipo].base=Math.round((ivaMap[tipo].base+(numES(item.base)||0))*100)/100;
       }
     });
-    const col=t=>ivaMap[t].on?[t+'%',ivaMap[t].cuota]:['',''];
+    // El tipo va como número, sin el símbolo % (Paqui, 15/10/2026).
+    const col=t=>ivaMap[t].on?[t,ivaMap[t].base,ivaMap[t].cuota]:['','',''];
     const base=[
       dt(f.fecha_factura||f.fecha_recepcion),
       codigoProv(f),nombreProv(f),cifDe(f),
@@ -2708,11 +2711,11 @@ async function exportAS400(){
     // Paqui, 06/10/2026: vacía y numérica → 0; vacía y de texto → en blanco.
     // Numéricas son los importes y los tipos (base, IVA, total, IRPF); los
     // códigos y números de documento (pedido, albaranes…) son texto.
-    const AS400_NUM=new Set([9,10,11,12,13,14,15,16,22,23]);
+    const AS400_NUM=new Set([9,10,11,12,13,14,15,16,17,18,19,25,26]);
     rows.push(base.map((v,i)=>v==null||v===''||(typeof v==='number'&&isNaN(v))?(AS400_NUM.has(i)?0:''):v));
   });
   const ws=XLSX.utils.aoa_to_sheet([head,...rows]);
-  ws['!cols']=[{wch:12},{wch:12},{wch:28},{wch:12},{wch:13},{wch:16},{wch:14},{wch:12},{wch:12},
+  ws['!cols']=[{wch:12},{wch:12},{wch:28},{wch:12},{wch:13},{wch:16},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},
     {wch:12},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:12},{wch:7},{wch:12},{wch:13},{wch:15},{wch:22},{wch:7},{wch:11},
     ...Array(20).fill({wch:12})];
   const wb=XLSX.utils.book_new();

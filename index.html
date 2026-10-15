@@ -914,6 +914,7 @@ async function loadAll(){
     // Lo descartado a mano (logos, capturas) no está sin asignar: está fuera,
     // en su propia lista, por si hay que recuperarlo.
     state.descartados=docsTodos.filter(d=>d.descartado);
+    state.docPorId=new Map(docsTodos.map(d=>[d.id,d]));
     const docs=docsTodos.filter(d=>!d.descartado);
     // Cero filas no significa "no hay documentos": si falta el permiso de lectura,
     // la base no da error, devuelve una lista vacía. El panel decía "0 sin asignar"
@@ -1164,12 +1165,31 @@ function homologacionDe(f){
 // "10281548 · 12/06/2026". La fecha sale de lo que la IA leyó de cada albarán.
 // Cada albarán con su fecha por separado, para el Excel: una columna para el
 // número y otra al lado para su fecha.
+// El número del albarán tal como figura EN EL ALBARÁN (María, 15/10/2026): la
+// factura lo cita a su manera y se perdían letras y ceros (EFEBEA «A026019129»
+// salía «026019129»; NADINE «00146323» salía «146323»). Se toma, por este orden,
+// el que se leyó del propio documento del albarán, el de su hoja en el PDF y el
+// leído de la factura; se casan por sus cifras.
 function albaranesDe(ia){
   const nums=Array.isArray(ia._albaranes)?ia._albaranes:[];
   const det=Array.isArray(ia.albaranes)?ia.albaranes:[];
-  const k=n=>String(n||'').replace(/\D/g,'').replace(/^0+/,'');
-  return nums.map(n=>{const m=det.find(a=>a&&k(a.numero)===k(n));return {num:String(n||''),fecha:m&&m.fecha?dt(m.fecha):''};});
+  const k=n=>String(n||'').toUpperCase().replace(/O/g,'0').replace(/\D/g,'').replace(/^0+/,'');
+  const candidatos=[];
+  (Array.isArray(ia._adjuntos)?ia._adjuntos:[]).forEach(a=>{
+    if(!a||a.tipo!=='ALBARAN')return;
+    const d=(state.docPorId||new Map()).get(a.documento_id);
+    String(d&&d.resumen_ia||'').split(/[|,;]/).forEach(t=>{const x=t.replace(/^\s*(ALBAR[AÁ]N(ES)?|ALB\.?)\s*:?\s*/i,'').trim();if(/\d/.test(x)&&!/^PEDIDO/i.test(x))candidatos.push(x);});
+  });
+  ((ia._respaldo_verificado||{}).por_pagina||ia.por_pagina||[]).forEach(p=>{if(p&&/ALBAR/i.test(p.que_es||'')&&p.numero)candidatos.push(String(p.numero));});
+  return nums.map(n=>{
+    const m=det.find(a=>a&&k(a.numero)===k(n));
+    const delAlbaran=candidatos.find(c=>k(c)===k(n));
+    return {num:String(delAlbaran||(m&&m.numero)||n||''),fecha:m&&m.fecha?dt(m.fecha):''};
+  });
 }
+// Para el AS400: lo que lleve (letras y ceros incluidos) sin espacios, barras ni
+// guiones, y como mucho 10 caracteres (los últimos: «AC ALV 0126013630» → 0126013630).
+const albAS400=n=>String(n||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(-10);
 function albaranesConFecha(ia){
   const nums=Array.isArray(ia._albaranes)?ia._albaranes:[];
   const det=Array.isArray(ia.albaranes)?ia.albaranes:[];
@@ -1709,7 +1729,7 @@ function viewAprobadas(){
       <td class="mono cell-strong" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)} <span style="color:var(--faint);font-weight:400">${a.fecha?new Date(a.fecha).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):''}</span></td>
       <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
-      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
+      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${codigoProv(f)?`<b class="mono" style="margin-right:6px">${esc(codigoProv(f))}</b>`:''}${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
       <td style="font-size:12.5px">${esc(formaPago(f).texto)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
       <td>${badgePago(f)}<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(estadoLbl(f.estado))}</div></td>
@@ -2715,7 +2735,7 @@ async function exportAS400(){
     ];
     // Paqui, 07/10/2026: el albarán va solo con sus cifras, sin prefijo, símbolos
     // ni fecha, porque cada delegación lo graba a su manera en el AS400.
-    const albNum=albaranesDe(ia).map(a=>({num:a.num.replace(/\D/g,''),fecha:a.fecha})).filter(a=>a.num);
+    const albNum=albaranesDe(ia).map(a=>({num:albAS400(a.num),fecha:a.fecha})).filter(a=>a.num);
     for(let i=0;i<10;i++) base.push(albNum[i]?albNum[i].num:'',albNum[i]?albNum[i].fecha:'');
     // Paqui, 06/10/2026: vacía y numérica → 0; vacía y de texto → en blanco.
     // Numéricas son los importes y los tipos (base, IVA, total, IRPF); los

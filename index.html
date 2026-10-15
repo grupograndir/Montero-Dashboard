@@ -2212,6 +2212,12 @@ async function openDrawer(id){
               :(sinFirmar?'Es el albarán que emite el proveedor, sin firma ni sello: no prueba que Montero recibiera la mercancía'
                        :(!tieneAlb&&albCitados.length?`La factura lo cita (${esc(albCitados.join(', '))}) pero el documento no está`:'')))}`}
         ${transporte.map(a=>doc('Transporte',`${esc(a.nombre||'')} — acredita el envío, no la mercancía`,true,'')).join('')}
+        ${adj.length&&!f.eliminada?`<div style="margin-top:12px"><div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">PAPELES PUESTOS CON ESTA FACTURA</div>
+          ${adj.map(x=>`<div class="pag-sep"><span class="bdg" style="margin:0">${esc(({ALBARAN:'Albarán',PEDIDO:'Pedido',TRANSPORTE:'Transporte'})[x.tipo]||'Otro')}</span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.como||'')}">${esc(x.nombre||'(sin nombre)')}</span>
+            ${x.url?`<button class="btn-s" data-pdf="${esc(x.url)}">Abrir</button>`:''}
+            ${x.documento_id?`<button class="btn-s rojo" data-quitar-doc="${esc(x.documento_id)}" title="No es de esta factura: se quita y vuelve a «Sin asignar»">Quitar de esta factura</button>`:''}</div>`).join('')}
+          <div style="font-size:11.5px;color:var(--muted);margin-top:4px">Si un papel no es de esta factura, «Quitar de esta factura» lo devuelve a «Sin asignar» para ponerlo con la suya.</div></div>`:''}
         ${(!esAbono&&(!tienePed||!tieneAlb))?`<div style="margin-top:10px;font-size:12.5px;color:var(--muted);line-height:1.5">Sin ${!tienePed&&!tieneAlb?'pedido ni albarán':(!tienePed?'el pedido':'el albarán')} no se puede comprobar que lo facturado sea lo que Montero pidió y recibió, así que la factura no se da por validada.</div>`:''}
         <details class="raw"><summary>Ver datos extraídos (JSON)</summary><pre>${esc(JSON.stringify(f.json_extraccion_ia,null,2))}</pre></details>
       </div>`;})()}`;
@@ -2231,6 +2237,7 @@ async function openDrawer(id){
     const a=b.dataset.ayudaAccion;
     if(a==='releer')abrirReleer(f.id);else if(a==='editar')abrirEdicion(f.id);else if(a==='separar')abrirSeparar(f.id);else pedirTarea(a,b);});
   bindExtrasFicha(f);
+  document.querySelectorAll('#dr-body [data-quitar-doc]').forEach(b=>b.onclick=()=>quitarDocumento(f.id,b.dataset.quitarDoc,b));
   document.querySelectorAll('#dr-body [data-restaurar]').forEach(b=>b.onclick=()=>restaurarFactura(b.dataset.restaurar));
   document.querySelectorAll('#dr-body [data-pdf]').forEach(b=>b.onclick=()=>openPdf(b.dataset.pdf));
   // Tambien fuera del cajon: la tabla de Sin asignar abre PDF igual, y el
@@ -3205,6 +3212,20 @@ function botonesExtraFicha(f){
     <button class="act-btn neu" data-enviar="${f.id}" title="Mandarla a un departamento sin descargarla">Enviar</button>
     <button class="act-btn neu" data-separar="${f.id}" title="El PDF trae varias facturas o papeles: separarlos">Separar documentos</button>
     ${cerrada?'':`<button class="act-btn del" data-sinasignar="${f.id}" title="No es una factura (es un pedido, un albarán…): sale del listado y su PDF vuelve a Sin asignar">Volver a Sin asignar</button>`}`;
+}
+
+/* ---------- quitar un papel puesto por error ---------- */
+// María, 15/10/2026: puso un albarán con la factura de Omenar que no era suyo y no
+// había forma de quitarlo. Se quita de la ficha y vuelve a «Sin asignar»; queda
+// anotado para que el emparejado no lo vuelva a poner con esta factura.
+async function quitarDocumento(facId,docId,boton){
+  const f=state.facturas.find(x=>x.id===facId);
+  const a=((f&&f.json_extraccion_ia||{})._adjuntos||[]).find(x=>x.documento_id===docId)||{};
+  if(!confirm(`¿Quitar «${a.nombre||'este documento'}» de la factura ${f&&f.numero_factura||''}?\n\nVuelve a «Sin asignar», desde donde se puede poner con la factura que toque.`))return;
+  if(boton)boton.disabled=true;
+  try{await rpc('quitar_documento_factura',{p_factura:facId,p_doc:docId});
+    toast('Quitado: está en «Sin asignar»');await loadAll();openDrawer(facId);}
+  catch(e){toast(e.message,'err');if(boton)boton.disabled=false;}
 }
 
 /* ---------- qué es cada documento ---------- */

@@ -1281,6 +1281,15 @@ function updateNav(){
 }
 // Aprobada para pago a mano y todavía sin pagar. Al pagarla pasa a «Pagadas»; la
 // aprobación se conserva para saber quién la autorizó.
+// Dónde está el PAGO de la factura, aparte de su estado contable (Paqui,
+// 15/10/2026): aprobada para pagar y todavía sin pagar → «Aprobada»; marcada
+// como pagada → «Pagada».
+function badgePago(f){
+  const ia=f.json_extraccion_ia||{};
+  if(ia._pago)return `<span class="bdg" style="background:var(--blue-s,#e0ecff);color:var(--blue,#1d4ed8);margin-right:5px" title="Pagada${ia._pago.fecha?' el '+dt(ia._pago.fecha):''}${ia._pago.por?' · '+esc(ia._pago.por):''}">Pagada</span>`;
+  if(ia._aprobada_pago)return `<span class="bdg" style="background:var(--amber-s);color:var(--amber);margin-right:5px" title="Aprobada para pagar${ia._aprobada_pago.fecha?' el '+dt(ia._aprobada_pago.fecha):''}; todavía sin pagar">Aprobada</span>`;
+  return '';
+}
 function aprobadaPago(f){return !!(f.json_extraccion_ia?._aprobada_pago&&!f.json_extraccion_ia?._pago);}
 
 /* ---------- router ---------- */
@@ -1504,7 +1513,7 @@ function colaTrabajo(ff){
       <td class="mono">${dt(f.fecha_factura)}</td>
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
-      <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${badgesSenales(f)}</td>
+      <td>${badgePago(f)}<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${badgesSenales(f)}</td>
       <td style="max-width:300px;color:var(--muted);font-size:12.5px"><div class="trunc" style="max-width:300px">${esc(motivoDe(f.id))}</div></td>
     </tr>`).join('');
   return`<div class="tbl-wrap"><table><thead><tr><th>Proveedor</th><th>Nº Factura</th><th>Fecha fra.</th><th>Cargada</th><th class="r">Total</th><th>Estado</th><th>Motivo</th></tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -1665,7 +1674,7 @@ function tablaFacturas(ff,full){
       ${full?(()=>{const v=validacion(f),c=fechaContabilizada(f);
         return `<td class="mono" style="white-space:nowrap" title="${v?esc('Validada '+v.como+(v.por?' por '+v.por:'')):''}">${v?(v.fecha?dt(v.fecha):'<span style="color:var(--muted)">auto</span>'):'—'}</td>
       <td class="mono" style="white-space:nowrap">${c?`<b title="Contabilizada">C</b> ${dt(c)}`:'—'}</td>`;})():''}
-      <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${sinCondiciones(f)?'<span class="bdg sincond" title="Este proveedor no está en el Excel de condiciones: hay que homologarlo">SIN CONDICIONES</span>':''}${badgesSenales(f)}</td>
+      <td>${badgePago(f)}<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${sinCondiciones(f)?'<span class="bdg sincond" title="Este proveedor no está en el Excel de condiciones: hay que homologarlo">SIN CONDICIONES</span>':''}${badgesSenales(f)}</td>
     </tr>`;
   }).join('');
   return `<div class="tbl-wrap"><table><thead><tr>
@@ -1703,8 +1712,8 @@ function viewAprobadas(){
       <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
       <td style="font-size:12.5px">${esc(formaPago(f).texto)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
-      <td><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span></td>
-      <td style="text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">${svg(ICN.card)}Pagada</button>
+      <td>${badgePago(f)}<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(estadoLbl(f.estado))}</div></td>
+      <td style="text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap" title="Ya se ha pagado: pasa a «Pagadas»">${svg(ICN.card)}Marcar pagada</button>
         <button class="act-btn del" data-desaprobar-fila="${f.id}" title="Vuelve a su sitio en el listado de facturas" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">Deshacer aprobación</button></div></td>
     </tr>`;}).join('');
   return filtro+`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
@@ -1887,7 +1896,7 @@ async function openDrawer(id){
       ${!f.json_extraccion_ia?._pago?(f.json_extraccion_ia?._aprobada_pago
         ?`<button class="act-btn del" data-desaprobar="${f.id}" title="Deshacer la aprobación: vuelve a su sitio en el listado de facturas">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer aprobación</button>`
         :`<button class="act-btn cont" data-aprobar="${f.id}" style="white-space:nowrap" title="Aprobarla para pago: pasa a la sección «Aprobadas»">${svg(ICN.check)}APROBADA PAGAR</button>`):''}
-      ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Marcar como pagada por transferencia bancaria">${svg(ICN.card)}Pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
+      ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Ya se ha pagado: pasa a «Pagadas»">${svg(ICN.card)}Marcar pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
       <button class="act-btn cont" data-manual="${f.id}" title="Subir un albarán, un pedido u otro papel que esté guardado en otro sitio y ponerlo con esta factura">${svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>')}Añadir manualmente</button>
       ${botonesExtraFicha(f)}
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>

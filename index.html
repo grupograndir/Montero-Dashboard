@@ -1338,6 +1338,7 @@ function render(){
   bindContent();
   if(state.view==='registro')bindRegistro();
   if(state.view==='excel')bindExcel();
+  if(state.view==='aprobadas')bindAprobadas();
   if(state.view==='resumen')drawCharts();
 }
 
@@ -1540,53 +1541,50 @@ function colaTrabajo(ff){
 }
 
 /* ---------- FACTURAS ---------- */
-function filtradas(){
-  let ff=state.facturas.filter(f=>!f.json_extraccion_ia?._pago&&!aprobadaPago(f));
-  // Una factura que llegó dos veces no es trabajo pendiente: es la misma otra vez,
-  // y verla en el listado hace pensar que hay algo que revisar. "Si están
-  // duplicadas no tienen que aparecer" (María, 12/08/2026). Siguen estando: se ven
-  // en su propio filtro, para poder comprobar que se descartó la copia correcta.
-  if(state.quickFilter!=='duplicados')
+// Los mismos filtros y el mismo orden para el listado general y para Aprobadas
+// (Paqui, 15/10/2026): una sola implementación.
+function aplicarFiltros(ff,c){
+  if(c.chip!=='duplicados')
     ff=ff.filter(f=>f.estado!=='DUPLICADO_PENDIENTE');
-  if(state.quickFilter==='revision')ff=ff.filter(f=>PEND.includes(f.estado));
-  else if(state.quickFilter==='duplicados')ff=ff.filter(f=>f.es_duplicado||f.estado==='DUPLICADO_PENDIENTE');
+  if(c.chip==='revision')ff=ff.filter(f=>PEND.includes(f.estado));
+  else if(c.chip==='duplicados')ff=ff.filter(f=>f.es_duplicado||f.estado==='DUPLICADO_PENDIENTE');
   // Cerradas = todo lo que ya pasó el corte, esté contabilizado o no. Las otras
   // dos parten eso en las dos mitades del trabajo: lo que falta por llevar al
   // AS400 (validadas) y lo que ya está asentado (contabilizadas). Antes se llamaba
   // «Aprobadas»; ese nombre es ahora la sección de aprobadas A MANO para pago.
-  else if(state.quickFilter==='cerradas')ff=ff.filter(f=>OK_CERRADAS.includes(f.estado));
-  else if(state.quickFilter==='validadas')ff=ff.filter(f=>f.estado==='VALIDADA');
-  else if(state.quickFilter==='contabilizadas')ff=ff.filter(f=>f.estado==='CONTABILIZADA');
-  else if(state.quickFilter==='sincond')ff=ff.filter(sinCondiciones);
-  else if(state.quickFilter==='sincodigo')ff=ff.filter(f=>!codigoProv(f));
-  else if(state.quickFilter==='sospecha')ff=ff.filter(f=>esSospechosa(f)&&f.estado!=='CONTABILIZADA');
-  else if(state.quickFilter==='posdup')ff=ff.filter(f=>posDuplicado(f)&&f.estado!=='CONTABILIZADA');
-  else if(state.quickFilter==='sinhomol')ff=ff.filter(f=>!homologacionDe(f));
-  else if(state.quickFilter==='sindeleg')ff=ff.filter(f=>!delegacionCiudad(f));
-  else if(state.quickFilter==='dudoso')ff=ff.filter(f=>tieneSenal(f,'PROVEEDOR_DUDOSO')||tieneSenal(f,'CIF_DUDOSO')||tieneSenal(f,'CIF_FALTA'));
-  else if(state.quickFilter==='faltapedido')ff=ff.filter(f=>tieneSenal(f,'FALTA_PEDIDO_R'));
-  else if(state.quickFilter==='domic')ff=ff.filter(esDeGiro);
-  if(state.fValida)ff=ff.filter(f=>(validadorDe(f)||'(nadie)')===state.fValida);
-  else if(state.quickFilter==='mes'){const n=new Date();ff=ff.filter(f=>{const d=new Date(f.fecha_factura||f.fecha_recepcion);return !isNaN(d)&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();});}
+  else if(c.chip==='cerradas')ff=ff.filter(f=>OK_CERRADAS.includes(f.estado));
+  else if(c.chip==='validadas')ff=ff.filter(f=>f.estado==='VALIDADA');
+  else if(c.chip==='contabilizadas')ff=ff.filter(f=>f.estado==='CONTABILIZADA');
+  else if(c.chip==='sincond')ff=ff.filter(sinCondiciones);
+  else if(c.chip==='sincodigo')ff=ff.filter(f=>!codigoProv(f));
+  else if(c.chip==='sospecha')ff=ff.filter(f=>esSospechosa(f)&&f.estado!=='CONTABILIZADA');
+  else if(c.chip==='posdup')ff=ff.filter(f=>posDuplicado(f)&&f.estado!=='CONTABILIZADA');
+  else if(c.chip==='sinhomol')ff=ff.filter(f=>!homologacionDe(f));
+  else if(c.chip==='sindeleg')ff=ff.filter(f=>!delegacionCiudad(f));
+  else if(c.chip==='dudoso')ff=ff.filter(f=>tieneSenal(f,'PROVEEDOR_DUDOSO')||tieneSenal(f,'CIF_DUDOSO')||tieneSenal(f,'CIF_FALTA'));
+  else if(c.chip==='faltapedido')ff=ff.filter(f=>tieneSenal(f,'FALTA_PEDIDO_R'));
+  else if(c.chip==='domic')ff=ff.filter(esDeGiro);
+  else if(c.chip==='mes'){const n=new Date();ff=ff.filter(f=>{const d=new Date(f.fecha_factura||f.fecha_recepcion);return !isNaN(d)&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();});}
+  if(c.valida)ff=ff.filter(f=>(validadorDe(f)||'(nadie)')===c.valida);
   // El desplegable guarda la clave agrupada, no el nombre suelto: filtrar por
   // "SECODI" tiene que traer sus 4 facturas, no las 3 de una de las dos formas.
-  if(state.fProv)ff=ff.filter(f=>claveProv(f)===state.fProv);
-  if(state.fEstado)ff=ff.filter(f=>f.estado===state.fEstado);
+  if(c.prov)ff=ff.filter(f=>claveProv(f)===c.prov);
+  if(c.estado)ff=ff.filter(f=>f.estado===c.estado);
   // Varias formas de pago a la vez (Paqui, 25/09/2026): confirming y pagaré, por ejemplo.
-  if(state.fPago.length)ff=ff.filter(f=>state.fPago.includes(formaPago(f).tipo));
+  if(c.pago.length)ff=ff.filter(f=>c.pago.includes(formaPago(f).tipo));
   // Se busca también sin espacios, puntos, barras ni guiones. Cada proveedor
   // escribe su número a su manera y el papel casi nunca coincide con lo guardado:
   // la factura de VALGEPORT pone "29" y aquí está como "29/000020"; la de Racing
   // Oil se guardó "1 002104" y quien la busca teclea "1-002104". Se daban por
   // desaparecidas facturas que estaban, y con el NIF pasa lo mismo (B-88658372).
-  if(state.search){
-    const q=state.search.toLowerCase(), qn=q.replace(/[^a-z0-9]/g,'');
+  if(c.search){
+    const q=c.search.toLowerCase(), qn=q.replace(/[^a-z0-9]/g,'');
     const pega=(v)=>{const s=String(v||'').toLowerCase();
       return s.includes(q)||(!!qn&&s.replace(/[^a-z0-9]/g,'').includes(qn));};
     ff=ff.filter(f=>pega(f.numero_factura)||pega(nombreProv(f))||pega(nombreLeido(f))||pega(nifProv(f))||pega(cifDe(f))||
       pega(formaPago(f).texto)||pega(f.forma_pago_factura)||pega(codigoProv(f)));
   }
-  const {k,dir}=state.sort;
+  const {k,dir}=c.sort;
   ff.sort((a,b)=>{
     let va,vb;
     if(k==='fecha'){va=new Date(a.fecha_factura||a.fecha_recepcion);vb=new Date(b.fecha_factura||b.fecha_recepcion);}
@@ -1598,10 +1596,17 @@ function filtradas(){
     else if(k==='contab'){va=fechaContabilizada(a)||'';vb=fechaContabilizada(b)||'';}
     else if(k==='conf'){va=+a.confianza_extraccion||0;vb=+b.confianza_extraccion||0;}
     else if(k==='valida'){va=validadorDe(a);vb=validadorDe(b);}
+    else if(k==='aprobada'){va=((a.json_extraccion_ia||{})._aprobada_pago||{}).fecha||'';vb=((b.json_extraccion_ia||{})._aprobada_pago||{}).fecha||'';}
+    else if(k==='num'){va=String(a.numero_factura||'');vb=String(b.numero_factura||'');}
+    else if(k==='estado'){va=a.estado||'';vb=b.estado||'';}
     else{va=a[k];vb=b[k];}
     return va<vb?-dir:va>vb?dir:0;
   });
   return ff;
+}
+function filtradas(){
+  const ff=state.facturas.filter(f=>!f.json_extraccion_ia?._pago&&!aprobadaPago(f));
+  return aplicarFiltros(ff,{chip:state.quickFilter,valida:state.fValida,prov:state.fProv,estado:state.fEstado,pago:state.fPago,search:state.search,sort:state.sort});
 }
 function viewFacturas(){
   const provs=[...new Set(state.facturas.map(claveProv))]
@@ -1610,7 +1615,7 @@ function viewFacturas(){
   const hay=new Set(state.facturas.map(f=>formaPago(f).tipo));
   const pagos=FORMAS_PAGO.filter(p=>hay.has(p));
   const ff=filtradas();
-  const chips=[['','Todas'],['revision','Requieren revisión'],['sospecha','¿Pedido o albarán?'],['duplicados','Duplicados'],['posdup','Posible duplicado'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['domic','Domiciliadas'],['sincond','Sin condiciones'],['sincodigo','Sin código proveedor'],['sinhomol','Sin homologación'],['sindeleg','Sin delegación'],['faltapedido','Falta pedido (R)'],['dudoso','Proveedor o CIF dudoso'],['mes','Este mes']];
+  const chips=CHIPS;
   const validadores=[...new Set(state.facturas.map(f=>validadorDe(f)||'(nadie)'))].sort();
   const chipElim=`<button class="chip ${state.verEliminadas?'active':''}" data-elim="1" title="Facturas quitadas del listado">Eliminadas</button>`;
   // Cuántas facturas están a medio comprobar. Sale aquí y no en un log del
@@ -1713,17 +1718,41 @@ function tablaFacturas(ff,full){
 /* ---------- APROBADAS PARA PAGO ---------- */
 // Por fecha de APROBACIÓN, no de factura: lo que se aprobó para pagar en un
 // periodo y cuánto suma (Paqui, 14/10/2026).
+const CHIPS=[['','Todas'],['revision','Requieren revisión'],['sospecha','¿Pedido o albarán?'],['duplicados','Duplicados'],['posdup','Posible duplicado'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['domic','Domiciliadas'],['sincond','Sin condiciones'],['sincodigo','Sin código proveedor'],['sinhomol','Sin homologación'],['sindeleg','Sin delegación'],['faltapedido','Falta pedido (R)'],['dudoso','Proveedor o CIF dudoso'],['mes','Este mes']];
+// Por fecha de APROBACIÓN, no de factura: lo que se aprobó para pagar en un
+// periodo y cuánto suma (Paqui, 14/10/2026). Y con los mismos filtros y el mismo
+// orden que el listado general (15/10/2026).
 function aprobadasFiltradas(){
-  return state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada&&enRango(f.json_extraccion_ia._aprobada_pago.fecha,state.apDesde,state.apHasta))
-    .sort((a,b)=>(new Date(a.json_extraccion_ia._aprobada_pago.fecha||0)-new Date(b.json_extraccion_ia._aprobada_pago.fecha||0))||String(a.fecha_factura||'').localeCompare(String(b.fecha_factura||'')));
+  const ff=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada&&enRango(f.json_extraccion_ia._aprobada_pago.fecha,state.apDesde,state.apHasta));
+  return aplicarFiltros(ff,{chip:state.apChip||'',valida:state.apValida||'',prov:state.apProv||'',estado:state.apEstado||'',
+    pago:state.apPago||[],search:state.apBuscar||'',sort:state.apSort||{k:'aprobada',dir:1}});
 }
 function viewAprobadas(){
+  const todas=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada);
   const ff=aprobadasFiltradas();
-  const filtro=`<div class="card" style="margin-bottom:14px"><div class="filtros" style="border:0;padding:0">
-    <b style="font-size:13px">Aprobadas entre el</b><input type="date" id="ap-desde" value="${esc(state.apDesde)}"><span>y el</span><input type="date" id="ap-hasta" value="${esc(state.apHasta)}">
-    <span style="font-size:13px;margin-left:8px">Total a pagar del periodo: <b>${eur(ff.reduce((s,f)=>s+(+f.total_factura||0),0))}</b> (${ff.length} factura${ff.length===1?'':'s'})</span>
-    <button class="btn-s" id="ap-excel" style="margin-left:auto" ${ff.length?'':'disabled'}>Excel del periodo</button></div></div>`;
-  if(!ff.length)return filtro+`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">No hay facturas aprobadas pendientes de pago</p><small>Cuando pulses «APROBADA PAGAR» en una factura, aparecerá aquí</small></div></div>`;
+  const so=state.apSort||{k:'aprobada',dir:1};
+  const thA=(k,l,r)=>`<th class="srt ${r?'r':''}" data-apsort="${k}">${l}<span class="arr">${so.k===k?(so.dir>0?'▲':'▼'):''}</span></th>`;
+  const provs=[...new Set(todas.map(claveProv))].map(k=>({k,n:nombreCanonico(k)})).sort((a,b)=>a.n.localeCompare(b.n,'es'));
+  const estados=[...new Set(todas.map(f=>f.estado).filter(Boolean))].sort();
+  const hay=new Set(todas.map(f=>formaPago(f).tipo)), pagos=FORMAS_PAGO.filter(p=>hay.has(p));
+  const validadores=[...new Set(todas.map(f=>validadorDe(f)||'(nadie)'))].sort();
+  const apPago=state.apPago||[];
+  const filtro=`<div class="card" style="margin-bottom:14px">
+    <div class="chips-row" style="padding:0 0 10px">${CHIPS.map(([k,l])=>`<button class="chip ${(state.apChip||'')===k?'active':''}" data-apchip="${k}">${l}</button>`).join('')}</div>
+    <div class="filtros" style="border:0;padding:0">
+      <div class="search">${svg('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>')}<input id="ap-buscar" placeholder="Buscar nº factura, proveedor, código, NIF o forma de pago…" value="${esc(state.apBuscar||'')}"></div>
+      <select class="sel" id="ap-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.apProv?'selected':''}>${esc(p.n)}</option>`).join('')}</select>
+      <select class="sel" id="ap-estado"><option value="">Todos los estados</option>${estados.map(e=>`<option value="${esc(e)}" ${e===state.apEstado?'selected':''}>${esc(estadoLbl(e))}</option>`).join('')}</select>
+      <select class="sel" id="ap-valida"><option value="">Valide quien valide</option>${validadores.map(v=>`<option value="${esc(v)}" ${v===state.apValida?'selected':''}>${esc(v)}</option>`).join('')}</select>
+      <details class="multi" id="ap-pago"><summary class="sel">${apPago.length?`Pago: ${esc(apPago.join(', '))}`:'Todas las formas de pago'}</summary>
+        <div class="multi-op">${pagos.map(p=>`<label><input type="checkbox" value="${esc(p)}" ${apPago.includes(p)?'checked':''}> ${esc(p)}</label>`).join('')}
+        ${apPago.length?'<button type="button" class="multi-limpiar" id="ap-pago-limpiar">Quitar filtro</button>':''}</div></details>
+    </div>
+    <div class="filtros" style="border:0;padding:10px 0 0">
+      <b style="font-size:13px">Aprobadas entre el</b><input type="date" id="ap-desde" value="${esc(state.apDesde)}"><span>y el</span><input type="date" id="ap-hasta" value="${esc(state.apHasta)}">
+      <span style="font-size:13px;margin-left:8px">Total a pagar de lo filtrado: <b>${eur(ff.reduce((s,f)=>s+(+f.total_factura||0),0))}</b> (${ff.length} de ${todas.length} factura${todas.length===1?'':'s'})</span>
+      <button class="btn-s" id="ap-excel" style="margin-left:auto" ${ff.length?'':'disabled'}>Excel de lo filtrado</button></div></div>`;
+  if(!ff.length)return filtro+`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">${todas.length?'Ninguna aprobada con estos filtros':'No hay facturas aprobadas pendientes de pago'}</p><small>Cuando pulses «APROBADA PAGAR» en una factura, aparecerá aquí</small></div></div>`;
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
   const rows=ff.map(f=>{const a=f.json_extraccion_ia._aprobada_pago;return `<tr data-id="${f.id}">
       <td class="mono cell-strong" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)} <span style="color:var(--faint);font-weight:400">${a.fecha?new Date(a.fecha).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):''}</span></td>
@@ -1732,17 +1761,32 @@ function viewAprobadas(){
       <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${codigoProv(f)?`<b class="mono" style="margin-right:6px">${esc(codigoProv(f))}</b>`:''}${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
       <td style="font-size:12.5px">${esc(formaPago(f).texto)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
-      <td>${badgePago(f)}<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(estadoLbl(f.estado))}</div></td>
+      <td style="font-size:12.5px;white-space:nowrap">${esc(validadorDe(f)||'—')}</td>
+      <td>${badgePago(f)}<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(estadoLbl(f.estado))}</div>${badgesSenales(f)}</td>
       <td style="text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap" title="Ya se ha pagado: pasa a «Pagadas»">${svg(ICN.card)}Marcar pagada</button>
         <button class="act-btn del" data-desaprobar-fila="${f.id}" title="Vuelve a su sitio en el listado de facturas" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">Deshacer aprobación</button></div></td>
     </tr>`;}).join('');
+  const filtrado=ff.length!==todas.length||state.apDesde||state.apHasta;
   return filtro+`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
-    <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${svg(ICN.check)}</div></div><div class="kpi-val">${ff.length}</div><div class="kpi-lbl">Aprobadas pendientes de pago${state.apDesde||state.apHasta?' (en el periodo)':''}</div></div>
-    <div class="kpi"><div class="kpi-top"><div class="kpi-ic blue">${svg(ICN.euro)}</div></div><div class="kpi-val">${eurS(total)}</div><div class="kpi-lbl">Total a pagar${state.apDesde||state.apHasta?' del periodo':''}</div></div>
+    <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${svg(ICN.check)}</div></div><div class="kpi-val">${ff.length}</div><div class="kpi-lbl">Aprobadas pendientes de pago${filtrado?' (con los filtros)':''}</div></div>
+    <div class="kpi"><div class="kpi-top"><div class="kpi-ic blue">${svg(ICN.euro)}</div></div><div class="kpi-val">${eurS(total)}</div><div class="kpi-lbl">Total a pagar${filtrado?' (con los filtros)':''}</div></div>
   </div>
   <div class="card"><div class="tbl-wrap"><table><thead><tr>
-    <th>Aprobada ▲</th><th>Fecha fra.</th><th>Nº Factura</th><th>Proveedor</th><th>Forma de pago</th><th class="r">Total</th><th>Estado</th><th></th>
+    ${thA('aprobada','Aprobada')}${thA('fecha','Fecha fra.')}${thA('num','Nº Factura')}${thA('prov','Proveedor')}${thA('pago','Forma de pago')}${thA('total','Total',1)}${thA('valida','Valida')}${thA('estado','Estado')}<th></th>
   </tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function bindAprobadas(){
+  document.querySelectorAll('[data-apchip]').forEach(b=>b.onclick=()=>{state.apChip=b.dataset.apchip;render();});
+  document.querySelectorAll('[data-apsort]').forEach(t=>t.onclick=()=>{const k=t.dataset.apsort,o=state.apSort||{k:'aprobada',dir:1};
+    state.apSort=o.k===k?{k,dir:-o.dir}:{k,dir:['prov','num','pago','valida','estado'].includes(k)?1:-1};render();});
+  const sel=(id,k)=>{const el=$('#'+id);if(el)el.onchange=e=>{state[k]=e.target.value;render();};};
+  sel('ap-prov','apProv');sel('ap-estado','apEstado');sel('ap-valida','apValida');
+  // La búsqueda repinta al escribir y deja el cursor donde estaba.
+  const bu=$('#ap-buscar');if(bu)bu.oninput=e=>{state.apBuscar=e.target.value;const pos=e.target.selectionStart;render();
+    const n=$('#ap-buscar');if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}}};
+  const pg=$('#ap-pago');
+  if(pg){pg.querySelectorAll('input[type=checkbox]').forEach(c=>c.onchange=()=>{state.apPago=[...pg.querySelectorAll('input:checked')].map(x=>x.value);render();const p=$('#ap-pago');if(p)p.open=true;});
+    const lp=$('#ap-pago-limpiar');if(lp)lp.onclick=()=>{state.apPago=[];render();};}
 }
 
 /* ---------- FACTURAS PAGADAS ---------- */

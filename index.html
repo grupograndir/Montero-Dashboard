@@ -2601,7 +2601,7 @@ function exportExcel(){
       f.numero_factura||'', dt(f.fecha_factura||f.fecha_recepcion),
       numeroPedido(f),
       ia._ambito_iva||'NACIONAL', delegacionCiudad(f),
-      iva.base||'', (Math.round(+iva.tipo)||0)+'%', iva.cuota||'',
+      iva.base||'', Math.round(+iva.tipo)||0, iva.cuota||'',
       f.total_factura||'', f.estado||'',
       ...(()=>{const v=validacion(f),c=fechaContabilizada(f);
         return [v&&v.fecha?dt(v.fecha):'', v?v.como:'', c?dt(c):'', sinCondiciones(f)?'SIN CONDICIONES':'', validadorDe(f)];})()
@@ -2658,7 +2658,7 @@ async function exportAS400(){
   const head=['Fecha Factura','Cod. Proveedor','Proveedor','NIF','Homologación',
     'Nº Factura','Nº Pedido Montero','Ámbito IVA','Delegación',
     // Paqui, 15/10/2026: con varios tipos de IVA, la base de cada tipo en su columna.
-    'Base Imponible','Tipo IVA (0%)','Base Imponible (0%)','Cuota IVA','Tipo IVA (10%)','Base Imponible (10%)','Cuota IVA','Tipo IVA (21%)','Base Imponible (21%)','Cuota IVA',
+    'Base Imponible','Tipo IVA 0','Base Imponible 0','Cuota IVA 0','Tipo IVA 10','Base Imponible 10','Cuota IVA 10','Tipo IVA 21','Base Imponible 21','Cuota IVA 21',
     'Total Factura','Estado','Validada el','Descargado el','Contabilizada el','Forma de pago','IRPF %','IRPF importe'];
   // Paqui, 14/10/2026: la fecha de cada albarán en la columna de al lado.
   for(let i=1;i<=10;i++) head.push('Albarán '+i,'Fecha albarán '+i);
@@ -3720,6 +3720,31 @@ async function cargarRegistroLeido(){
     state.registro=null;state._regLeido=null;await loadAll();}
   catch(e){toast(e.message,'err');if(b)b.disabled=false;}
 }
+
+/* ---------- versión nueva publicada ---------- */
+// Una pestaña abierta desde ayer sigue con el código de ayer: el Excel del AS400
+// salía con el % aunque ya estuviera corregido (15/10/2026). Se mira si hay una
+// versión nueva y se avisa para recargar, sin recargar sola (podría perder lo
+// que se está escribiendo).
+let _versionPanel=null;
+async function huellaPanel(){
+  const t=await (await fetch(location.pathname,{cache:'no-store'})).text();
+  let h=0;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))|0;return h+':'+t.length;
+}
+async function mirarVersion(){
+  try{
+    const v=await huellaPanel();
+    if(_versionPanel===null){_versionPanel=v;return;}
+    if(v!==_versionPanel&&!$('#aviso-version')){
+      const d=document.createElement('div');d.id='aviso-version';
+      d.style.cssText='position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:500;background:var(--ink,#0f172a);color:#fff;padding:12px 16px;border-radius:10px;font-size:13.5px;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.25)';
+      d.innerHTML='Hay una versión nueva del panel.<button class="btn-s ok" style="height:30px">Recargar</button>';
+      d.querySelector('button').onclick=()=>location.reload();
+      document.body.appendChild(d);
+    }
+  }catch(_){}
+}
+mirarVersion();setInterval(mirarVersion,5*60*1000);window.addEventListener('focus',mirarVersion);
 
 /* ---------- init ---------- */
 document.addEventListener('keydown',e=>{

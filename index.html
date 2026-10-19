@@ -1310,7 +1310,7 @@ function updateNav(){
 // como pagada → «Pagada».
 function badgePago(f){
   const ia=f.json_extraccion_ia||{};
-  const conf=ia._conformada?`<span class="bdg" style="background:var(--gr-s,#e8f5ee);color:var(--green);margin-right:5px" title="Conformada (firmada)${ia._conformada.fecha?' el '+dt(ia._conformada.fecha):''}${ia._conformada.por?' · '+esc(ia._conformada.por):''}">Conformada</span>`:'';
+  const conf=ia._conformada?`<span class="bdg" style="background:var(--gr-s,#e8f5ee);color:var(--green);margin-right:5px" title="Conformada${ia._conformada.fecha?' el '+dt(ia._conformada.fecha):''}${ia._conformada.por?' · '+esc(ia._conformada.por):''}">Conformada</span>`:'';
   return conf+badgePagoSolo(f);
 }
 function badgePagoSolo(f){
@@ -3423,19 +3423,19 @@ function abrirReleer(facId){
 }
 
 /* ---------- enviar a un departamento ---------- */
-/* ---------- factura conformada (firmada) ---------- */
-// Paqui, 19/10/2026: una vez firmada en Acrobat, la factura tiene que volver a
+/* ---------- factura conformada ---------- */
+// Paqui, 19/10/2026: una vez conformada en Acrobat, la factura tiene que volver a
 // su sitio. Se arrastra el PDF a la ficha (o se elige) y queda guardada con ella
 // como «conformada»: se ve en el listado y se abre junto a sus documentos.
 function cajaConformada(f){
   const c=(f.json_extraccion_ia||{})._conformada;
   if(c)return `<div class="aviso-sen bien" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <span><b>Factura conformada</b> · ${esc(c.por||'')} · ${dtL(c.fecha)}</span>
-    <span style="margin-left:auto;display:flex;gap:6px">${c.url?`<button class="btn-s" data-pdf="${esc(c.url)}">Abrir la firmada</button>`:''}
+    <span style="margin-left:auto;display:flex;gap:6px">${c.url?`<button class="btn-s" data-pdf="${esc(c.url)}">Abrir la conformada</button>`:''}
       <label class="btn-s" style="display:inline-flex;align-items:center">Sustituir<input type="file" id="conf-archivo" accept=".pdf,application/pdf,image/jpeg,image/png" style="display:none"></label></span></div>`;
   return `<label id="conf-zona" class="conf-zona">
     <input type="file" id="conf-archivo" accept=".pdf,application/pdf,image/jpeg,image/png" style="display:none">
-    <b>¿Ya está firmada?</b> Arrastra aquí el PDF conformado o pulsa para elegirlo. Se guarda con esta factura.</label>`;
+    <b>¿Ya está conformada?</b> Arrastra aquí el PDF conformado o pulsa para elegirlo. Se guarda con esta factura.</label>`;
 }
 function bindConformada(f){
   const inp=$('#conf-archivo');if(inp)inp.onchange=()=>subirConformada(f.id,inp.files[0]);
@@ -3450,15 +3450,15 @@ async function subirConformada(facId,archivo){
   const f=state.facturas.find(x=>x.id===facId);if(!f||!archivo)return;
   if(!/pdf|jpe?g|png/i.test(archivo.type+archivo.name)){toast('Solo PDF, JPG o PNG','err');return;}
   if(archivo.size>25*1024*1024){toast('El archivo pasa de 25 MB','err');return;}
-  const z=$('#conf-zona');if(z)z.textContent='Subiendo la factura firmada…';
+  const z=$('#conf-zona');if(z)z.textContent='Subiendo la factura conformada…';
   try{
     const pdf=await aPdf(archivo);
     const nombre=archivo.name.replace(/\.(jpe?g|png)$/i,'.pdf');
-    const doc=await subirDocumento(pdf,nombre,'OTRO',`Factura ${f.numero_factura||''} conformada (firmada)`);
+    const doc=await subirDocumento(pdf,nombre,'OTRO',`Factura ${f.numero_factura||''} conformada`);
     const url=`${SB_URL}/storage/v1/object/public/facturas/${doc.hash}.pdf`;
     const ia=Object.assign({},f.json_extraccion_ia||{});
     const adj=(Array.isArray(ia._adjuntos)?ia._adjuntos:[]).filter(a=>a.documento_id!==doc.id&&!(ia._conformada&&a.documento_id===ia._conformada.documento_id));
-    adj.push({nombre:`Conformada · ${nombre}`,tipo:'OTRO',documento_id:doc.id,como:`factura firmada, subida por ${quienSoy()}`,leido:true,a_mano:true,url});
+    adj.push({nombre:`Conformada · ${nombre}`,tipo:'OTRO',documento_id:doc.id,como:`factura conformada, subida por ${quienSoy()}`,leido:true,a_mano:true,url});
     ia._adjuntos=adj;
     ia._conformada={fecha:new Date().toISOString(),por:quienSoy(),documento_id:doc.id,url,nombre};
     await guardarIA(facId,ia);

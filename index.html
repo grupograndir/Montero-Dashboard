@@ -687,6 +687,15 @@ const eur=n=>n==null?'—':new Intl.NumberFormat('es-ES',{style:'currency',curre
 const eurS=n=>{if(n==null)return'—';if(Math.abs(n)>=1e6)return(n/1e6).toFixed(2)+' M€';if(Math.abs(n)>=1e3)return(n/1e3).toFixed(1)+' k€';return eur(n);};
 const dt=d=>d?new Date(d).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
 const dtL=d=>d?new Date(d).toLocaleString('es-ES',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+// Buscar sin que importen tildes, mayúsculas, espacios ni signos: «julian
+// somovilla» encuentra «JULIÁN SOMOVILLA» y «b88658372» encuentra «B-88658372»
+// (Paqui, 19/10/2026: no aparecía un proveedor que sí estaba).
+const normBusca=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+function coincide(texto,consulta){
+  const q=normBusca(consulta);if(!q)return true;
+  const t=normBusca(texto);
+  return t.includes(q)||t.replace(/ /g,'').includes(q.replace(/ /g,''));
+}
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const initials=n=>String(n||'?').replace(/[^a-zA-ZÀ-ÿ ]/g,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
 // Si la factura ya está unida a su proveedor del maestro (por CIF, lo hace la
@@ -1589,9 +1598,7 @@ function aplicarFiltros(ff,c){
   // Oil se guardó "1 002104" y quien la busca teclea "1-002104". Se daban por
   // desaparecidas facturas que estaban, y con el NIF pasa lo mismo (B-88658372).
   if(c.search){
-    const q=c.search.toLowerCase(), qn=q.replace(/[^a-z0-9]/g,'');
-    const pega=(v)=>{const s=String(v||'').toLowerCase();
-      return s.includes(q)||(!!qn&&s.replace(/[^a-z0-9]/g,'').includes(qn));};
+    const pega=v=>coincide(v,c.search);
     ff=ff.filter(f=>pega(f.numero_factura)||pega(nombreProv(f))||pega(nombreLeido(f))||pega(nifProv(f))||pega(cifDe(f))||
       pega(formaPago(f).texto)||pega(f.forma_pago_factura)||pega(codigoProv(f)));
   }
@@ -1806,15 +1813,14 @@ function bindAprobadas(){
 function viewPagadas(){
   const todas=state.facturas.filter(f=>!f.eliminada&&(f.json_extraccion_ia?._pago||(state.pgDomic&&esDeGiro(f))));
   const provs=[...new Set(todas.map(claveProv))].map(k=>({k,n:nombreCanonico(k)})).sort((a,b)=>a.n.localeCompare(b.n,'es'));
-  const q=String(state.pgBuscar||'').toLowerCase(), qn=q.replace(/[^a-z0-9]/g,'');
+  const q=String(state.pgBuscar||'').trim();
   const min=numES(state.pgMin), max=numES(state.pgMax);
   const ff=todas.filter(f=>{
     const pago=(f.json_extraccion_ia||{})._pago;
     if((state.pgDesde||state.pgHasta)&&!enRango(pago?pago.fecha:f.fecha_factura,state.pgDesde,state.pgHasta))return false;
     if(state.pgProv&&claveProv(f)!==state.pgProv)return false;
     const t=+f.total_factura||0; if(min!=null&&t<min)return false; if(max!=null&&t>max)return false;
-    if(q){const s=`${f.numero_factura} ${nombreProv(f)} ${cifDe(f)} ${formaPago(f).texto}`.toLowerCase();
-      if(!s.includes(q)&&!(qn&&s.replace(/[^a-z0-9]/g,'').includes(qn)))return false;}
+    if(q&&!coincide(`${f.numero_factura} ${nombreProv(f)} ${nombreLeido(f)} ${codigoProv(f)} ${cifDe(f)} ${formaPago(f).texto}`,q))return false;
     return true;
   }).sort((a,b)=>{const da=new Date(a.fecha_factura||a.fecha_recepcion),db=new Date(b.fecha_factura||b.fecha_recepcion);return db-da;});
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
@@ -2587,11 +2593,10 @@ function bindContent(){
   const fv=$('#f-valida');if(fv)fv.onchange=e=>{state.fValida=e.target.value;refreshTabla();};
   const ss=$('#s-search');
   if(ss)ss.oninput=e=>{
-    const q=e.target.value.toLowerCase().trim(), qn=q.replace(/[^a-z0-9]/g,'');
+    const q=e.target.value;
     let n=0;
     document.querySelectorAll('tr[data-suelto]').forEach(tr=>{
-      const t=tr.textContent.toLowerCase();
-      const ok=!q||t.includes(q)||(!!qn&&t.replace(/[^a-z0-9]/g,'').includes(qn));
+      const ok=coincide(tr.textContent,q);
       tr.style.display=ok?'':'none';if(ok)n++;
       const f=document.querySelector(`tr[data-form="${tr.dataset.suelto}"]`);if(f&&!ok)f.style.display='none';
     });
@@ -3736,7 +3741,7 @@ function viewExcel(){
   const hi=Math.min(state.excelHoja||0,hojas.length-1), h=hojas[hi], filas=h.filas||[];
   const ancho=Math.max(1,...filas.map(f=>f.length));
   const iHom=(filas[0]||[]).findIndex(c=>HOM_COL.test(cabNorm(c)));
-  const q=String(state.excelBuscar||'').toLowerCase().trim();
+  const q=String(state.excelBuscar||'').trim();
   // Cada columna tan ancha como su texto más largo (como «autoajustar» en Excel),
   // para que no se corte nada; la tabla se desliza a lo ancho si no cabe.
   const anchoCol=Array.from({length:ancho},(_,c)=>Math.min(80,Math.max(5,...filas.map(f=>String(f[c]??'').length))));
@@ -3745,7 +3750,7 @@ function viewExcel(){
     return `<td${mal?' class="x-mal" title="La homologación va siempre con siglas: HNR, HNG, HLGV…"':''}><input type="text" data-x="${r}" data-c="${c}" value="${esc(v??'')}" style="width:${Math.ceil(anchoCol[c]*1.15)+2}ch" title="${esc(v??'')}"></td>`;
   };
   const filaHtml=(f,r)=>{
-    const vis=!q||r===0||f.join(' ').toLowerCase().includes(q);
+    const vis=!q||r===0||coincide(f.join(' '),q);
     return `<tr data-xr="${r}" ${vis?'':'style="display:none"'}>${Array.from({length:ancho},(_,c)=>celda(r,c,f[c])).join('')}</tr>`;
   };
   return `<div class="card x-libro ${state.excelCompleto?'x-completo':''}" id="x-libro">
@@ -3772,12 +3777,24 @@ function viewExcel(){
         state.excelOpcEliminar=new Map();
         return filas.slice(1).map((f,i)=>{const n=String(f[iN]??'').trim();if(!n)return '';
           const et=`${n}${iC>=0&&String(f[iC]??'').trim()?' · '+String(f[iC]).trim():''} (fila ${i+1})`;
-          state.excelOpcEliminar.set(et,i+1);return `<option value="${esc(et)}"></option>`;}).join('');})()}</datalist>
+          state.excelOpcEliminar.set(et,i+1);return `<option value="${esc(et)}" label="${esc(normBusca(et))}"></option>`;}).join('');})()}</datalist>
       <button class="btn-s rojo" id="x-eli-ok">Eliminar</button><button class="btn-s" id="x-eli-no">Cancelar</button>
     </div>
     <div class="x-ayuda">Es el Excel de proveedores homologados, igual que en Excel. Lo que guardes aquí lo usa el sistema al momento: homologación (siempre con siglas), código AS400, si lleva pedido y albarán, quién valida la factura (AUT FRA), forma de pago… Los proveedores nuevos se dan de alta solos al guardar.</div>
+    <div id="x-otras" class="x-ayuda" style="display:none;color:var(--ink);background:var(--amber-s)"></div>
     <div class="tbl-wrap x-hoja"><table class="tbl-ed x-tabla"><thead>${filaHtml(filas[0]||[],0)}</thead>
       <tbody>${filas.slice(1).map((f,i)=>filaHtml(f,i+1)).join('')}</tbody></table></div></div>`;
+}
+// Si lo buscado no está en la hoja que se ve pero sí en otra, se dice y se puede saltar a ella.
+function pintarOtrasHojas(q,visibles){
+  const caja=$('#x-otras');if(!caja)return;
+  const hojas=(state.excel&&state.excel.hojas)||[], hi=Math.min(state.excelHoja||0,hojas.length-1);
+  const otras=String(q||'').trim()?hojas.map((h,i)=>({i,nombre:h.nombre,n:(h.filas||[]).slice(1).filter(f=>coincide(f.join(' '),q)).length})).filter(x=>x.i!==hi&&x.n):[];
+  if(!String(q||'').trim()||(!otras.length&&visibles)){caja.style.display='none';return;}
+  caja.style.display='';
+  caja.innerHTML=(visibles?'':`<b>No está en la hoja «${esc((hojas[hi]||{}).nombre||'')}».</b> `)+
+    (otras.length?`También aparece en: ${otras.map(x=>`<button class="btn-s" data-xir="${x.i}" style="height:24px">${esc(x.nombre)} (${x.n})</button>`).join(' ')}`:'No aparece en ninguna hoja.');
+  caja.querySelectorAll('[data-xir]').forEach(b=>b.onclick=()=>{state.excelHoja=+b.dataset.xir;state.excelScroll=null;render();});
 }
 function bindExcel(){
   const libro=$('#x-libro'); if(!libro){const im=$('#x-imp');if(im)im.onchange=()=>importarExcelProv(im.files[0]);return;}
@@ -3793,10 +3810,11 @@ function bindExcel(){
   });
   libro.querySelectorAll('[data-xhoja]').forEach(b=>b.onclick=()=>{state.excelHoja=+b.dataset.xhoja;state.excelScroll=null;render();});
   const bu=$('#x-buscar');if(bu)bu.oninput=e=>{
-    state.excelBuscar=e.target.value;const q=e.target.value.toLowerCase().trim();
+    state.excelBuscar=e.target.value;const q=e.target.value;let n=0;
     libro.querySelectorAll('tbody tr[data-xr]').forEach(tr=>{
-      const t=[...tr.querySelectorAll('input')].map(i=>i.value).join(' ').toLowerCase();
-      tr.style.display=!q||t.includes(q)?'':'none';});
+      const ok=coincide([...tr.querySelectorAll('input')].map(i=>i.value).join(' '),q);
+      tr.style.display=ok?'':'none';if(ok)n++;});
+    pintarOtrasHojas(q,n);
   };
   const nuevaFila=r=>{const f=h().filas,ancho=Math.max(1,...f.map(x=>x.length));f.splice(r+1,0,Array(ancho).fill(''));sucio();
     state.excelBuscar='';render();
@@ -3812,6 +3830,7 @@ function bindExcel(){
     const nom=f.filter(x=>String(x).trim()).slice(0,4).join(' · ');
     if(!confirm(`¿Eliminar este proveedor del Excel?\n\n${nom}\n\nNo se aplica hasta que pulses «Guardar cambios».`))return;
     h().filas.splice(r,1);sucio();render();toast('Proveedor quitado. Pulsa «Guardar cambios» para aplicarlo');};
+  if(state.excelBuscar)pintarOtrasHojas(state.excelBuscar,libro.querySelectorAll('tbody tr[data-xr]:not([style*="display: none"])').length);
   // La hoja no se mueve sola: al repintar se queda donde estaba.
   const hoja=libro.querySelector('.x-hoja');
   if(hoja){if(state.excelScroll){hoja.scrollTop=state.excelScroll.t;hoja.scrollLeft=state.excelScroll.l;}
@@ -3877,7 +3896,7 @@ function viewRegistro(){
   const R=state.registro, fil=state.regFiltro||'';
   const casadas=R.filter(r=>r.factura_id).length;
   const ver=R.filter(r=>fil==='sin'?!r.factura_id:fil==='casadas'?!!r.factura_id:true)
-    .filter(r=>!state.regBuscar||(`${r.numero_factura} ${r.proveedor} ${r.nif} ${r.numero_registro}`).toLowerCase().includes(state.regBuscar.toLowerCase()));
+    .filter(r=>coincide(`${r.numero_factura} ${r.proveedor} ${r.nif} ${r.numero_registro}`,state.regBuscar||''));
   const porId=new Map((state.todasFacturas||[]).map(f=>[f.id,f]));
   const kpi=(cls,v,l)=>`<div class="kpi"><div class="kpi-top"><div class="kpi-ic ${cls}">${svg(ICN.file)}</div></div><div class="kpi-val">${v}</div><div class="kpi-lbl">${l}</div></div>`;
   return `<div class="kpis">${kpi('blue',R.length,'Líneas del registro')}${kpi('green',casadas,'Casadas con su factura (contabilizadas)')}${kpi('amber',R.length-casadas,'Sin casar')}${kpi('green',eurS(R.reduce((s,r)=>s+(+r.cuota||0),0)),'IVA soportado')}</div>

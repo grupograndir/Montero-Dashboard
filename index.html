@@ -164,6 +164,8 @@ body.side-off .sidebar{display:none}
 .x-libro.x-completo .x-hoja{max-height:none;flex:1}
 .x-libro:fullscreen{background:var(--card);display:flex;flex-direction:column}
 .x-libro:fullscreen .x-hoja{max-height:none;flex:1}
+.conf-zona{display:block;margin:0 0 12px;padding:14px;border:2px dashed var(--green);border-radius:10px;background:var(--gr-s,#e8f5ee);font-size:13px;color:var(--ink-2);cursor:pointer;text-align:center}
+.conf-zona.encima{background:var(--green);color:#fff}
 .pag-sep{display:flex;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px;margin-bottom:5px;background:var(--card);font-size:12.5px}
 .chips-row{display:flex;gap:8px;padding:13px 18px 0;flex-wrap:wrap}
 .chip{padding:6px 14px;border-radius:20px;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--bg);border:1px solid var(--line);transition:.12s}
@@ -1308,6 +1310,11 @@ function updateNav(){
 // como pagada → «Pagada».
 function badgePago(f){
   const ia=f.json_extraccion_ia||{};
+  const conf=ia._conformada?`<span class="bdg" style="background:var(--gr-s,#e8f5ee);color:var(--green);margin-right:5px" title="Conformada (firmada)${ia._conformada.fecha?' el '+dt(ia._conformada.fecha):''}${ia._conformada.por?' · '+esc(ia._conformada.por):''}">Conformada</span>`:'';
+  return conf+badgePagoSolo(f);
+}
+function badgePagoSolo(f){
+  const ia=f.json_extraccion_ia||{};
   if(ia._pago)return `<span class="bdg" style="background:var(--blue-s,#e0ecff);color:var(--blue,#1d4ed8);margin-right:5px" title="Pagada${ia._pago.fecha?' el '+dt(ia._pago.fecha):''}${ia._pago.por?' · '+esc(ia._pago.por):''}">Pagada</span>`;
   if(ia._aprobada_pago)return `<span class="bdg" style="background:var(--amber-s);color:var(--amber);margin-right:5px" title="Aprobada para pagar${ia._aprobada_pago.fecha?' el '+dt(ia._aprobada_pago.fecha):''}; todavía sin pagar">Aprobada</span>`;
   return '';
@@ -1566,6 +1573,8 @@ function aplicarFiltros(ff,c){
   else if(c.chip==='dudoso')ff=ff.filter(f=>tieneSenal(f,'PROVEEDOR_DUDOSO')||tieneSenal(f,'CIF_DUDOSO')||tieneSenal(f,'CIF_FALTA'));
   else if(c.chip==='faltapedido')ff=ff.filter(f=>tieneSenal(f,'FALTA_PEDIDO_R'));
   else if(c.chip==='domic')ff=ff.filter(esDeGiro);
+  else if(c.chip==='conformadas')ff=ff.filter(f=>!!(f.json_extraccion_ia||{})._conformada);
+  else if(c.chip==='sinconformar')ff=ff.filter(f=>{const ia=f.json_extraccion_ia||{};return (ia._envios||[]).length&&!ia._conformada;});
   else if(c.chip==='mes'){const n=new Date();ff=ff.filter(f=>{const d=new Date(f.fecha_factura||f.fecha_recepcion);return !isNaN(d)&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();});}
   if(c.valida)ff=ff.filter(f=>(validadorDe(f)||'(nadie)')===c.valida);
   // El desplegable guarda la clave agrupada, no el nombre suelto: filtrar por
@@ -1720,7 +1729,7 @@ function tablaFacturas(ff,full){
 /* ---------- APROBADAS PARA PAGO ---------- */
 // Por fecha de APROBACIÓN, no de factura: lo que se aprobó para pagar en un
 // periodo y cuánto suma (Paqui, 14/10/2026).
-const CHIPS=[['','Todas'],['revision','Requieren revisión'],['sospecha','¿Pedido o albarán?'],['duplicados','Duplicados'],['posdup','Posible duplicado'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['domic','Domiciliadas'],['sincond','Sin condiciones'],['sincodigo','Sin código proveedor'],['sinhomol','Sin homologación'],['sindeleg','Sin delegación'],['faltapedido','Falta pedido (R)'],['dudoso','Proveedor o CIF dudoso'],['mes','Este mes']];
+const CHIPS=[['','Todas'],['revision','Requieren revisión'],['sospecha','¿Pedido o albarán?'],['duplicados','Duplicados'],['posdup','Posible duplicado'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['domic','Domiciliadas'],['sinconformar','Enviadas sin conformar'],['conformadas','Conformadas'],['sincond','Sin condiciones'],['sincodigo','Sin código proveedor'],['sinhomol','Sin homologación'],['sindeleg','Sin delegación'],['faltapedido','Falta pedido (R)'],['dudoso','Proveedor o CIF dudoso'],['mes','Este mes']];
 // Por fecha de APROBACIÓN, no de factura: lo que se aprobó para pagar en un
 // periodo y cuánto suma (Paqui, 14/10/2026). Y con los mismos filtros y el mismo
 // orden que el listado general (15/10/2026).
@@ -1968,6 +1977,7 @@ async function openDrawer(id){
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>
     </div>
     <div id="panel-extra"></div>`:''}
+    ${!f.eliminada?cajaConformada(f):''}
     ${!f.eliminada?`<div id="manual-form" style="display:none;margin:10px 0;padding:12px;border:1px dashed var(--line);border-radius:10px;background:var(--bg)">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">Añadir un documento a esta factura</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -2239,6 +2249,7 @@ async function openDrawer(id){
     const a=b.dataset.ayudaAccion;
     if(a==='releer')abrirReleer(f.id);else if(a==='editar')abrirEdicion(f.id);else if(a==='separar')abrirSeparar(f.id);else pedirTarea(a,b);});
   bindExtrasFicha(f);
+  bindConformada(f);
   document.querySelectorAll('#dr-body [data-quitar-doc]').forEach(b=>b.onclick=()=>quitarDocumento(f.id,b.dataset.quitarDoc,b));
   document.querySelectorAll('#dr-body [data-restaurar]').forEach(b=>b.onclick=()=>restaurarFactura(b.dataset.restaurar));
   document.querySelectorAll('#dr-body [data-pdf]').forEach(b=>b.onclick=()=>openPdf(b.dataset.pdf));
@@ -3412,6 +3423,54 @@ function abrirReleer(facId){
 }
 
 /* ---------- enviar a un departamento ---------- */
+/* ---------- factura conformada (firmada) ---------- */
+// Paqui, 19/10/2026: una vez firmada en Acrobat, la factura tiene que volver a
+// su sitio. Se arrastra el PDF a la ficha (o se elige) y queda guardada con ella
+// como «conformada»: se ve en el listado y se abre junto a sus documentos.
+function cajaConformada(f){
+  const c=(f.json_extraccion_ia||{})._conformada;
+  if(c)return `<div class="aviso-sen bien" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span><b>Factura conformada</b> · ${esc(c.por||'')} · ${dtL(c.fecha)}</span>
+    <span style="margin-left:auto;display:flex;gap:6px">${c.url?`<button class="btn-s" data-pdf="${esc(c.url)}">Abrir la firmada</button>`:''}
+      <label class="btn-s" style="display:inline-flex;align-items:center">Sustituir<input type="file" id="conf-archivo" accept=".pdf,application/pdf,image/jpeg,image/png" style="display:none"></label></span></div>`;
+  return `<label id="conf-zona" class="conf-zona">
+    <input type="file" id="conf-archivo" accept=".pdf,application/pdf,image/jpeg,image/png" style="display:none">
+    <b>¿Ya está firmada?</b> Arrastra aquí el PDF conformado o pulsa para elegirlo. Se guarda con esta factura.</label>`;
+}
+function bindConformada(f){
+  const inp=$('#conf-archivo');if(inp)inp.onchange=()=>subirConformada(f.id,inp.files[0]);
+  const z=$('#conf-zona');
+  if(z){
+    z.ondragover=e=>{e.preventDefault();z.classList.add('encima');};
+    z.ondragleave=()=>z.classList.remove('encima');
+    z.ondrop=e=>{e.preventDefault();z.classList.remove('encima');const a=e.dataTransfer.files&&e.dataTransfer.files[0];if(a)subirConformada(f.id,a);};
+  }
+}
+async function subirConformada(facId,archivo){
+  const f=state.facturas.find(x=>x.id===facId);if(!f||!archivo)return;
+  if(!/pdf|jpe?g|png/i.test(archivo.type+archivo.name)){toast('Solo PDF, JPG o PNG','err');return;}
+  if(archivo.size>25*1024*1024){toast('El archivo pasa de 25 MB','err');return;}
+  const z=$('#conf-zona');if(z)z.textContent='Subiendo la factura firmada…';
+  try{
+    const pdf=await aPdf(archivo);
+    const nombre=archivo.name.replace(/\.(jpe?g|png)$/i,'.pdf');
+    const doc=await subirDocumento(pdf,nombre,'OTRO',`Factura ${f.numero_factura||''} conformada (firmada)`);
+    const url=`${SB_URL}/storage/v1/object/public/facturas/${doc.hash}.pdf`;
+    const ia=Object.assign({},f.json_extraccion_ia||{});
+    const adj=(Array.isArray(ia._adjuntos)?ia._adjuntos:[]).filter(a=>a.documento_id!==doc.id&&!(ia._conformada&&a.documento_id===ia._conformada.documento_id));
+    adj.push({nombre:`Conformada · ${nombre}`,tipo:'OTRO',documento_id:doc.id,como:`factura firmada, subida por ${quienSoy()}`,leido:true,a_mano:true,url});
+    ia._adjuntos=adj;
+    ia._conformada={fecha:new Date().toISOString(),por:quienSoy(),documento_id:doc.id,url,nombre};
+    await guardarIA(facId,ia);
+    // Que el emparejado del PC la respete como papel puesto a mano con esta factura.
+    const tok=getToken()||SB_ANON;
+    fetch(`${SB_URL}/rest/v1/auditoria_workflow`,{method:'POST',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+      body:JSON.stringify({evento:'TAREA: asignar',nivel:'INFO',n8n_execution_id:'panel',
+        detalle:{documento_id:doc.id,factura_id:facId,tipo:'OTRO',accion:'asignar',estado:'PENDIENTE',pedido_por:quienSoy(),cuando:new Date().toISOString()}})}).catch(()=>{});
+    toast('Factura conformada guardada');await loadAll();openDrawer(facId);
+  }catch(e){toast('No se pudo subir: '+e.message,'err');openDrawer(facId);}
+}
+
 /* ---------- PDF para firmar ---------- */
 // Paqui, 19/10/2026: el departamento abría el enlace en el navegador y Acrobat
 // recibía una copia temporal en «solo lectura»: había que guardarla y volver a

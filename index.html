@@ -795,7 +795,7 @@ async function api1(path,_reintento){
 }
 // La URL firmada de un documento del bucket privado. La usan openPdf (para
 // abrirlo en una pestaña) y la descarga masiva (para bajarse el PDF).
-async function urlFirmada(docUrl,segundos){
+async function urlFirmada(docUrl,segundos,descargarComo){
   const m=docUrl.match(/\/object\/(?:public\/|authenticated\/)?([^/]+)\/(.+)$/);
   const bucket=m?m[1]:'facturas';
   const filePath=m?m[2]:docUrl.split('/').pop();
@@ -809,7 +809,9 @@ async function urlFirmada(docUrl,segundos){
   const signed=d.signedUrl||d.signedURL;
   if(!signed)throw new Error('No signed URL returned');
   // Supabase devuelve una ruta relativa (/object/sign/...); anteponer la base de Storage
-  return /^https?:\/\//.test(signed)?signed:`${SB_URL}/storage/v1${signed}`;
+  const full=/^https?:\/\//.test(signed)?signed:`${SB_URL}/storage/v1${signed}`;
+  // Con nombre, el navegador lo DESCARGA (un archivo normal, que Acrobat deja firmar) en vez de abrirlo.
+  return descargarComo?`${full}${full.includes('?')?'&':'?'}download=${encodeURIComponent(descargarComo)}`:full;
 }
 async function openPdf(docUrl){
   if(!docUrl)return;
@@ -3410,19 +3412,90 @@ function abrirReleer(facId){
 }
 
 /* ---------- enviar a un departamento ---------- */
+/* ---------- PDF para firmar ---------- */
+// Paqui, 19/10/2026: el departamento abría el enlace en el navegador y Acrobat
+// recibía una copia temporal en «solo lectura»: había que guardarla y volver a
+// abrirla para poder firmar. Ahora el enlace DESCARGA un PDF normal, hecho solo
+// con las hojas de la factura, que se abre en Acrobat y se firma directamente.
+// Si el proveedor lo bloqueó contra cambios (BYG lo hace), se rehace con
+// imágenes de sus páginas, que sí se pueden firmar.
+let _pdfjs=null;
+async function cargarPdfJs(){
+  if(_pdfjs)return _pdfjs;
+  await new Promise((ok,mal)=>{const sc=document.createElement('script');
+    sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';sc.onload=ok;sc.onerror=()=>mal(new Error('no se pudo cargar el lector de PDF'));document.head.appendChild(sc);});
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  return _pdfjs=window.pdfjsLib;
+}
+const nombreFirma=f=>`Factura ${String(f.numero_factura||'sin numero').replace(/[\\/:*?"<>|]+/g,'-')} ${nombreProv(f)}`.replace(/\s+/g,' ').trim().slice(0,90)+'.pdf';
+async function pdfParaFirmar(f){
+  const j=f.json_extraccion_ia||{};
+  if(!j._documento_url)throw new Error('esta factura no tiene el PDF guardado');
+  const bytes=await (await fetch(await urlFirmada(j._documento_url))).arrayBuffer();
+  const prop=j._paginas_propias&&j._paginas_propias.desde?j._paginas_propias:null;
+  const elegir=n=>Array.from({length:n},(_,i)=>i).filter(i=>!prop||(i+1>=prop.desde&&i+1<=(prop.hasta||n)));
+  try{
+    const src=await PDFLib.PDFDocument.load(bytes);            // sin ignoreEncryption: si está bloqueado, salta
+    const out=await PDFLib.PDFDocument.create();
+    (await out.copyPages(src,elegir(src.getPageCount()))).forEach(p=>out.addPage(p));
+    out.setTitle(nombreFirma(f).replace(/\.pdf$/,''));
+    return await out.save();
+  }catch(e){
+    if(!/encrypt/i.test(String(e&&e.message||e)))throw e;
+    const pdfjs=await cargarPdfJs();
+    const doc=await pdfjs.getDocument({data:new Uint8Array(bytes)}).promise;
+    const out=await PDFLib.PDFDocument.create();
+    for(const i of elegir(doc.numPages)){
+      const pg=await doc.getPage(i+1), vp1=pg.getViewport({scale:1}), vp=pg.getViewport({scale:2});
+      const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;
+      await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+      const img=await out.embedJpg(await (await fetch(cv.toDataURL('image/jpeg',0.9))).arrayBuffer());
+      out.addPage([vp1.width,vp1.height]).drawImage(img,{x:0,y:0,width:vp1.width,height:vp1.height});
+    }
+    return await out.save();
+  }
+}
+// Se sube aparte (no se toca el original) y se da un enlace que DESCARGA el
+// archivo con un nombre normal, en vez de abrirlo en el navegador.
+async function enlaceParaFirmar(f){
+  const pdf=await pdfParaFirmar(f);
+  const tok=getToken()||SB_ANON;
+  const ruta=`firmar_${f.id}_${Date.now()}.pdf`;
+  const up=await fetch(`${SB_URL}/storage/v1/object/facturas/${ruta}`,{method:'POST',
+    headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/pdf'},body:pdf});
+  if(!up.ok)throw new Error('no se ha podido preparar el PDF: '+(await up.text()).slice(0,100));
+  return await urlFirmada(`${SB_URL}/storage/v1/object/facturas/${ruta}`,7*24*3600,nombreFirma(f));
+}
+async function descargarParaFirmar(f,boton){
+  const antes=boton?boton.textContent:'';if(boton){boton.disabled=true;boton.textContent='Preparando…';}
+  try{
+    const blob=new Blob([await pdfParaFirmar(f)],{type:'application/pdf'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nombreFirma(f);
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+    toast('Descargado: ábrelo con Acrobat para firmarlo, o adjúntalo al correo');
+  }catch(e){toast('No se pudo preparar el PDF: '+e.message,'err');}
+  if(boton){boton.disabled=false;boton.textContent=antes;}
+}
+
+/* ---------- enviar a un departamento ---------- */
 function abrirEnviar(facId){
   const f=state.facturas.find(x=>x.id===facId);if(!f)return;
   const box=$('#panel-extra');if(!box)return;
   const deps=state.departamentos||[];
-  box.innerHTML=`<div class="caja-extra"><h4>Enviar la factura</h4>
-    <div style="font-size:12px;color:var(--muted)">Se abre tu correo con el mensaje escrito y los enlaces a los documentos (valen 7 días). No hace falta descargar nada.</div>
+  box.innerHTML=`<div class="caja-extra"><h4>Enviar la factura para validar</h4>
+    <div style="font-size:12px;color:var(--muted);line-height:1.5">Se abre tu correo con el mensaje escrito y un enlace que <b>descarga</b> la factura en PDF (vale 7 días).
+      Quien la recibe pulsa el enlace, abre el archivo descargado con <b>Adobe Acrobat</b> y la firma directamente con «Rellenar y firmar».
+      Si prefieres adjuntarla, usa «Descargar el PDF para firmar».</div>
     <div class="frm">
       <label class="ancho">Para<input id="en-para" list="dl-deps" placeholder="correo@montero.es o elige un departamento"></label>
       <datalist id="dl-deps">${deps.map(d=>`<option value="${esc(d.email)}">${esc(d.nombre||'')}</option>`).join('')}</datalist>
       <label class="ancho">Mensaje<textarea id="en-msg" rows="3" placeholder="Opcional: qué necesitas que hagan"></textarea></label>
+      <label style="flex-direction:row;align-items:center;gap:6px" class="ancho"><input type="checkbox" id="en-resp" style="height:auto"> Añadir también los albaranes y pedidos</label>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-s ok" id="en-ok">Abrir el correo</button>
+      <button class="btn-s" id="en-pdf">Descargar el PDF para firmar</button>
       <button class="btn-s" id="en-guardar">Guardar este destinatario</button></div></div>`;
+  $('#en-pdf').onclick=()=>descargarParaFirmar(f,$('#en-pdf'));
   $('#en-guardar').onclick=async()=>{
     const email=$('#en-para').value.trim(); if(!/@/.test(email)){toast('Escribe primero el correo','err');return;}
     const nombre=prompt('¿Qué departamento es? (p. ej. «Taller Valencia»)')||'';
@@ -3432,21 +3505,27 @@ function abrirEnviar(facId){
   };
   $('#en-ok').onclick=async()=>{
     const para=$('#en-para').value.trim(); if(!/@/.test(para)){toast('Falta el correo del destinatario','err');return;}
+    const b=$('#en-ok');b.disabled=true;b.textContent='Preparando…';
     const win=window.open('about:blank','_blank');
     try{
       const j=f.json_extraccion_ia||{};
-      const docs=[];
-      if(j._documento_url)docs.push(['Factura',j._documento_url]);
-      (Array.isArray(j._adjuntos)?j._adjuntos:[]).filter(a=>a&&a.url).forEach(a=>{if(!docs.some(d=>d[1]===a.url))docs.push([`${({ALBARAN:'Albarán',PEDIDO:'Pedido',TRANSPORTE:'Transporte'})[a.tipo]||'Documento'} ${a.nombre||''}`.trim(),a.url]);});
-      const enl=[];for(const [et,u] of docs){try{enl.push(`- ${et}: ${await urlFirmada(u,7*24*3600)}`);}catch(_){}}
-      const asunto=`Factura ${f.numero_factura||''} · ${nombreProv(f)} · ${eur(f.total_factura)}`;
-      const cuerpo=[`Hola,`,``,`Te paso la factura ${f.numero_factura||'(sin número)'} de ${nombreProv(f)}, de ${eur(f.total_factura)} y fecha ${dt(f.fecha_factura)}.`,
-        $('#en-msg').value.trim(),``,`Documentos (los enlaces valen 7 días):`,...enl,``,`Un saludo.`].filter((x,i)=>x!==''||i!==3).join('\n');
+      const enl=[`- Factura para firmar: ${await enlaceParaFirmar(f)}`];
+      if($('#en-resp').checked)
+        for(const a of (Array.isArray(j._adjuntos)?j._adjuntos:[]).filter(a=>a&&a.url)){
+          const et=`${({ALBARAN:'Albarán',PEDIDO:'Pedido',TRANSPORTE:'Transporte'})[a.tipo]||'Documento'} ${a.nombre||''}`.trim();
+          try{enl.push(`- ${et}: ${await urlFirmada(a.url,7*24*3600,String(a.nombre||et).replace(/[\\/:*?"<>|]+/g,'-').replace(/(\.pdf)?$/i,'.pdf'))}`);}catch(_){}
+        }
+      const asunto=`Validar factura ${f.numero_factura||''} · ${nombreProv(f)} · ${eur(f.total_factura)}`;
+      const cuerpo=[`Hola,`,``,`Te paso la factura ${f.numero_factura||'(sin número)'} de ${nombreProv(f)}, de ${eur(f.total_factura)} y fecha ${dt(f.fecha_factura)}, para que la valides.`,
+        $('#en-msg').value.trim(),``,
+        `Pulsa el enlace: se descarga el PDF. Ábrelo con Adobe Acrobat y fírmalo con «Rellenar y firmar» (los enlaces valen 7 días).`,...enl,``,`Un saludo.`]
+        .filter((x,i)=>x!==''||i!==3).join('\n');
       const url=`mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
       if(win)win.location.href=url;else location.href=url;
-      const ia=Object.assign({},j);ia._envios=(Array.isArray(ia._envios)?ia._envios:[]).concat([{a:para,por:quienSoy(),fecha:new Date().toISOString()}]);
+      const ia=Object.assign({},j);ia._envios=(Array.isArray(ia._envios)?ia._envios:[]).concat([{a:para,por:quienSoy(),fecha:new Date().toISOString(),para_firmar:true}]);
       guardarIA(facId,ia).catch(()=>{});
     }catch(e){if(win)win.close();toast('No se pudo preparar el correo: '+e.message,'err');}
+    b.disabled=false;b.textContent='Abrir el correo';
   };
   box.scrollIntoView({block:'nearest'});
 }

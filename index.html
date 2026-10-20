@@ -945,8 +945,9 @@ async function loadAll(){
       // de una factura de julio o de septiembre salía como suelto. Paqui vio 422
       // "sin asignar" en agosto (23/09/2026) cuando de verdad eran unos 170, y
       // la mayoría de hoy mismo, esperando a su factura.
-      const todas=await api(`facturas_procesadas?select=id,documento_recibido_id,eliminada,motivo_eliminacion,numero_factura,total_factura,fecha_factura,prov:json_extraccion_ia->proveedor->>nombre,adj:json_extraccion_ia->_adjuntos,sug:json_extraccion_ia->_sugeridos&limit=20000`);
+      const todas=await api(`facturas_procesadas?select=id,documento_recibido_id,eliminada,motivo_eliminacion,numero_factura,total_factura,fecha_factura,prov:json_extraccion_ia->proveedor->>nombre,nif:json_extraccion_ia->proveedor->>nif_cif,proveedor_id,adj:json_extraccion_ia->_adjuntos,sug:json_extraccion_ia->_sugeridos&limit=20000`);
       state.todasFacturas=todas.filter(f=>!f.eliminada);
+      state.ligeras=todas;
       // Menos las retiradas por NO SER facturas: un albarán que entró como factura
       // y se sacó del listado no está asignado a nada, está esperando a la suya
       // (Leuka ATC/260812, 08/10/2026). Si contara, María no lo veía en ningún sitio.
@@ -1304,12 +1305,12 @@ function deriveIncidencias(ff){
 }
 function setConn(ok,msg){$('#conn-dot').className='dot'+(ok?'':' off');$('#conn-txt').textContent=ok?'Conectado':'Sin conexión';}
 function updateNav(){
-  $('#nav-fac').textContent=state.facturas.filter(f=>!f.json_extraccion_ia?._pago&&!aprobadaPago(f)).length;
+  $('#nav-fac').textContent=state.facturas.filter(f=>!enPagadas(f)&&!aprobadaPago(f)).length;
   // el contador refleja FACTURAS afectadas, no incidencias sueltas (coherente con la vista agrupada)
   $('#nav-inc').textContent=new Set(state.incidencias.filter(i=>i.estado==='ABIERTA').map(i=>i.factura_id)).size;
   const provs=new Set(state.facturas.map(claveProv));$('#nav-prov').textContent=provs.size;
   $('#nav-sueltos').textContent=state.sueltos===null?'?':state.sueltos.length;
-  $('#nav-pagadas').textContent=state.facturas.filter(f=>f.json_extraccion_ia?._pago&&!f.eliminada).length;
+  $('#nav-pagadas').textContent=state.facturas.filter(f=>enPagadas(f)&&!f.eliminada).length;
   $('#nav-aprobadas').textContent=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada).length;
 }
 // Aprobada para pago a mano y todavía sin pagar. Al pagarla pasa a «Pagadas»; la
@@ -1324,11 +1325,17 @@ function badgePago(f){
 }
 function badgePagoSolo(f){
   const ia=f.json_extraccion_ia||{};
+  if(ia._pago&&f.estado!=='CONTABILIZADA')return `<span class="bdg" style="background:var(--amber-s);color:var(--amber);margin-right:5px" title="Pagada${ia._pago.fecha?' el '+dt(ia._pago.fecha):''}${ia._pago.por?' · '+esc(ia._pago.por):''}; pasará a «Pagadas» cuando esté contabilizada">Pagada · sin contabilizar</span>`;
   if(ia._pago)return `<span class="bdg" style="background:var(--blue-s,#e0ecff);color:var(--blue,#1d4ed8);margin-right:5px" title="Pagada${ia._pago.fecha?' el '+dt(ia._pago.fecha):''}${ia._pago.por?' · '+esc(ia._pago.por):''}">Pagada</span>`;
   if(ia._aprobada_pago)return `<span class="bdg" style="background:var(--amber-s);color:var(--amber);margin-right:5px" title="Aprobada para pagar${ia._aprobada_pago.fecha?' el '+dt(ia._aprobada_pago.fecha):''}; todavía sin pagar">Aprobada</span>`;
   return '';
 }
 function aprobadaPago(f){return !!(f.json_extraccion_ia?._aprobada_pago&&!f.json_extraccion_ia?._pago);}
+// A «Pagadas» solo pasa lo pagado Y contabilizado (Rubén, 20/10/2026): una factura
+// pagada con tarjeta que aún no está en el AS400 se puede marcar como pagada, pero
+// sigue en el listado («Pagada · sin contabilizar») hasta que se contabilice.
+function enPagadas(f){return !!f.json_extraccion_ia?._pago&&f.estado==='CONTABILIZADA';}
+function pagadaSinContab(f){return !!f.json_extraccion_ia?._pago&&f.estado!=='CONTABILIZADA';}
 
 /* ---------- router ---------- */
 const TITLES={resumen:['Resumen','Vista general de la facturación'],facturas:['Facturas','Listado completo de facturas procesadas'],incidencias:['Incidencias','Validaciones, avisos y bloqueos detectados'],proveedores:['Actividad proveedores','Actividad y ranking de proveedores'],sueltos:['Sin asignar','Documentos que han llegado y no están puestos con ninguna factura'],pagadas:['Facturas Pagadas','Facturas abonadas manualmente por Montero'],aprobadas:['Aprobadas para pago','Facturas aprobadas a mano, pendientes de pagar'],registro:['Registro IVA soportado','Lo que ya está contabilizado en el AS400'],excel:['Proveedores','El Excel de proveedores homologados, editable']};
@@ -1582,6 +1589,7 @@ function aplicarFiltros(ff,c){
   else if(c.chip==='dudoso')ff=ff.filter(f=>tieneSenal(f,'PROVEEDOR_DUDOSO')||tieneSenal(f,'CIF_DUDOSO')||tieneSenal(f,'CIF_FALTA'));
   else if(c.chip==='faltapedido')ff=ff.filter(f=>tieneSenal(f,'FALTA_PEDIDO_R'));
   else if(c.chip==='domic')ff=ff.filter(esDeGiro);
+  else if(c.chip==='pagsincont')ff=ff.filter(pagadaSinContab);
   else if(c.chip==='conformadas')ff=ff.filter(f=>!!(f.json_extraccion_ia||{})._conformada);
   else if(c.chip==='sinconformar')ff=ff.filter(f=>{const ia=f.json_extraccion_ia||{};return (ia._envios||[]).length&&!ia._conformada;});
   else if(c.chip==='mes'){const n=new Date();ff=ff.filter(f=>{const d=new Date(f.fecha_factura||f.fecha_recepcion);return !isNaN(d)&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();});}
@@ -1597,11 +1605,7 @@ function aplicarFiltros(ff,c){
   // la factura de VALGEPORT pone "29" y aquí está como "29/000020"; la de Racing
   // Oil se guardó "1 002104" y quien la busca teclea "1-002104". Se daban por
   // desaparecidas facturas que estaban, y con el NIF pasa lo mismo (B-88658372).
-  if(c.search){
-    const pega=v=>coincide(v,c.search);
-    ff=ff.filter(f=>pega(f.numero_factura)||pega(nombreProv(f))||pega(nombreLeido(f))||pega(nifProv(f))||pega(cifDe(f))||
-      pega(formaPago(f).texto)||pega(f.forma_pago_factura)||pega(codigoProv(f)));
-  }
+  if(c.search)ff=ff.filter(f=>casaBusqueda(f,c.search));
   const {k,dir}=c.sort;
   ff.sort((a,b)=>{
     let va,vb;
@@ -1623,7 +1627,7 @@ function aplicarFiltros(ff,c){
   return ff;
 }
 function filtradas(){
-  const ff=state.facturas.filter(f=>!f.json_extraccion_ia?._pago&&!aprobadaPago(f));
+  const ff=state.facturas.filter(f=>!enPagadas(f)&&!aprobadaPago(f));
   return aplicarFiltros(ff,{chip:state.quickFilter,valida:state.fValida,prov:state.fProv,estado:state.fEstado,pago:state.fPago,search:state.search,sort:state.sort});
 }
 function viewFacturas(){
@@ -1704,6 +1708,21 @@ function th(k,lbl,r){const a=state.sort.k===k?(state.sort.dir>0?'▲':'▼'):'';
 // Buscar «OIGO» no traía la de OUIGO y parecía que faltaban facturas (Paqui,
 // 20/10/2026). Si la búsqueda no da nada, se dice dónde está lo que casa (otro
 // filtro, Aprobadas, Pagadas) y qué proveedores se escriben casi igual.
+// Todo lo que identifica a una factura para el buscador: su número, el proveedor
+// como lo leyó la factura, como está en el maestro y como lo escribe el Excel de
+// Paqui («SUM IND DAYCA» es SUMINISTROS INDUSTRIALES DAYCA), el código y el CIF.
+function textosBusqueda(f){
+  const c=condicionDe(f)||{},p=proveedorDeFactura(f)||{};
+  return [f.numero_factura,nombreProv(f),nombreLeido(f),p.nombre,c.nombre,c.clave,codigoProv(f),nifProv(f),cifDe(f),
+          formaPago(f).texto,f.forma_pago_factura];
+}
+function casaBusqueda(f,q){return textosBusqueda(f).some(v=>coincide(v,q));}
+// Lo mismo para las facturas que no están cargadas (eliminadas, otros periodos)
+function casaLigera(l,q){
+  const p=(l.proveedor_id&&state.provPorId&&state.provPorId.get(l.proveedor_id))||{};
+  const c=(state.condiciones||[]).find(x=>p.codigo_proveedor&&String(x.codigo||'')===String(p.codigo_proveedor))||{};
+  return [l.numero_factura,l.prov,l.nif,p.nombre,p.codigo_proveedor,c.nombre,c.clave].some(v=>coincide(v,q));
+}
 function distanciaTexto(a,b){
   const d=Array.from({length:b.length+1},(_,i)=>i);
   for(let i=1;i<=a.length;i++){let prev=d[0];d[0]=i;
@@ -1711,22 +1730,34 @@ function distanciaTexto(a,b){
   return d[b.length];
 }
 function pistaBusqueda(q){
-  const casa=f=>[f.numero_factura,nombreProv(f),nombreLeido(f),nifProv(f),cifDe(f),codigoProv(f)].some(v=>coincide(v,q));
-  const todas=state.facturas.filter(casa);
-  const enPag=todas.filter(f=>f.json_extraccion_ia?._pago).length;
+  const todas=state.facturas.filter(f=>casaBusqueda(f,q));
+  const enPag=todas.filter(enPagadas).length;
   const enAprob=todas.filter(aprobadaPago).length;
   const enOtro=todas.length-enPag-enAprob;
   const donde=[];
   if(enOtro)donde.push(`<a href="#" data-pista="filtros">${enOtro} ${enOtro===1?'oculta':'ocultas'} por los filtros: quitarlos</a>`);
   if(enAprob)donde.push(`<a href="#" data-pista="aprobadas">${enAprob} en Aprobadas</a>`);
   if(enPag)donde.push(`<a href="#" data-pista="pagadas">${enPag} en Pagadas</a>`);
+  // Las que no están cargadas: eliminadas (o, viendo eliminadas, las activas) y las
+  // de fuera del periodo elegido. Axarnet no salía porque se había eliminado.
+  const cargadas=new Set(state.facturas.map(f=>f.id));
+  const fuera=(state.ligeras||[]).filter(l=>!cargadas.has(l.id)&&casaLigera(l,q));
+  const nElim=fuera.filter(l=>l.eliminada).length, nPer=fuera.filter(l=>!l.eliminada).length;
+  if(nElim&&!state.verEliminadas)donde.push(`<a href="#" data-pista="eliminadas">${nElim} ${nElim===1?'eliminada':'eliminadas'}: ${nElim===1?'verla':'verlas'}</a>`);
+  if(nPer)donde.push(`<a href="#" data-pista="periodo">${nPer} ${state.verEliminadas?'sin eliminar o ':''}fuera del periodo elegido: ver todas</a>`);
+  // Está en el Excel de proveedores pero no tiene ninguna factura
+  if(!donde.length){
+    const ex=(state.condiciones||[]).filter(c=>[c.nombre,c.clave,c.codigo].some(v=>coincide(v,q)));
+    if(ex.length)donde.push(ex.slice(0,3).map(c=>`«${esc(c.nombre||c.clave)}»${c.codigo?' (código '+esc(c.codigo)+')':''}`).join(', ')+
+      ` está en el Excel de proveedores, pero no hay ninguna factura suya`);
+  }
   // Proveedores casi iguales: se compara con cada palabra del nombre (y con su
   // principio, para quien aún no ha terminado de escribir).
   const qn=normBusca(q).replace(/ /g,'');
   const tope=qn.length<4?0:qn.length<7?1:2;
   const parecidos=[];
   if(tope&&!todas.length){
-    for(const n of new Set(state.facturas.map(nombreProv))){
+    for(const n of new Set([...state.facturas.map(nombreProv),...state.facturas.map(nombreLeido),...(state.condiciones||[]).map(c=>c.nombre).filter(Boolean)])){
       let mejor=99;
       for(const w of normBusca(n).split(' ').filter(w=>w.length>=3))
         for(const p of [w,w.slice(0,qn.length),w.slice(0,qn.length+1)])mejor=Math.min(mejor,distanciaTexto(qn,p));
@@ -1734,7 +1765,7 @@ function pistaBusqueda(q){
     }
     parecidos.sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1]));
   }
-  const sug=parecidos.slice(0,4).map(([,n])=>`<a href="#" data-busca="${esc(n)}">${esc(n)}</a>`);
+  const sug=[...new Map(parecidos.map(([d,n])=>[normBusca(n),n])).values()].slice(0,4).map(n=>`<a href="#" data-busca="${esc(n)}">${esc(n)}</a>`);
   return`<div class="empty">${svg(ICN.inbox)}<p>Ninguna factura con «${esc(q)}» aquí</p>
     ${donde.length?`<small>Hay ${donde.join(' · ')}</small>`:''}
     ${sug.length?`<small style="display:block;margin-top:6px">¿Querías decir ${sug.join(', ')}?</small>`:''}
@@ -1746,6 +1777,10 @@ document.addEventListener('click',e=>{
   if(a.dataset.busca!=null){state.search=a.dataset.busca;render();return;}
   const p=a.dataset.pista,q=state.search;
   if(p==='filtros'){state.quickFilter='';state.fValida='';state.fProv='';state.fEstado='';state.fPago=[];render();}
+  else if(p==='eliminadas'){state.verEliminadas=true;state.quickFilter='';loadAll();}
+  else if(p==='periodo'){state.dias=0;state.desde='';state.hasta='';state.verEliminadas=false;
+    document.querySelectorAll('#period button').forEach(b=>b.classList.toggle('active',b.dataset.d==='0'));
+    ['#rg-desde','#rg-hasta'].forEach(id=>{const el=$(id);if(el)el.value='';});if(typeof pintaRango==='function')pintaRango();loadAll();}
   else if(p==='aprobadas'){setView('aprobadas');state.apBuscar=q;render();}
   else if(p==='pagadas'){setView('pagadas');state.pgBuscar=q;render();}
 });
@@ -1785,7 +1820,7 @@ function tablaFacturas(ff,full){
 /* ---------- APROBADAS PARA PAGO ---------- */
 // Por fecha de APROBACIÓN, no de factura: lo que se aprobó para pagar en un
 // periodo y cuánto suma (Paqui, 14/10/2026).
-const CHIPS=[['','Todas'],['revision','Requieren revisión'],['sospecha','¿Pedido o albarán?'],['duplicados','Duplicados'],['posdup','Posible duplicado'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['domic','Domiciliadas'],['sinconformar','Enviadas sin conformar'],['conformadas','Conformadas'],['sincond','Sin condiciones'],['sincodigo','Sin código proveedor'],['sinhomol','Sin homologación'],['sindeleg','Sin delegación'],['faltapedido','Falta pedido (R)'],['dudoso','Proveedor o CIF dudoso'],['mes','Este mes']];
+const CHIPS=[['','Todas'],['revision','Requieren revisión'],['sospecha','¿Pedido o albarán?'],['duplicados','Duplicados'],['posdup','Posible duplicado'],['cerradas','Validadas y contabilizadas'],['validadas','Validadas'],['contabilizadas','Contabilizadas'],['domic','Domiciliadas'],['pagsincont','Pagadas sin contabilizar'],['sinconformar','Enviadas sin conformar'],['conformadas','Conformadas'],['sincond','Sin condiciones'],['sincodigo','Sin código proveedor'],['sinhomol','Sin homologación'],['sindeleg','Sin delegación'],['faltapedido','Falta pedido (R)'],['dudoso','Proveedor o CIF dudoso'],['mes','Este mes']];
 // Por fecha de APROBACIÓN, no de factura: lo que se aprobó para pagar en un
 // periodo y cuánto suma (Paqui, 14/10/2026). Y con los mismos filtros y el mismo
 // orden que el listado general (15/10/2026).
@@ -1830,7 +1865,7 @@ function viewAprobadas(){
       <td class="r cell-strong">${eur(f.total_factura)}</td>
       <td style="font-size:12.5px;white-space:nowrap">${esc(validadorDe(f)||'—')}</td>
       <td>${badgePago(f)}<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(estadoLbl(f.estado))}</div>${badgesSenales(f)}</td>
-      <td style="text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap" title="Ya se ha pagado: pasa a «Pagadas»">${svg(ICN.card)}Marcar pagada</button>
+      <td style="text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap" title="Ya se ha pagado. Pasa a «Pagadas» cuando esté contabilizada; mientras, sigue en el listado como «Pagada · sin contabilizar»">${svg(ICN.card)}Marcar pagada</button>
         <button class="act-btn del" data-desaprobar-fila="${f.id}" title="Vuelve a su sitio en el listado de facturas" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">Deshacer aprobación</button></div></td>
     </tr>`;}).join('');
   const filtrado=ff.length!==todas.length||state.apDesde||state.apHasta;
@@ -1860,7 +1895,7 @@ function bindAprobadas(){
 // Con los mismos filtros que el listado (Paqui, 14/10/2026): proveedor, importe,
 // fechas de pago y búsqueda. Las domiciliadas se paga solas: se pueden ver aquí.
 function viewPagadas(){
-  const todas=state.facturas.filter(f=>!f.eliminada&&(f.json_extraccion_ia?._pago||(state.pgDomic&&esDeGiro(f))));
+  const todas=state.facturas.filter(f=>!f.eliminada&&(enPagadas(f)||(state.pgDomic&&esDeGiro(f))));
   const provs=[...new Set(todas.map(claveProv))].map(k=>({k,n:nombreCanonico(k)})).sort((a,b)=>a.n.localeCompare(b.n,'es'));
   const q=String(state.pgBuscar||'').trim();
   const min=numES(state.pgMin), max=numES(state.pgMax);
@@ -1869,7 +1904,7 @@ function viewPagadas(){
     if((state.pgDesde||state.pgHasta)&&!enRango(pago?pago.fecha:f.fecha_factura,state.pgDesde,state.pgHasta))return false;
     if(state.pgProv&&claveProv(f)!==state.pgProv)return false;
     const t=+f.total_factura||0; if(min!=null&&t<min)return false; if(max!=null&&t>max)return false;
-    if(q&&!coincide(`${f.numero_factura} ${nombreProv(f)} ${nombreLeido(f)} ${codigoProv(f)} ${cifDe(f)} ${formaPago(f).texto}`,q))return false;
+    if(q&&!casaBusqueda(f,q))return false;
     return true;
   }).sort((a,b)=>{const da=new Date(a.fecha_factura||a.fecha_recepcion),db=new Date(b.fecha_factura||b.fecha_recepcion);return db-da;});
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
@@ -2026,7 +2061,7 @@ async function openDrawer(id){
       ${!f.json_extraccion_ia?._pago?(f.json_extraccion_ia?._aprobada_pago
         ?`<button class="act-btn del" data-desaprobar="${f.id}" title="Deshacer la aprobación: vuelve a su sitio en el listado de facturas">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer aprobación</button>`
         :`<button class="act-btn cont" data-aprobar="${f.id}" style="white-space:nowrap" title="Aprobarla para pago: pasa a la sección «Aprobadas»">${svg(ICN.check)}APROBADA PAGAR</button>`):''}
-      ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Ya se ha pagado: pasa a «Pagadas»">${svg(ICN.card)}Marcar pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
+      ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Ya se ha pagado. Pasa a «Pagadas» cuando esté contabilizada; mientras, sigue en el listado como «Pagada · sin contabilizar»">${svg(ICN.card)}Marcar pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
       <button class="act-btn cont" data-manual="${f.id}" title="Subir un albarán, un pedido u otro papel que esté guardado en otro sitio y ponerlo con esta factura">${svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>')}Añadir manualmente</button>
       ${botonesExtraFicha(f)}
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>
@@ -2368,7 +2403,7 @@ async function resolverFactura(id,nuevoEstado){
       const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:ia})});
       const data=await r.json().catch(()=>[]);
       if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
-      closeDrawer();toast('Factura marcada como pagada');await loadAll();
+      closeDrawer();toast(f.estado==='CONTABILIZADA'?'Factura pagada: pasa a «Pagadas»':'Marcada como pagada. Pasará a «Pagadas» cuando esté contabilizada');await loadAll();
     }catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');}
     return;
   }else ia._revision={accion:nuevoEstado,fecha:new Date().toISOString(),por:quien};
@@ -2402,11 +2437,11 @@ async function aprobarPago(id,aprobar){
 }
 async function marcarPagada(id,boton){
   const f=state.facturas.find(x=>x.id===id);if(!f)return;
-  if(!confirm(`¿Marcar como pagada la factura ${f.numero_factura||''} (${eur(f.total_factura)})?\n\nPasará a la sección «Pagadas».`))return;
+  if(!confirm(`¿Marcar como pagada la factura ${f.numero_factura||''} (${eur(f.total_factura)})?\n\n${f.estado==='CONTABILIZADA'?'Pasará a la sección «Pagadas».':'Todavía no está contabilizada: seguirá en el listado como «Pagada · sin contabilizar» y pasará a «Pagadas» cuando se contabilice.'}`))return;
   if(boton)boton.disabled=true;
   const ia=Object.assign({},f.json_extraccion_ia||{});
   ia._pago={fecha:new Date().toISOString(),por:(_session?.user?.email||'Panel')};
-  try{await guardarIA(id,ia);toast('Factura marcada como pagada');await loadAll();}
+  try{await guardarIA(id,ia);toast(f.estado==='CONTABILIZADA'?'Factura pagada: pasa a «Pagadas»':'Marcada como pagada. Pasará a «Pagadas» cuando esté contabilizada');await loadAll();}
   catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');if(boton)boton.disabled=false;}
 }
 // «Añadir manualmente»: un albarán o un pedido que tienen guardado en otro sitio.

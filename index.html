@@ -1701,7 +1701,56 @@ function refreshTabla(){
   document.querySelectorAll('th[data-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.sort;if(state.sort.k===k)state.sort.dir*=-1;else state.sort={k,dir:k==='prov'?1:-1};refreshTabla();});
 }
 function th(k,lbl,r){const a=state.sort.k===k?(state.sort.dir>0?'▲':'▼'):'';return`<th class="srt ${r?'r':''}" data-sort="${k}">${lbl}<span class="arr">${a}</span></th>`;}
+// Buscar «OIGO» no traía la de OUIGO y parecía que faltaban facturas (Paqui,
+// 20/10/2026). Si la búsqueda no da nada, se dice dónde está lo que casa (otro
+// filtro, Aprobadas, Pagadas) y qué proveedores se escriben casi igual.
+function distanciaTexto(a,b){
+  const d=Array.from({length:b.length+1},(_,i)=>i);
+  for(let i=1;i<=a.length;i++){let prev=d[0];d[0]=i;
+    for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=t;}}
+  return d[b.length];
+}
+function pistaBusqueda(q){
+  const casa=f=>[f.numero_factura,nombreProv(f),nombreLeido(f),nifProv(f),cifDe(f),codigoProv(f)].some(v=>coincide(v,q));
+  const todas=state.facturas.filter(casa);
+  const enPag=todas.filter(f=>f.json_extraccion_ia?._pago).length;
+  const enAprob=todas.filter(aprobadaPago).length;
+  const enOtro=todas.length-enPag-enAprob;
+  const donde=[];
+  if(enOtro)donde.push(`<a href="#" data-pista="filtros">${enOtro} ${enOtro===1?'oculta':'ocultas'} por los filtros: quitarlos</a>`);
+  if(enAprob)donde.push(`<a href="#" data-pista="aprobadas">${enAprob} en Aprobadas</a>`);
+  if(enPag)donde.push(`<a href="#" data-pista="pagadas">${enPag} en Pagadas</a>`);
+  // Proveedores casi iguales: se compara con cada palabra del nombre (y con su
+  // principio, para quien aún no ha terminado de escribir).
+  const qn=normBusca(q).replace(/ /g,'');
+  const tope=qn.length<4?0:qn.length<7?1:2;
+  const parecidos=[];
+  if(tope&&!todas.length){
+    for(const n of new Set(state.facturas.map(nombreProv))){
+      let mejor=99;
+      for(const w of normBusca(n).split(' ').filter(w=>w.length>=3))
+        for(const p of [w,w.slice(0,qn.length),w.slice(0,qn.length+1)])mejor=Math.min(mejor,distanciaTexto(qn,p));
+      if(mejor<=tope)parecidos.push([mejor,n]);
+    }
+    parecidos.sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1]));
+  }
+  const sug=parecidos.slice(0,4).map(([,n])=>`<a href="#" data-busca="${esc(n)}">${esc(n)}</a>`);
+  return`<div class="empty">${svg(ICN.inbox)}<p>Ninguna factura con «${esc(q)}» aquí</p>
+    ${donde.length?`<small>Hay ${donde.join(' · ')}</small>`:''}
+    ${sug.length?`<small style="display:block;margin-top:6px">¿Querías decir ${sug.join(', ')}?</small>`:''}
+    ${!donde.length&&!sug.length?'<small>Prueba con otra parte del nombre, el CIF o el nº de factura</small>':''}</div>`;
+}
+document.addEventListener('click',e=>{
+  const a=e.target.closest('[data-busca],[data-pista]');if(!a)return;
+  e.preventDefault();
+  if(a.dataset.busca!=null){state.search=a.dataset.busca;render();return;}
+  const p=a.dataset.pista,q=state.search;
+  if(p==='filtros'){state.quickFilter='';state.fValida='';state.fProv='';state.fEstado='';state.fPago=[];render();}
+  else if(p==='aprobadas'){setView('aprobadas');state.apBuscar=q;render();}
+  else if(p==='pagadas'){setView('pagadas');state.pgBuscar=q;render();}
+});
 function tablaFacturas(ff,full){
+  if(!ff.length&&full&&state.view==='facturas'&&String(state.search||'').trim())return pistaBusqueda(String(state.search).trim());
   if(!ff.length)return`<div class="empty">${svg(ICN.inbox)}<p>No hay facturas</p><small>No se encontraron facturas en este periodo o filtro</small></div>`;
   const rows=ff.map(f=>{
     const dif=f.diferencia_importe!=null?+f.diferencia_importe:null;

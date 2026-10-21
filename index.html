@@ -517,7 +517,7 @@ function showLogin(){$('#login-overlay').classList.remove('hidden');$('#l-email'
 function showApp(){
   $('#login-overlay').classList.add('hidden');
   const u=_session?.user||{};
-  $('#user-email-lbl').textContent=u.user_metadata?.nombre||u.email||'';
+  $('#user-email-lbl').textContent=u.user_metadata?.nombre||(u.email||'').replace(DOMINIO_USUARIOS,'');
   if(u.user_metadata?.cambiar_clave)openPerfil(true);
 }
 
@@ -696,7 +696,8 @@ function coincide(texto,consulta){
   const t=normBusca(texto);
   return t.includes(q)||t.replace(/ /g,'').includes(q.replace(/ /g,''));
 }
-const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// Quien hizo algo se guarda como «paqui@montero.local»; en pantalla basta «paqui».
+const esc=s=>String(s??'').replace(/@montero\.local\b/gi,'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const initials=n=>String(n||'?').replace(/[^a-zA-ZÀ-ÿ ]/g,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
 // Si la factura ya está unida a su proveedor del maestro (por CIF, lo hace la
 // base), manda el nombre del maestro: «Racingoll s.l.» era RACING OIL mal leído.

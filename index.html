@@ -1184,6 +1184,13 @@ function homologacionDe(f){
 // salía «026019129»; NADINE «00146323» salía «146323»). Se toma, por este orden,
 // el que se leyó del propio documento del albarán, el de su hoja en el PDF y el
 // leído de la factura; se casan por sus cifras.
+// Columnas de albarán de los Excel: siempre las mismas, aunque vayan vacías, porque el
+// AS400 las carga por posición (Ricardo, 21/10/2026). DISMAN mete 20 en una factura.
+const MAX_ALBARANES_EXCEL=50;
+function avisoMuchosAlbaranes(ff){
+  const n=ff.filter(f=>albaranesDe(f.json_extraccion_ia||{}).length>MAX_ALBARANES_EXCEL).map(f=>f.numero_factura);
+  if(n.length)toast(`Más de ${MAX_ALBARANES_EXCEL} albaranes en ${n.join(', ')}: los que sobran no caben en el Excel`,'err');
+}
 function albaranesDe(ia){
   const nums=Array.isArray(ia._albaranes)?ia._albaranes:[];
   const det=Array.isArray(ia.albaranes)?ia.albaranes:[];
@@ -2770,7 +2777,7 @@ function exportExcel(){
     'Ámbito IVA','Delegación','Base Imponible IVA','Tipo IVA','Cuota IVA','Total Factura','Estado',
     'Validada el','Validación','Contabilizada el','Condiciones','Valida'];
   // Una columna de fecha al lado de cada albarán (Paqui, 14/10/2026)
-  for(let i=1;i<=20;i++) head.push('Albarán '+i,'Fecha albarán '+i);
+  for(let i=1;i<=MAX_ALBARANES_EXCEL;i++) head.push('Albarán '+i,'Fecha albarán '+i);
   const rows=ff.map(f=>{
     const ia=f.json_extraccion_ia||{};
     const albs=albaranesDe(ia);
@@ -2788,15 +2795,16 @@ function exportExcel(){
       ...(()=>{const v=validacion(f),c=fechaContabilizada(f);
         return [v&&v.fecha?dt(v.fecha):'', v?v.como:'', c?dt(c):'', sinCondiciones(f)?'SIN CONDICIONES':'', validadorDe(f)];})()
     ];
-    for(let i=0;i<20;i++) row.push(albs[i]?albs[i].num:'',albs[i]?albs[i].fecha:'');
+    for(let i=0;i<MAX_ALBARANES_EXCEL;i++) row.push(albs[i]?albs[i].num:'',albs[i]?albs[i].fecha:'');
     return row;
   });
   const ws=XLSX.utils.aoa_to_sheet([head,...rows]);
   ws['!cols']=[{wch:14},{wch:20},{wch:12},{wch:13},{wch:14},{wch:13},{wch:14},{wch:12},
-              {wch:14},{wch:14},{wch:15},{wch:10},{wch:12},{wch:13},{wch:12},{wch:12},{wch:11},{wch:14},{wch:16},{wch:14},...Array(40).fill({wch:13})];
+              {wch:14},{wch:14},{wch:15},{wch:10},{wch:12},{wch:13},{wch:12},{wch:12},{wch:11},{wch:14},{wch:16},{wch:14},...Array(2*MAX_ALBARANES_EXCEL).fill({wch:13})];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Facturas');
   XLSX.writeFile(wb,`AS400_facturas_montero_${new Date().toISOString().slice(0,10)}.xlsx`);
+  avisoMuchosAlbaranes(ff);
 }
 
 async function exportAS400(){
@@ -2843,7 +2851,7 @@ async function exportAS400(){
     'Base Imponible','Tipo IVA 0','Base Imponible 0','Cuota IVA 0','Tipo IVA 10','Base Imponible 10','Cuota IVA 10','Tipo IVA 21','Base Imponible 21','Cuota IVA 21',
     'Total Factura','Estado','Validada el','Descargado el','Contabilizada el','Forma de pago','IRPF %','IRPF importe'];
   // Paqui, 14/10/2026: la fecha de cada albarán en la columna de al lado.
-  for(let i=1;i<=10;i++) head.push('Albarán '+i,'Fecha albarán '+i);
+  for(let i=1;i<=MAX_ALBARANES_EXCEL;i++) head.push('Albarán '+i,'Fecha albarán '+i);
   const rows=[];
   ff.forEach(f=>{
     const ia=f.json_extraccion_ia||{};
@@ -2889,7 +2897,7 @@ async function exportAS400(){
     // Paqui, 07/10/2026: el albarán va solo con sus cifras, sin prefijo, símbolos
     // ni fecha, porque cada delegación lo graba a su manera en el AS400.
     const albNum=albaranesDe(ia).map(a=>({num:albAS400(a.num),fecha:a.fecha})).filter(a=>a.num);
-    for(let i=0;i<10;i++) base.push(albNum[i]?albNum[i].num:'',albNum[i]?albNum[i].fecha:'');
+    for(let i=0;i<MAX_ALBARANES_EXCEL;i++) base.push(albNum[i]?albNum[i].num:'',albNum[i]?albNum[i].fecha:'');
     // Paqui, 06/10/2026: vacía y numérica → 0; vacía y de texto → en blanco.
     // Numéricas son los importes y los tipos (base, IVA, total, IRPF); los
     // códigos y números de documento (pedido, albaranes…) son texto.
@@ -2899,10 +2907,11 @@ async function exportAS400(){
   const ws=XLSX.utils.aoa_to_sheet([head,...rows]);
   ws['!cols']=[{wch:12},{wch:12},{wch:28},{wch:12},{wch:13},{wch:16},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},
     {wch:12},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:11},{wch:12},{wch:7},{wch:12},{wch:13},{wch:15},{wch:22},{wch:7},{wch:11},
-    ...Array(20).fill({wch:12})];
+    ...Array(2*MAX_ALBARANES_EXCEL).fill({wch:12})];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'AS400');
   XLSX.writeFile(wb,`AS400_asientos_montero_${new Date().toISOString().slice(0,10)}.xlsx`);
+  avisoMuchosAlbaranes(ff);
   // Las facturas en PDF acompañan al Excel: se guardan en el registro de IVA
   // soportado (Paqui, 25/09/2026). Si fallan, el Excel ya está descargado.
   const notaPdf=await descargarFacturasIva(ff,btn);

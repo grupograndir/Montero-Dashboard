@@ -672,6 +672,8 @@ const ACCION_DE={V30:'emparejar',V31:'emparejar',V24:'editar',V03:'releer',V05:'
   TOTAL_NO_CUADRA:'editar',PROVEEDOR_DUDOSO:'editar',CIF_DUDOSO:'editar',CIF_FALTA:'editar',SIN_DELEGACION:'editar',
   VARIAS_FACTURAS:'separar',FALTA_PEDIDO_R:'editar'};
 const OK_CERRADAS=['VALIDADA','EXPORTADA','CONTABILIZADA'];
+// Solo se aprueba o se paga lo validado y que no sea una copia (la base también lo exige).
+const pagable=f=>OK_CERRADAS.includes(f.estado)&&!f.es_duplicado&&!f.eliminada;
 // Si descargar el Excel de AS400 pasa las facturas a CONTABILIZADA por sí solo.
 // Apagado el 07/08/2026: el Excel se lleva a contabilidad, pero el asiento puede
 // tardar días o no hacerse — darlas por contabilizadas al descargar volvía a
@@ -685,7 +687,21 @@ const estadoLbl=e=>LABEL[e]||e||'—';
 const $=s=>document.querySelector(s);
 const eur=n=>n==null?'—':new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n);
 const eurS=n=>{if(n==null)return'—';if(Math.abs(n)>=1e6)return(n/1e6).toFixed(2)+' M€';if(Math.abs(n)>=1e3)return(n/1e3).toFixed(1)+' k€';return eur(n);};
-const dt=d=>d?new Date(d).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
+// «2026-09-30» y «05/10/2026» se escriben tal cual: new Date() lee la segunda
+// como 10 de mayo y una fecha rara como «Invalid Date» (revisión 21/10/2026).
+const dt=d=>{
+  if(!d)return'—';
+  if(typeof d==='string'){
+    const e=d.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2}|\d{4})$/);
+    if(e)return `${e[1].padStart(2,'0')}/${e[2].padStart(2,'0')}/${e[3].length===2?'20'+e[3]:e[3]}`;
+    const i=d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(i)return `${i[3]}/${i[2]}/${i[1]}`;
+  }
+  const x=new Date(d);
+  return isNaN(x)?String(d):x.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+};
+// El día de hoy en Madrid, no en UTC: entre las 00:00 y las 02:00 toISOString da ayer.
+const hoyISO=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const dtL=d=>d?new Date(d).toLocaleString('es-ES',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
 // Buscar sin que importen tildes, mayúsculas, espacios ni signos: «julian
 // somovilla» encuentra «JULIÁN SOMOVILLA» y «b88658372» encuentra «B-88658372»
@@ -897,15 +913,24 @@ async function openPdfsJuntos(docs){
     toast('No se pudieron abrir los documentos: '+e.message,'err');
   }
 }
+// Las que no tienen fecha leída salen siempre: con un periodo elegido desaparecían
+// de todas partes (revisión 21/10/2026).
+function rangoFechas(desde,hasta){
+  const c=[desde&&`fecha_factura.gte.${desde}`,hasta&&`fecha_factura.lte.${hasta}`].filter(Boolean);
+  if(!c.length)return'';
+  return `&or=(${c.length>1?`and(${c.join(',')})`:c[0]},fecha_factura.is.null)`;
+}
 // Se filtra por la FECHA DE LA FACTURA (la del documento), no por cuándo entró al
 // sistema: la contabilidad se lleva por meses según la fecha de la factura.
+const facturaLocal=id=>state.facturas.find(f=>f.id===id)||(state.facturasPago||[]).find(f=>f.id===id);
+const conPagos=()=>state.facturas.concat(state.facturasPago||[]);
 function periodFilter(){
   if(state.desde||state.hasta){
-    return (state.desde?`&fecha_factura=gte.${state.desde}`:'')+(state.hasta?`&fecha_factura=lte.${state.hasta}`:'');
+    return rangoFechas(state.desde,state.hasta);
   }
   if(!state.dias)return'';
   const d=new Date();d.setDate(d.getDate()-state.dias);
-  return `&fecha_factura=gte.${d.toISOString().slice(0,10)}`;
+  return rangoFechas(hoyISO(d),null);
 }
 async function loadAll(){
   setConn(true);
@@ -915,6 +940,16 @@ async function loadAll(){
   }catch(e){
     if(e instanceof SesionCaducada){clearSession();showLogin();return;}
     console.error(e);setConn(false,e.message);state.facturas=[];}
+  // Aprobadas y Pagadas no dependen del periodo: una factura de julio aprobada hoy
+  // tiene que salir en la remesa de hoy (revisión 21/10/2026).
+  state.facturasPago=null;
+  if(periodFilter()&&!state.verEliminadas){
+    try{
+      const ya=new Set(state.facturas.map(f=>f.id));
+      state.facturasPago=(await api(`facturas_procesadas?select=*&eliminada=is.false&or=(json_extraccion_ia->_aprobada_pago.not.is.null,json_extraccion_ia->_pago.not.is.null)&limit=5000`))
+        .filter(f=>!ya.has(f.id));
+    }catch(e){console.error(e);}
+  }
   try{
     state.proveedoresBD=await api(`proveedores?select=id,nombre,nif_cif,codigo_proveedor,cuenta_contable,tipo_hoja,actividad`);
   }catch(e){console.error(e);state.proveedoresBD=[];}
@@ -946,7 +981,7 @@ async function loadAll(){
       // de una factura de julio o de septiembre salía como suelto. Paqui vio 422
       // "sin asignar" en agosto (23/09/2026) cuando de verdad eran unos 170, y
       // la mayoría de hoy mismo, esperando a su factura.
-      const todas=await api(`facturas_procesadas?select=id,documento_recibido_id,eliminada,motivo_eliminacion,numero_factura,total_factura,fecha_factura,prov:json_extraccion_ia->proveedor->>nombre,nif:json_extraccion_ia->proveedor->>nif_cif,proveedor_id,adj:json_extraccion_ia->_adjuntos,sug:json_extraccion_ia->_sugeridos&limit=20000`);
+      const todas=await api(`facturas_procesadas?select=id,documento_recibido_id,eliminada,es_duplicado,estado,motivo_eliminacion,numero_factura,total_factura,fecha_factura,prov:json_extraccion_ia->proveedor->>nombre,nif:json_extraccion_ia->proveedor->>nif_cif,proveedor_id,adj:json_extraccion_ia->_adjuntos,sug:json_extraccion_ia->_sugeridos&limit=20000`);
       state.todasFacturas=todas.filter(f=>!f.eliminada);
       state.ligeras=todas;
       // Menos las retiradas por NO SER facturas: un albarán que entró como factura
@@ -978,7 +1013,7 @@ async function loadAll(){
   // Lo que se ha puesto a mano en las últimas horas, para enseñar en qué ha
   // quedado cada documento: pendiente, hecho o con error.
   try{
-    const d=new Date(Date.now()-864e5).toISOString();
+    const d=new Date(Date.now()-7*864e5).toISOString();
     state.asignaciones=await api(`auditoria_workflow?select=id,detalle,creado_en&evento=eq.TAREA: asignar&creado_en=gte.${d}&order=creado_en.desc&limit=200`);
   }catch(e){state.asignaciones=[];}
   // Estado del sistema: lo deja scripts/salud.py en cada pasada. Si esto falla,
@@ -1308,7 +1343,7 @@ function deriveIncidencias(ff){
       out.push({factura_id:f.id,codigo_validacion:'V23',tipo:'INCIDENCIA',estado:'ABIERTA',descripcion:'La dirección fiscal de la factura no coincide con la oficial de Montero Alquiler S.A.',dato_esperado:'AV LA RECOMBA (P.I. LA LAGUNA), 10 · 28911 Leganés',dato_recibido:f.direccion_fiscal_detectada});
   });
   // Facturas revisadas manualmente → sus incidencias pasan a RESUELTA
-  const resueltas=new Set(ff.filter(f=>(f.json_extraccion_ia||{})._revision).map(f=>f.id));
+  const resueltas=new Set(ff.filter(f=>((f.json_extraccion_ia||{})._revision||{}).accion==='VALIDADA').map(f=>f.id));
   return out.map(i=>resueltas.has(i.factura_id)?{...i,estado:'RESUELTA'}:i);
 }
 function setConn(ok,msg){$('#conn-dot').className='dot'+(ok?'':' off');$('#conn-txt').textContent=ok?'Conectado':'Sin conexión';}
@@ -1397,7 +1432,7 @@ function viewSueltos(){
       </div></div></div>`;
   }
   const ds=state.sueltos||[];
-  const hoy=ds.filter(d=>String(d.fecha_recepcion||'').slice(0,10)===new Date().toISOString().slice(0,10)).length;
+  const hoy=ds.filter(d=>String(d.fecha_recepcion||'').slice(0,10)===hoyISO()).length;
   const t=state.tareas||[];
   const enCurso=t.find(x=>((x.detalle||{}).estado)==='PENDIENTE'||((x.detalle||{}).estado)==='EN_CURSO');
   const ultima=t.find(x=>['HECHO','ERROR'].includes((x.detalle||{}).estado));
@@ -1434,10 +1469,13 @@ function viewSueltos(){
   // Para elegir la factura: todas las del listado, no solo las del mes que se
   // está mirando. El albarán de una factura de julio llega a veces en septiembre.
   state.opcionesFac=new Map();
-  const opciones=(state.todasFacturas||[]).slice()
+  const opciones=(state.todasFacturas||[]).filter(f=>!f.es_duplicado&&f.estado!=='DUPLICADO_PENDIENTE').slice()
     .sort((a,b)=>String(b.fecha_factura||'').localeCompare(String(a.fecha_factura||'')))
     .map(f=>{
-      const et=`${f.numero_factura||'(sin número)'} · ${f.prov||'?'} · ${eur(f.total_factura)} · ${dt(f.fecha_factura)}`;
+      // Dos facturas con el mismo texto se distinguen por su referencia: antes la
+      // segunda pisaba a la primera y el papel iba a la que no era.
+      let et=`${f.numero_factura||'(sin número)'} · ${f.prov||'?'} · ${eur(f.total_factura)} · ${dt(f.fecha_factura)}`;
+      if(state.opcionesFac.has(et))et+=` · ref ${f.id.slice(0,6)}`;
       state.opcionesFac.set(et,f.id);
       return `<option value="${esc(et)}"></option>`;
     }).join('');
@@ -1513,10 +1551,14 @@ async function asignarDocumento(docId,boton){
 }
 
 /* ---------- metrics ---------- */
+// Las copias duplicadas y las rechazadas no son gasto: no cuentan en importes ni
+// en el total (revisión 21/10/2026). «En automático» son solo las que no tocó nadie.
+const cuentaGasto=f=>!f.es_duplicado&&f.estado!=='DUPLICADO_PENDIENTE'&&f.estado!=='RECHAZADA';
 function metrics(ff){
-  const importe=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
   const revision=ff.filter(f=>PEND.includes(f.estado)).length;
-  const validadas=ff.filter(f=>OK_CERRADAS.includes(f.estado)).length;
+  ff=ff.filter(cuentaGasto);
+  const importe=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
+  const validadas=ff.filter(f=>OK_CERRADAS.includes(f.estado)&&(validacion(f)||{}).como==='automática').length;
   return{total:ff.length,importe,revision,validadas};
 }
 function facturasPendientes(){
@@ -1833,12 +1875,12 @@ const CHIPS=[['','Todas'],['revision','Requieren revisión'],['sospecha','¿Pedi
 // periodo y cuánto suma (Paqui, 14/10/2026). Y con los mismos filtros y el mismo
 // orden que el listado general (15/10/2026).
 function aprobadasFiltradas(){
-  const ff=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada&&enRango(f.json_extraccion_ia._aprobada_pago.fecha,state.apDesde,state.apHasta));
+  const ff=conPagos().filter(f=>aprobadaPago(f)&&!f.eliminada&&enRango(f.json_extraccion_ia._aprobada_pago.fecha,state.apDesde,state.apHasta));
   return aplicarFiltros(ff,{chip:state.apChip||'',valida:state.apValida||'',prov:state.apProv||'',estado:state.apEstado||'',
     pago:state.apPago||[],search:state.apBuscar||'',sort:state.apSort||{k:'aprobada',dir:1}});
 }
 function viewAprobadas(){
-  const todas=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada);
+  const todas=conPagos().filter(f=>aprobadaPago(f)&&!f.eliminada);
   const ff=aprobadasFiltradas();
   const so=state.apSort||{k:'aprobada',dir:1};
   const thA=(k,l,r)=>`<th class="srt ${r?'r':''}" data-apsort="${k}">${l}<span class="arr">${so.k===k?(so.dir>0?'▲':'▼'):''}</span></th>`;
@@ -1903,7 +1945,7 @@ function bindAprobadas(){
 // Con los mismos filtros que el listado (Paqui, 14/10/2026): proveedor, importe,
 // fechas de pago y búsqueda. Las domiciliadas se paga solas: se pueden ver aquí.
 function viewPagadas(){
-  const todas=state.facturas.filter(f=>!f.eliminada&&(enPagadas(f)||(state.pgDomic&&esDeGiro(f))));
+  const todas=conPagos().filter(f=>!f.eliminada&&(enPagadas(f)||(state.pgDomic&&esDeGiro(f))));
   const provs=[...new Set(todas.map(claveProv))].map(k=>({k,n:nombreCanonico(k)})).sort((a,b)=>a.n.localeCompare(b.n,'es'));
   const q=String(state.pgBuscar||'').trim();
   const min=numES(state.pgMin), max=numES(state.pgMax);
@@ -1957,7 +1999,7 @@ function listaIncidencias(inc){
   });
   const peor=items=>items.some(i=>i.tipo==='BLOQUEANTE')?'BLOQUEANTE':items.some(i=>i.tipo==='INCIDENCIA')?'INCIDENCIA':'AVISO';
   return [...grupos.entries()].map(([facturaId,items])=>{
-    const f=state.facturas.find(x=>x.id===facturaId);
+    const f=facturaLocal(facturaId);
     const tipo=peor(items);
     const abiertas=items.filter(i=>i.estado==='ABIERTA').length;
     const codigos=[...new Set(items.map(i=>i.codigo_validacion).filter(Boolean))];
@@ -2033,7 +2075,7 @@ function viewProveedorDetalle(clave){
 
 /* ---------- DRAWER DETALLE ---------- */
 async function openDrawer(id){
-  const f=state.facturas.find(x=>x.id===id);if(!f)return;
+  const f=facturaLocal(id);if(!f)return;
   $('#ov').classList.add('open');$('#drawer').classList.add('open');
   const dif=f.diferencia_importe!=null?+f.diferencia_importe:null;
   const warn=dif!=null&&Math.abs(dif)>TOL;
@@ -2066,10 +2108,10 @@ async function openDrawer(id){
       ${(f.estado==='VALIDADA'||f.estado==='RECHAZADA')?`<button class="act-btn" data-act="EN_REVISION" data-id="${f.id}" title="Quitarle el estado y volver a dejarla pendiente">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Devolver a revisión</button>`:''}
       ${f.estado==='VALIDADA'?`<button class="act-btn cont" data-act="CONTABILIZADA" data-id="${f.id}" title="El asiento ya está hecho en el AS400">${svg('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h4"/>')}Marcar contabilizada</button>`:''}
       ${f.estado==='CONTABILIZADA'?`<button class="act-btn del" data-act="VALIDADA" data-id="${f.id}" title="Deshacer: volver a dejarla pendiente de contabilizar">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer contabilizada</button>`:''}
-      ${!f.json_extraccion_ia?._pago?(f.json_extraccion_ia?._aprobada_pago
+      ${!f.json_extraccion_ia?._pago&&(pagable(f)||f.json_extraccion_ia?._aprobada_pago)?(f.json_extraccion_ia?._aprobada_pago
         ?`<button class="act-btn del" data-desaprobar="${f.id}" title="Deshacer la aprobación: vuelve a su sitio en el listado de facturas">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer aprobación</button>`
         :`<button class="act-btn cont" data-aprobar="${f.id}" style="white-space:nowrap" title="Aprobarla para pago: pasa a la sección «Aprobadas»">${svg(ICN.check)}APROBADA PAGAR</button>`):''}
-      ${!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Ya se ha pagado. Pasa a «Pagadas» cuando esté contabilizada; mientras, sigue en el listado como «Pagada · sin contabilizar»">${svg(ICN.card)}Marcar pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`}
+      ${f.json_extraccion_ia?._pago||pagable(f)?(!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Ya se ha pagado. Pasa a «Pagadas» cuando esté contabilizada; mientras, sigue en el listado como «Pagada · sin contabilizar»">${svg(ICN.card)}Marcar pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`):''}
       <button class="act-btn cont" data-manual="${f.id}" title="Subir un albarán, un pedido u otro papel que esté guardado en otro sitio y ponerlo con esta factura">${svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>')}Añadir manualmente</button>
       ${botonesExtraFicha(f)}
       <button class="act-btn del" data-del="${f.id}" title="Quitar del listado y del Excel de contabilidad">${svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>')}Eliminar</button>
@@ -2361,7 +2403,7 @@ async function openDrawer(id){
   });
 }
 async function eliminarFactura(id,motivoFijo){
-  const f=state.facturas.find(x=>x.id===id);if(!f)return;
+  const f=facturaLocal(id);if(!f)return;
   const ref=`${f.numero_factura||'(sin número)'} · ${nombreProv(f)} · ${eur(f.total_factura)}`;
   if(!confirm(`¿Quitar esta factura del listado?\n\n${ref}\n\nDejará de aparecer en el panel y en el Excel de contabilidad. El documento se conserva y se puede recuperar.`))return;
   const motivo=motivoFijo||prompt('Motivo (opcional): p. ej. "duplicada", "no es nuestra"…')||null;
@@ -2388,7 +2430,7 @@ async function restaurarFactura(id){
   }catch(e){console.error(e);toast('No se pudo recuperar','err');}
 }
 async function resolverFactura(id,nuevoEstado){
-  const f=state.facturas.find(x=>x.id===id);if(!f)return;
+  const f=facturaLocal(id);if(!f)return;
   // Deshacer una contabilización es volver a VALIDADA desde CONTABILIZADA. Hay que
   // borrar el registro, no solo cambiar el estado: si se queda, el recálculo la
   // devuelve a contabilizada en la siguiente pasada.
@@ -2408,7 +2450,7 @@ async function resolverFactura(id,nuevoEstado){
   else if(nuevoEstado==='PAGADA'){ia._pago={fecha:new Date().toISOString(),por:quien};
     try{
       const tok=getToken()||SB_ANON;
-      const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:ia})});
+      const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:await iaFresca(id,ia)})});
       const data=await r.json().catch(()=>[]);
       if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
       closeDrawer();toast(f.estado==='CONTABILIZADA'?'Factura pagada: pasa a «Pagadas»':'Marcada como pagada. Pasará a «Pagadas» cuando esté contabilizada');await loadAll();
@@ -2417,7 +2459,7 @@ async function resolverFactura(id,nuevoEstado){
   }else ia._revision={accion:nuevoEstado,fecha:new Date().toISOString(),por:quien};
   try{
     const tok=getToken()||SB_ANON;
-    const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({estado:nuevoEstado,json_extraccion_ia:ia})});
+    const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({estado:nuevoEstado,json_extraccion_ia:await iaFresca(id,ia)})});
     const data=await r.json().catch(()=>[]);
     if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
     const MSG={VALIDADA:'Factura validada',RECHAZADA:'Factura rechazada',CONTABILIZADA:'Factura marcada como contabilizada',
@@ -2425,16 +2467,32 @@ async function resolverFactura(id,nuevoEstado){
     closeDrawer();toast(esDeshacer?'Ya no consta como contabilizada':(MSG[nuevoEstado]||'Factura actualizada'));await loadAll();
   }catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');}
 }
+// Guardar solo lo que ha cambiado. La ficha que tiene el panel puede llevar
+// minutos abierta: entretanto el PC cuelga albaranes y otra persona aprueba o paga.
+// Se guardaba el JSON entero y se perdía lo de los demás (revisión 21/10/2026).
+// Se mira qué claves ha tocado este botón y solo esas se ponen sobre lo que hay HOY.
+async function iaFresca(id,ia){
+  const antes=(facturaLocal(id)||{}).json_extraccion_ia;
+  if(!antes||!ia)return ia;
+  const fila=(await api(`facturas_procesadas?select=json_extraccion_ia&id=eq.${id}`))[0];
+  if(!fila)return ia;
+  const hoy=Object.assign({},fila.json_extraccion_ia||{});
+  new Set([...Object.keys(antes),...Object.keys(ia)]).forEach(c=>{
+    if(JSON.stringify(antes[c])===JSON.stringify(ia[c]))return;
+    if(c in ia)hoy[c]=ia[c];else delete hoy[c];
+  });
+  return hoy;
+}
 // Guarda solo json_extraccion_ia: aprobar y pagar no cambian el estado de la
 // factura (validada, contabilizada…), que es otra decisión.
 async function guardarIA(id,ia){
   const tok=getToken()||SB_ANON;
-  const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:ia})});
+  const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:await iaFresca(id,ia)})});
   const data=await r.json().catch(()=>[]);
   if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
 }
 async function aprobarPago(id,aprobar){
-  const f=state.facturas.find(x=>x.id===id);if(!f)return;
+  const f=facturaLocal(id);if(!f)return;
   if(!confirm(aprobar?`¿Aprobar para pago la factura ${f.numero_factura||''}?\n\nPasará a la sección «Aprobadas».`
                      :`¿Deshacer la aprobación de pago de la factura ${f.numero_factura||''}?\n\nVolverá a su sitio en el listado de facturas.`))return;
   const ia=Object.assign({},f.json_extraccion_ia||{});
@@ -2444,7 +2502,7 @@ async function aprobarPago(id,aprobar){
   catch(e){console.error(e);toast('No se pudo guardar (falta permiso de escritura)','err');}
 }
 async function marcarPagada(id,boton){
-  const f=state.facturas.find(x=>x.id===id);if(!f)return;
+  const f=facturaLocal(id);if(!f)return;
   if(!confirm(`¿Marcar como pagada la factura ${f.numero_factura||''} (${eur(f.total_factura)})?\n\n${f.estado==='CONTABILIZADA'?'Pasará a la sección «Pagadas».':'Todavía no está contabilizada: seguirá en el listado como «Pagada · sin contabilizar» y pasará a «Pagadas» cuando se contabilice.'}`))return;
   if(boton)boton.disabled=true;
   const ia=Object.assign({},f.json_extraccion_ia||{});
@@ -2470,7 +2528,7 @@ async function aPdf(archivo){
   return await doc.save();
 }
 async function anadirManual(facId,boton){
-  const f=state.facturas.find(x=>x.id===facId);if(!f)return;
+  const f=facturaLocal(facId);if(!f)return;
   const archivo=$('#manual-archivo')?.files?.[0];
   const tipo=$('#manual-tipo')?.value||'ALBARAN';
   if(!archivo){toast('Elige primero el archivo','err');return;}
@@ -2493,13 +2551,13 @@ async function anadirManual(facId,boton){
   }
 }
 async function deshacerPagada(id){
-  const f=state.facturas.find(x=>x.id===id);if(!f)return;
+  const f=facturaLocal(id);if(!f)return;
   if(!confirm(`¿Deshacer el pago de la factura ${f.numero_factura||''}?\n\nVolverá al listado general de facturas.`))return;
   const ia=Object.assign({},f.json_extraccion_ia||{});
   delete ia._pago;
   try{
     const tok=getToken()||SB_ANON;
-    const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:ia})});
+    const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:await iaFresca(id,ia)})});
     const data=await r.json().catch(()=>[]);
     if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
     closeDrawer();toast('Factura devuelta al listado general');await loadAll();
@@ -2522,13 +2580,13 @@ async function guardarObservaciones(id){
     if(aviso)aviso.textContent='';
     toast('No se pudo guardar — vuelve a iniciar sesión','err');return;
   }
-  const f=state.facturas.find(x=>x.id===id);
+  const f=facturaLocal(id);
   if(f)f.notas_resolucion=txt||null;
   if(aviso)aviso.textContent=txt?'guardado':'observaciones borradas';
   refreshTabla();
 }
 async function guardarCodigoProveedor(id){
-  const f=state.facturas.find(x=>x.id===id);if(!f)return;
+  const f=facturaLocal(id);if(!f)return;
   const val=(($('#inp-cod-prov')||{}).value||'').trim();
   if(!/^\d{1,8}$/.test(val)){toast('El código de proveedor solo lleva números','err');return;}
   const p=proveedorDeFactura(f);
@@ -2550,7 +2608,7 @@ async function guardarPedidoMontero(id){
   const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({numero_pedido_montero:val||null})});
   const data=await r.json().catch(()=>[]);
   if(!r.ok||!Array.isArray(data)||!data.length){toast('No se pudo guardar — vuelve a iniciar sesión','err');return;}
-  const f=state.facturas.find(x=>x.id===id);
+  const f=facturaLocal(id);
   if(f)f.numero_pedido_montero=val||null;
   toast('Nº pedido guardado');
 }
@@ -2609,7 +2667,7 @@ function openLegend(){
 /* ---------- charts ---------- */
 function drawCharts(){
   if(!window.Chart)return;
-  const ff=state.facturas;
+  const ff=state.facturas.filter(cuentaGasto);
   // Gasto por mes (últimos 6 meses)
   const now=new Date();
   const meses=[];
@@ -2804,7 +2862,7 @@ function exportExcel(){
               {wch:14},{wch:14},{wch:15},{wch:10},{wch:12},{wch:13},{wch:12},{wch:12},{wch:11},{wch:14},{wch:16},{wch:14},...Array(2*MAX_ALBARANES_EXCEL).fill({wch:13})];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Facturas');
-  XLSX.writeFile(wb,`AS400_facturas_montero_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb,`AS400_facturas_montero_${hoyISO()}.xlsx`);
   avisoMuchosAlbaranes(ff);
 }
 
@@ -2819,7 +2877,7 @@ async function exportAS400(){
   const rehacer=state.view==='facturas'&&state.quickFilter==='contabilizadas';
   const ff=rehacer
     ? base.filter(f=>f.estado==='CONTABILIZADA'&&!f.es_duplicado&&!f.eliminada)
-    : base.filter(f=>['RECIBIDA','VALIDADA'].includes(f.estado)&&!f.es_duplicado&&!f.eliminada);
+    : base.filter(f=>f.estado==='VALIDADA'&&!f.es_duplicado&&!f.eliminada);
   const excluidas=base.length-ff.length;
   if(!ff.length){
     toast(rehacer?'No hay facturas contabilizadas que descargar'
@@ -2854,6 +2912,9 @@ async function exportAS400(){
   // Paqui, 14/10/2026: la fecha de cada albarán en la columna de al lado.
   for(let i=1;i<=MAX_ALBARANES_EXCEL;i++) head.push('Albarán '+i,'Fecha albarán '+i);
   const rows=[];
+  // El AS400 lee las columnas por posición: un IVA del 4 % o del 5 % no tiene
+  // columna. No se inventa una: se avisa (revisión 21/10/2026).
+  const tiposRaros=new Set();
   ff.forEach(f=>{
     const ia=f.json_extraccion_ia||{};
     const prov=ia.proveedor||{};
@@ -2870,29 +2931,33 @@ async function exportAS400(){
     const ivaMap={0:{on:false,cuota:0,base:0},10:{on:false,cuota:0,base:0},21:{on:false,cuota:0,base:0}};
     d.forEach(item=>{
       const tipo=/EXENT/i.test(String(item.tipo))?0:Math.round(parseFloat(String(item.tipo).replace(',','.'))||0);
-      if(ivaMap[tipo]){
+      if(!ivaMap[tipo]){tiposRaros.add(f.numero_factura||f.id);return;}
+      {
         ivaMap[tipo].on=true;
-        ivaMap[tipo].cuota=Math.round((ivaMap[tipo].cuota+(parseFloat(item.cuota)||0))*100)/100;
+        ivaMap[tipo].cuota=Math.round((ivaMap[tipo].cuota+(numES(item.cuota)||0))*100)/100;
         ivaMap[tipo].base=Math.round((ivaMap[tipo].base+(numES(item.base)||0))*100)/100;
       }
     });
     // El tipo va como número, sin el símbolo % (Paqui, 15/10/2026).
-    const col=t=>ivaMap[t].on?[t,ivaMap[t].base,ivaMap[t].cuota]:['','',''];
+    // Abono: base y cuota en negativo, como el total (venían en positivo).
+    const sg=v=>(+f.total_factura<0&&+v>0)?-v:v;
+    const col=t=>ivaMap[t].on?[t,sg(ivaMap[t].base),sg(ivaMap[t].cuota)]:['','',''];
     const base=[
       dt(f.fecha_factura||f.fecha_recepcion),
       codigoProv(f),nombreProv(f),cifDe(f),
       homologacionDe(f),
       String(f.numero_factura||'').replace(/[^A-Za-z0-9]/g,''),numeroPedido(f),
       ia._ambito_iva||'NACIONAL',delegacionCiudad(f),
-      f.base_imponible||'',
+      f.base_imponible!=null&&f.base_imponible!==''?sg(+f.base_imponible):'',
       ...col(0),...col(10),...col(21),
       f.total_factura||'',
       'C',
       (()=>{const v=validacion(f);return v&&v.fecha?dt(v.fecha):(v?'automática':'');})(),
-      dt(new Date().toISOString().slice(0,10)),
+      dt(hoyISO()),
       fechaContabilizada(f)?dt(fechaContabilizada(f)):'',
       f.forma_pago_factura||ia._plazo_acordado||'',
-      ia._irpf?.pct || ia.factura?.importes?.irpf?.pct || f.importe_irpf||'',
+      ia._irpf?.pct || ia.factura?.importes?.irpf?.pct ||
+        (+f.importe_irpf&&+f.base_imponible?Math.round(Math.abs(f.importe_irpf/f.base_imponible)*100):''),
       ia._irpf?.importe || ia.factura?.importes?.irpf?.importe || f.importe_irpf||''
     ];
     // Paqui, 07/10/2026: el albarán va solo con sus cifras, sin prefijo, símbolos
@@ -2911,8 +2976,9 @@ async function exportAS400(){
     ...Array(2*MAX_ALBARANES_EXCEL).fill({wch:12})];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'AS400');
-  XLSX.writeFile(wb,`AS400_asientos_montero_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb,`AS400_asientos_montero_${hoyISO()}.xlsx`);
   avisoMuchosAlbaranes(ff);
+  if(tiposRaros.size)alert(`Ojo: ${tiposRaros.size} factura${tiposRaros.size!==1?'s':''} con un IVA distinto de 0, 10 o 21 % (${[...tiposRaros].slice(0,8).join(', ')}).\n\nEse tipo no tiene columna en el Excel del AS400: su base y su cuota NO salen en las columnas de IVA. Grábalas a mano.`);
   // Las facturas en PDF acompañan al Excel: se guardan en el registro de IVA
   // soportado (Paqui, 25/09/2026). Si fallan, el Excel ya está descargado.
   const notaPdf=await descargarFacturasIva(ff,btn);
@@ -2939,7 +3005,7 @@ async function marcarContabilizadas(ff){
     const ia=Object.assign({},f.json_extraccion_ia||{});
     ia._contabilizacion={fecha:ahora,por:quien};
     try{
-      const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${f.id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({estado:'CONTABILIZADA',exportada_as400:true,fecha_exportacion_as400:ahora,json_extraccion_ia:ia})});
+      const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${f.id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({estado:'CONTABILIZADA',exportada_as400:true,fecha_exportacion_as400:ahora,json_extraccion_ia:await iaFresca(f.id,ia)})});
       if(!r.ok)return {id:f.id,ok:false,code:r.status};
       const d=await r.json().catch(()=>[]);
       return {id:f.id,ok:Array.isArray(d)&&d.length,ia};
@@ -3042,7 +3108,7 @@ async function descargarFacturasIva(ff,btn){
     const blob=await zip.generateAsync({type:'blob'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download=`AS400_facturas_PDF_${new Date().toISOString().slice(0,10)}.zip`;
+    a.download=`AS400_facturas_PDF_${hoyISO()}.zip`;
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),10000);
     if(fallos.length)console.warn('Sin PDF para el registro de IVA:',fallos);
@@ -3087,7 +3153,7 @@ async function descargarDocumentos(){
     const blob=await zip.generateAsync({type:'blob'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download=`documentos_montero_${new Date().toISOString().slice(0,10)}.zip`;
+    a.download=`documentos_montero_${hoyISO()}.zip`;
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),10000);
     toast(fallos.length
@@ -3225,6 +3291,7 @@ async function rpc(fn,args){
   return d;
 }
 async function patchFactura(id,body){
+  if(body&&body.json_extraccion_ia)body={...body,json_extraccion_ia:await iaFresca(id,body.json_extraccion_ia)};
   const tok=getToken()||SB_ANON;
   const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',
     headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(body)});
@@ -3234,7 +3301,7 @@ async function patchFactura(id,body){
 }
 // La ficha entera de una factura aunque no esté en el periodo que se está viendo.
 async function facturaPorId(id){
-  const f=state.facturas.find(x=>x.id===id); if(f)return f;
+  const f=facturaLocal(id); if(f)return f;
   return (await api1(`facturas_procesadas?select=*&id=eq.${id}`))[0]||null;
 }
 
@@ -3331,7 +3398,7 @@ function botonesExtraFicha(f){
 // había forma de quitarlo. Se quita de la ficha y vuelve a «Sin asignar»; queda
 // anotado para que el emparejado no lo vuelva a poner con esta factura.
 async function quitarDocumento(facId,docId,boton){
-  const f=state.facturas.find(x=>x.id===facId);
+  const f=facturaLocal(facId);
   const a=((f&&f.json_extraccion_ia||{})._adjuntos||[]).find(x=>x.documento_id===docId)||{};
   if(!confirm(`¿Quitar «${a.nombre||'este documento'}» de la factura ${f&&f.numero_factura||''}?\n\nVuelve a «Sin asignar», desde donde se puede poner con la factura que toque.`))return;
   if(boton)boton.disabled=true;
@@ -3441,7 +3508,7 @@ function formAltaManual(docId,pre,origen,doc){
 
 /* ---------- editar los datos de una factura ---------- */
 function abrirEdicion(facId){
-  const f=state.facturas.find(x=>x.id===facId);if(!f)return;
+  const f=facturaLocal(facId);if(!f)return;
   const ia=f.json_extraccion_ia||{};
   const box=$('#panel-extra');if(!box)return;
   const p=proveedorDeFactura(f);
@@ -3469,7 +3536,7 @@ function abrirEdicion(facId){
   box.scrollIntoView({block:'nearest'});
 }
 async function guardarEdicion(facId){
-  const f=state.facturas.find(x=>x.id===facId);if(!f)return;
+  const f=facturaLocal(facId);if(!f)return;
   const v=k=>(($('#ed-'+k)||{}).value||'').trim();
   const ia=JSON.parse(JSON.stringify(f.json_extraccion_ia||{}));
   const o=(state.opcionesProv||new Map()).get(v('prov'));
@@ -3546,7 +3613,7 @@ function bindConformada(f){
   }
 }
 async function subirConformada(facId,archivo){
-  const f=state.facturas.find(x=>x.id===facId);if(!f||!archivo)return;
+  const f=facturaLocal(facId);if(!f||!archivo)return;
   if(!/pdf|jpe?g|png/i.test(archivo.type+archivo.name)){toast('Solo PDF, JPG o PNG','err');return;}
   if(archivo.size>25*1024*1024){toast('El archivo pasa de 25 MB','err');return;}
   const z=$('#conf-zona');if(z)z.textContent='Subiendo la factura conformada…';
@@ -3581,7 +3648,7 @@ let _pdfjs=null;
 async function cargarPdfJs(){
   if(_pdfjs)return _pdfjs;
   await new Promise((ok,mal)=>{const sc=document.createElement('script');
-    sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';sc.onload=ok;sc.onerror=()=>mal(new Error('no se pudo cargar el lector de PDF'));document.head.appendChild(sc);});
+    sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';sc.integrity='sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e';sc.crossOrigin='anonymous';sc.onload=ok;sc.onerror=()=>mal(new Error('no se pudo cargar el lector de PDF'));document.head.appendChild(sc);});
   window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   return _pdfjs=window.pdfjsLib;
 }
@@ -3630,20 +3697,20 @@ async function descargarParaFirmar(f,boton){
     const blob=new Blob([await pdfParaFirmar(f)],{type:'application/pdf'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nombreFirma(f);
     document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);
-    toast('Descargado: ábrelo con Acrobat para firmarlo, o adjúntalo al correo');
+    toast('Descargado: ábrelo con Acrobat para conformarlo, o adjúntalo al correo');
   }catch(e){toast('No se pudo preparar el PDF: '+e.message,'err');}
   if(boton){boton.disabled=false;boton.textContent=antes;}
 }
 
 /* ---------- enviar a un departamento ---------- */
 function abrirEnviar(facId){
-  const f=state.facturas.find(x=>x.id===facId);if(!f)return;
+  const f=facturaLocal(facId);if(!f)return;
   const box=$('#panel-extra');if(!box)return;
   const deps=state.departamentos||[];
   box.innerHTML=`<div class="caja-extra"><h4>Enviar la factura para validar</h4>
     <div style="font-size:12px;color:var(--muted);line-height:1.5">Se abre tu correo con el mensaje escrito y un enlace que <b>descarga</b> la factura en PDF (vale 7 días).
-      Quien la recibe pulsa el enlace, abre el archivo descargado con <b>Adobe Acrobat</b> y la firma directamente con «Rellenar y firmar».
-      Si prefieres adjuntarla, usa «Descargar el PDF para firmar».</div>
+      Quien la recibe pulsa el enlace, abre el archivo descargado con <b>Adobe Acrobat</b> y la conforma directamente con «Rellenar y firmar».
+      Si prefieres adjuntarla, usa «Descargar el PDF para conformar».</div>
     <div class="frm">
       <label class="ancho">Para<input id="en-para" list="dl-deps" placeholder="correo@montero.es o elige un departamento"></label>
       <datalist id="dl-deps">${deps.map(d=>`<option value="${esc(d.email)}">${esc(d.nombre||'')}</option>`).join('')}</datalist>
@@ -3651,7 +3718,7 @@ function abrirEnviar(facId){
       <label style="flex-direction:row;align-items:center;gap:6px" class="ancho"><input type="checkbox" id="en-resp" style="height:auto"> Añadir también los albaranes y pedidos</label>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-s ok" id="en-ok">Abrir el correo</button>
-      <button class="btn-s" id="en-pdf">Descargar el PDF para firmar</button>
+      <button class="btn-s" id="en-pdf">Descargar el PDF para conformar</button>
       <button class="btn-s" id="en-guardar">Guardar este destinatario</button></div></div>`;
   $('#en-pdf').onclick=()=>descargarParaFirmar(f,$('#en-pdf'));
   $('#en-guardar').onclick=async()=>{
@@ -3667,7 +3734,7 @@ function abrirEnviar(facId){
     const win=window.open('about:blank','_blank');
     try{
       const j=f.json_extraccion_ia||{};
-      const enl=[`- Factura para firmar: ${await enlaceParaFirmar(f)}`];
+      const enl=[`- Factura para conformar: ${await enlaceParaFirmar(f)}`];
       if($('#en-resp').checked)
         for(const a of (Array.isArray(j._adjuntos)?j._adjuntos:[]).filter(a=>a&&a.url)){
           const et=`${({ALBARAN:'Albarán',PEDIDO:'Pedido',TRANSPORTE:'Transporte'})[a.tipo]||'Documento'} ${a.nombre||''}`.trim();
@@ -3676,7 +3743,7 @@ function abrirEnviar(facId){
       const asunto=`Validar factura ${f.numero_factura||''} · ${nombreProv(f)} · ${eur(f.total_factura)}`;
       const cuerpo=[`Hola,`,``,`Te paso la factura ${f.numero_factura||'(sin número)'} de ${nombreProv(f)}, de ${eur(f.total_factura)} y fecha ${dt(f.fecha_factura)}, para que la valides.`,
         $('#en-msg').value.trim(),``,
-        `Pulsa el enlace: se descarga el PDF. Ábrelo con Adobe Acrobat y fírmalo con «Rellenar y firmar» (los enlaces valen 7 días).`,...enl,``,`Un saludo.`]
+        `Pulsa el enlace: se descarga el PDF. Ábrelo con Adobe Acrobat y confórmalo con «Rellenar y firmar» (los enlaces valen 7 días).`,...enl,``,`Un saludo.`]
         .filter((x,i)=>x!==''||i!==3).join('\n');
       const url=`mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
       if(win)win.location.href=url;else location.href=url;
@@ -3722,7 +3789,7 @@ async function ponerAdjunto(facId,doc,tipo){
 
 /* ---------- separar un PDF que trae varios documentos ---------- */
 async function abrirSeparar(facId){
-  const f=state.facturas.find(x=>x.id===facId);if(!f)return;
+  const f=facturaLocal(facId);if(!f)return;
   const j=f.json_extraccion_ia||{};
   const box=$('#panel-extra');if(!box)return;
   if(!j._documento_url){toast('Esta factura no tiene el PDF guardado','err');return;}
@@ -3737,7 +3804,7 @@ async function abrirSeparar(facId){
   const info=i=>pp.find(p=>+p.pagina===i)||{};
   const prop=j._paginas_propias||{};
   state.opcionesFac=new Map();
-  const opts=(state.todasFacturas||[]).map(x=>{const et=`${x.numero_factura||'(sin número)'} · ${x.prov||'?'} · ${eur(x.total_factura)}`;state.opcionesFac.set(et,x.id);return `<option value="${esc(et)}"></option>`;}).join('');
+  const opts=(state.todasFacturas||[]).filter(x=>!x.es_duplicado&&x.estado!=='DUPLICADO_PENDIENTE').map(x=>{let et=`${x.numero_factura||'(sin número)'} · ${x.prov||'?'} · ${eur(x.total_factura)}`;if(state.opcionesFac.has(et))et+=` · ref ${x.id.slice(0,6)}`;state.opcionesFac.set(et,x.id);return `<option value="${esc(et)}"></option>`;}).join('');
   const esta=[...state.opcionesFac.entries()].find(([,id])=>id===facId);
   box.innerHTML=`<div class="caja-extra"><h4>Separar documentos (${n} página${n===1?'':'s'})</h4>
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Marca las páginas y elige qué hacer con ellas. Lo que dice cada página es lo que leyó el sistema; ábrelo para comprobarlo.
@@ -3942,7 +4009,7 @@ function bindExcel(){
   $('#x-guardar').onclick=guardarExcelProv;
   $('#x-exp').onclick=()=>{const wb=XLSX.utils.book_new();
     state.excel.hojas.forEach(x=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(x.filas||[]),String(x.nombre||'Hoja').slice(0,31)));
-    XLSX.writeFile(wb,`PROVEEDORES HOMOLOGADOS ${new Date().toISOString().slice(0,10)}.xlsx`);};
+    XLSX.writeFile(wb,`PROVEEDORES HOMOLOGADOS ${hoyISO()}.xlsx`);};
   const im=$('#x-imp');if(im)im.onchange=()=>importarExcelProv(im.files[0]);
 }
 // Al salir de la pantalla completa con Esc, el botón vuelve a su estado.
@@ -4105,8 +4172,17 @@ setInterval(async()=>{
     const ok=await refreshToken();
     if(!ok){clearSession();showLogin();}
   }
+  // Sin pestaña a la vista no se descarga nada (carga de la base), y no se repinta
+  // mientras alguien escribe: el refresco borraba «Poner con una factura» a medias.
+  if(document.hidden){_refrescoPendiente=true;return;}
+  const a=document.activeElement;
+  if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value){_refrescoPendiente=true;return;}
   loadAll();
 },5*60*1000);
+let _refrescoPendiente=false;
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&_refrescoPendiente&&getToken()){_refrescoPendiente=false;loadAll();}
+});
 </script>
 </body>
 </html>

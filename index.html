@@ -889,15 +889,16 @@ async function openPdfsJuntos(docs){
       try{
         const r=await fetch(await urlFirmada(u));
         if(!r.ok)continue;
-        const src=await PDFLib.PDFDocument.load(await r.arrayBuffer(),{ignoreEncryption:true});
-        // Cuando el PDF trae varias facturas seguidas, solo van las páginas de ésta
-        let idx=src.getPageIndices();
-        if(rango&&rango.desde){
-          const desde=Math.max(1,rango.desde), hasta=rango.hasta||src.getPageCount();
-          idx=idx.filter(i=>i+1>=desde&&i+1<=hasta);
-          if(!idx.length)idx=src.getPageIndices();
-        }
-        const pgs=await salida.copyPages(src,idx);
+        // Cuando el PDF trae varias facturas seguidas, solo van las páginas de ésta.
+        const rec=await recortarPdf(await r.arrayBuffer(),total=>{
+          const todas=Array.from({length:total},(_,i)=>i+1);
+          if(!(rango&&rango.desde))return todas;
+          const desde=Math.max(1,rango.desde), hasta=rango.hasta||total;
+          const idx=todas.filter(n=>n>=desde&&n<=hasta);
+          return idx.length?idx:todas;
+        });
+        const src=await PDFLib.PDFDocument.load(rec.bytes);
+        const pgs=await salida.copyPages(src,src.getPageIndices());
         pgs.forEach(p=>salida.addPage(p));
         unidos++;
       }catch(_){ /* un PDF ilegible no puede impedir ver los demás */ }
@@ -3136,12 +3137,9 @@ async function descargarSeleccionRegistro(btn){
       if(!url)throw new Error('no tiene PDF');
       const r=await fetch(await urlFirmada(url));
       if(!r.ok)throw new Error('no se ha podido bajar su PDF');
-      const src=await PDFLib.PDFDocument.load(await r.arrayBuffer(),{ignoreEncryption:true});
-      const pags=paginasFactura(f,src.getPageCount(),true);
-      if(!pags)throw new Error('no se sabe con seguridad qué hoja es la factura: descárgala a mano desde su ficha');
-      const out=await PDFLib.PDFDocument.create();
-      (await out.copyPages(src,pags.map(n=>n-1))).forEach(p=>out.addPage(p));
-      const bytes=await out.save();
+      const rec=await recortarPdf(await r.arrayBuffer(),total=>paginasFactura(f,total,true),nombre.replace(/\.pdf$/,''));
+      if(!rec)throw new Error('no se sabe con seguridad qué hoja es la factura: descárgala a mano desde su ficha');
+      const bytes=rec.bytes,pags=rec.paginas;
       if(dir){
         const fh=await dir.getFileHandle(nombre,{create:true});
         const w=await fh.createWritable();await w.write(bytes);await w.close();
@@ -3198,14 +3196,11 @@ async function descargarFacturasIva(ff,btn,opc={}){
       try{
         const r=await fetch(await urlFirmada(f.json_extraccion_ia._documento_url));
         if(!r.ok)throw new Error('HTTP '+r.status);
-        const src=await PDFLib.PDFDocument.load(await r.arrayBuffer(),{ignoreEncryption:true});
-        const pags=paginasFactura(f,src.getPageCount());
-        const out=await PDFLib.PDFDocument.create();
-        (await out.copyPages(src,pags.map(n=>n-1))).forEach(p=>out.addPage(p));
+        const rec=await recortarPdf(await r.arrayBuffer(),total=>paginasFactura(f,total));
         let nombre=(opc.nombre?opc.nombre(f):`${nombreProv(f)} - ${f.numero_factura||'sin numero'}`).replace(/[\\/:*?"<>|]/g,'-').slice(0,110);
         let k=2;while(usados.has(nombre))nombre=`${nombre} (${k++})`;
         usados.add(nombre);
-        zip.file(nombre+'.pdf',await out.save());
+        zip.file(nombre+'.pdf',rec.bytes);
       }catch(e){fallos.push(`${f.numero_factura||'?'} · ${nombreProv(f)}`);}
       hechos++;
       if(btn)btn.textContent=`PDF ${hechos}/${ff.length}…`;
@@ -3760,33 +3755,43 @@ async function cargarPdfJs(){
   window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   return _pdfjs=window.pdfjsLib;
 }
+// Una sola forma de sacar unas hojas de un PDF (norma 2). Si el proveedor lo
+// protegió (BYG, Valgeport: cifrado sin contraseña para abrirlo), pdf-lib no lo
+// descifra y las hojas salían EN BLANCO —lo destapó la simulación del registro de
+// IVA del 22/10/2026—; entonces se rehacen con imágenes de pdf.js, que sí lo abre.
+// «elegir(total)» devuelve las hojas (desde 1) o null para no sacar nada.
+async function recortarPdf(bytes,elegir,titulo){
+  let src=null;
+  try{src=await PDFLib.PDFDocument.load(bytes);}
+  catch(e){if(!/encrypt/i.test(String(e&&e.message||e)))throw e;}
+  const out=await PDFLib.PDFDocument.create();
+  let pags;
+  if(src){
+    pags=elegir(src.getPageCount());if(!pags)return null;
+    (await out.copyPages(src,pags.map(n=>n-1))).forEach(p=>out.addPage(p));
+  }else{
+    const pdfjs=await cargarPdfJs();
+    const doc=await pdfjs.getDocument({data:new Uint8Array(bytes).slice()}).promise;
+    pags=elegir(doc.numPages);if(!pags)return null;
+    for(const n of pags){
+      const pg=await doc.getPage(n), vp1=pg.getViewport({scale:1}), vp=pg.getViewport({scale:2});
+      const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;
+      await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+      const img=await out.embedJpg(await (await fetch(cv.toDataURL('image/jpeg',0.9))).arrayBuffer());
+      out.addPage([vp1.width,vp1.height]).drawImage(img,{x:0,y:0,width:vp1.width,height:vp1.height});
+    }
+  }
+  if(titulo)out.setTitle(titulo);
+  return {bytes:await out.save(),paginas:pags,protegido:!src};
+}
 const nombreFirma=f=>`Factura ${String(f.numero_factura||'sin numero').replace(/[\\/:*?"<>|]+/g,'-')} ${nombreProv(f)}`.replace(/\s+/g,' ').trim().slice(0,90)+'.pdf';
 async function pdfParaFirmar(f){
   const j=f.json_extraccion_ia||{};
   if(!j._documento_url)throw new Error('esta factura no tiene el PDF guardado');
   const bytes=await (await fetch(await urlFirmada(j._documento_url))).arrayBuffer();
   const prop=j._paginas_propias&&j._paginas_propias.desde?j._paginas_propias:null;
-  const elegir=n=>Array.from({length:n},(_,i)=>i).filter(i=>!prop||(i+1>=prop.desde&&i+1<=(prop.hasta||n)));
-  try{
-    const src=await PDFLib.PDFDocument.load(bytes);            // sin ignoreEncryption: si está bloqueado, salta
-    const out=await PDFLib.PDFDocument.create();
-    (await out.copyPages(src,elegir(src.getPageCount()))).forEach(p=>out.addPage(p));
-    out.setTitle(nombreFirma(f).replace(/\.pdf$/,''));
-    return await out.save();
-  }catch(e){
-    if(!/encrypt/i.test(String(e&&e.message||e)))throw e;
-    const pdfjs=await cargarPdfJs();
-    const doc=await pdfjs.getDocument({data:new Uint8Array(bytes)}).promise;
-    const out=await PDFLib.PDFDocument.create();
-    for(const i of elegir(doc.numPages)){
-      const pg=await doc.getPage(i+1), vp1=pg.getViewport({scale:1}), vp=pg.getViewport({scale:2});
-      const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;
-      await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
-      const img=await out.embedJpg(await (await fetch(cv.toDataURL('image/jpeg',0.9))).arrayBuffer());
-      out.addPage([vp1.width,vp1.height]).drawImage(img,{x:0,y:0,width:vp1.width,height:vp1.height});
-    }
-    return await out.save();
-  }
+  const elegir=n=>Array.from({length:n},(_,i)=>i+1).filter(i=>!prop||(i>=prop.desde&&i<=(prop.hasta||n)));
+  return (await recortarPdf(bytes,elegir,nombreFirma(f).replace(/\.pdf$/,''))).bytes;
 }
 // Se sube aparte (no se toca el original) y se da un enlace que DESCARGA el
 // archivo con un nombre normal, en vez de abrirlo en el navegador.
@@ -3934,12 +3939,7 @@ async function abrirSeparar(facId){
     </div></div>`;
   box.querySelectorAll('[data-pdf]').forEach(b=>b.onclick=()=>openPdf(b.dataset.pdf));
   const marcadas=()=>[...box.querySelectorAll('[data-pag]:checked')].map(c=>+c.dataset.pag);
-  const cortar=async pags=>{
-    const src=await PDFLib.PDFDocument.load(state._sepBytes,{ignoreEncryption:true});
-    const out=await PDFLib.PDFDocument.create();
-    (await out.copyPages(src,pags.map(p=>p-1))).forEach(p=>out.addPage(p));
-    return await out.save();
-  };
+  const cortar=async pags=>(await recortarPdf(state._sepBytes,()=>pags)).bytes;
   const base=(f.numero_factura||'factura').replace(/[^\w.-]+/g,'_');
   $('#sp-fac').onclick=async()=>{
     const pags=marcadas(); if(!pags.length){toast('Marca primero las páginas','err');return;}

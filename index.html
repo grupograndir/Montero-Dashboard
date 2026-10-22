@@ -3077,7 +3077,7 @@ function paginasFactura(f,total){
   if(!ok.length)ok=rango.filter(n=>deHoja(n).length);
   return ok.length?ok:rango;
 }
-async function descargarFacturasIva(ff,btn){
+async function descargarFacturasIva(ff,btn,opc={}){
   if(typeof JSZip==='undefined'||typeof PDFLib==='undefined')return ' · OJO: sin los PDF (recarga la página y vuelve a descargar)';
   const zip=new JSZip(), usados=new Set();
   let hechos=0; const fallos=[];
@@ -3094,7 +3094,7 @@ async function descargarFacturasIva(ff,btn){
         const pags=paginasFactura(f,src.getPageCount());
         const out=await PDFLib.PDFDocument.create();
         (await out.copyPages(src,pags.map(n=>n-1))).forEach(p=>out.addPage(p));
-        let nombre=`${nombreProv(f)} - ${f.numero_factura||'sin numero'}`.replace(/[\\/:*?"<>|]/g,'-').slice(0,110);
+        let nombre=(opc.nombre?opc.nombre(f):`${nombreProv(f)} - ${f.numero_factura||'sin numero'}`).replace(/[\\/:*?"<>|]/g,'-').slice(0,110);
         let k=2;while(usados.has(nombre))nombre=`${nombre} (${k++})`;
         usados.add(nombre);
         zip.file(nombre+'.pdf',await out.save());
@@ -3108,7 +3108,7 @@ async function descargarFacturasIva(ff,btn){
     const blob=await zip.generateAsync({type:'blob'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download=`AS400_facturas_PDF_${hoyISO()}.zip`;
+    a.download=opc.zip||`AS400_facturas_PDF_${hoyISO()}.zip`;
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),10000);
     if(fallos.length)console.warn('Sin PDF para el registro de IVA:',fallos);
@@ -4046,7 +4046,8 @@ async function importarExcelProv(archivo){
 // tome por el nº de factura ni «NIF proveedor» por el nombre.
 const REG_CAMPOS=[['fecha_registro','Fecha registro',/fecha.?(reg|asiento|contab|apunte)/],
   ['fecha_factura','Fecha factura',/fecha.?(fra|fac|doc|exp|emision)|^fecha$/],['nif','CIF / NIF',/nif|cif/],
-  ['numero_registro','Nº registro / asiento',/^(?!fecha).*(registro|asiento|apunte)|^n.?reg/],
+  ['numero_registro','Nº registro / asiento',/^(?!fecha).*(registro|asiento|apunte)|^n.?reg|numero.?iva|^n.?iva/],
+  ['codigo_proveedor','Código proveedor',/^cod.*(prov|acreed|tercero)|^cod$/],
   ['numero_factura','Nº factura',/^(?!fecha).*(factura|fra|documento|\bdoc\b)/],
   ['proveedor','Proveedor',/^(?!cod).*(proveedor|nombre|razon|tercero)/],['base','Base imponible',/base/],['cuota','Cuota IVA',/cuota|^iva|importe.?iva/],['total','Total',/total|importe/]];
 async function cargarRegistro(){
@@ -4122,14 +4123,25 @@ async function cargarRegistroLeido(){
   const num=v=>typeof v==='number'?Math.round(v*100)/100:numES(v);
   const filas=L.datos.map(r=>({numero_registro:val(r,'numero_registro')!=null?String(val(r,'numero_registro')).trim():null,
     fecha_registro:fechaISO(val(r,'fecha_registro')),fecha_factura:fechaISO(val(r,'fecha_factura')),nif:val(r,'nif')!=null?String(val(r,'nif')):null,
-    proveedor:val(r,'proveedor')!=null?String(val(r,'proveedor')):null,numero_factura:val(r,'numero_factura')!=null?String(val(r,'numero_factura')).trim():null,
+    proveedor:val(r,'proveedor')!=null?String(val(r,'proveedor')):null,
+    codigo_proveedor:val(r,'codigo_proveedor')!=null?String(val(r,'codigo_proveedor')):null,numero_factura:val(r,'numero_factura')!=null?String(val(r,'numero_factura')).trim():null,
     base:num(val(r,'base')),cuota:num(val(r,'cuota')),total:num(val(r,'total')),
     fila:Object.fromEntries(L.cab.map((c,i)=>[c||('col'+(i+1)),r[i] instanceof Date?fechaISO(r[i]):r[i]]))}))
     .filter(x=>x.numero_factura);
   const b=$('#r-cargar');if(b)b.disabled=true;
   try{const r=await rpc('cargar_registro_iva',{p_filas:filas,p_fichero:L.archivo});
     toast(`${r.nuevas} líneas nuevas (${r.repetidas} ya estaban) · ${r.casadas} facturas contabilizadas · ${r.sin_casar} sin casar`);
-    state.registro=null;state._regLeido=null;await loadAll();}
+    state.registro=null;state._regLeido=null;await loadAll();
+    // Paqui, 20/10/2026: las imágenes de las facturas se guardan con el registro de
+    // IVA. Sale un ZIP con el PDF de cada factura casada, nombrado por su nº de
+    // registro («003035 - BOMAG… - 9330003380.pdf») para archivarlo en ese orden.
+    const ids=Array.isArray(r.facturas)?r.facturas:[];
+    if(ids.length){
+      const ff=[];for(const id of ids){const f=await facturaPorId(id);if(f)ff.push(f);}
+      const nota=await descargarFacturasIva(ff,b,{zip:`Registro_IVA_PDF_${hoyISO()}.zip`,
+        nombre:f=>`${((f.json_extraccion_ia||{})._registro_iva||{}).numero_registro||''} - ${nombreProv(f)} - ${f.numero_factura||'sin numero'}`});
+      toast(`${r.casadas} facturas contabilizadas${nota}`);
+    }}
   catch(e){toast(e.message,'err');if(b)b.disabled=false;}
 }
 

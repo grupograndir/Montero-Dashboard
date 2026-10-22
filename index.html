@@ -585,7 +585,7 @@ async function cambiarClave(){
   finally{btn.disabled=false;btn.textContent='Guardar contraseña';}
 }
 
-const state={view:'resumen',dias:0,desde:'',hasta:'',verEliminadas:false,facturas:[],incidencias:[],proveedoresBD:[],search:'',fProv:'',fEstado:'',fPago:[],fValida:'',provSel:null,quickFilter:'',sort:{k:'fecha',dir:-1},
+const state={selArchivo:new Set(),soloSinDescargar:false,view:'resumen',dias:0,desde:'',hasta:'',verEliminadas:false,facturas:[],incidencias:[],proveedoresBD:[],search:'',fProv:'',fEstado:'',fPago:[],fValida:'',provSel:null,quickFilter:'',sort:{k:'fecha',dir:-1},
   apDesde:'',apHasta:'',pgDesde:'',pgHasta:'',pgProv:'',pgMin:'',pgMax:'',pgBuscar:'',pgDomic:false};
 let chartMes=null;
 const PEND=['ILEGIBLE','EN_REVISION','DUPLICADO_PENDIENTE','PENDIENTE_CRITERIO'];
@@ -1677,7 +1677,10 @@ function aplicarFiltros(ff,c){
   return ff;
 }
 function filtradas(){
-  const ff=state.facturas.filter(f=>!enPagadas(f)&&!aprobadaPago(f));
+  // En «Contabilizadas» salen todas, también las pagadas y aprobadas: es la lista
+  // de lo que se archiva con el registro de IVA (22/10/2026).
+  let ff=state.quickFilter==='contabilizadas'?conPagos():state.facturas.filter(f=>!enPagadas(f)&&!aprobadaPago(f));
+  if(state.quickFilter==='contabilizadas'&&state.soloSinDescargar)ff=ff.filter(f=>!(f.json_extraccion_ia||{})._descargada_registro);
   return aplicarFiltros(ff,{chip:state.quickFilter,valida:state.fValida,prov:state.fProv,estado:state.fEstado,pago:state.fPago,search:state.search,sort:state.sort});
 }
 function viewFacturas(){
@@ -1729,6 +1732,11 @@ function viewFacturas(){
       ${chips.map(([k,l])=>`<button class="chip ${(state.quickFilter||'')===k?'active':''}" data-chip="${k}">${l}</button>`).join('')}${chipElim}
     </div>
     ${avisoSalud}${avisoVerif}
+    ${modoArchivo()?`<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 12px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:12.5px">
+      <span style="color:var(--muted);flex:1;min-width:240px">Marca las facturas y pulsa <b>Descargar</b>: se guarda un PDF por factura, solo con la hoja de la factura,
+        con el nombre del registro de IVA («3085 (8195) PROVEEDOR FRA 367 2026-09-30.pdf»). Con Chrome o Edge eliges la carpeta donde guardarlas.</span>
+      <label style="display:flex;gap:5px;align-items:center;white-space:nowrap"><input type="checkbox" id="arch-sin" ${state.soloSinDescargar?'checked':''}> Solo sin descargar</label>
+      <button class="btn-s ok" id="arch-desc" disabled>Descargar facturas (0)</button></div>`:''}
     <div class="tbl-tools">
       <div class="search">${svg(ICN.list).replace(ICN.list,'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>')}<input id="f-search" placeholder="Buscar nº factura, proveedor, NIF o forma de pago…" value="${esc(state.search)}"></div>
       <select class="sel" id="f-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.fProv?'selected':''}>${esc(p.n)}</option>`).join('')}</select>
@@ -1753,6 +1761,7 @@ function refreshTabla(){
   if(meta)meta.textContent=`${ff.length} resultado${ff.length!==1?'s':''}`;
   document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));
   document.querySelectorAll('th[data-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.sort;if(state.sort.k===k)state.sort.dir*=-1;else state.sort={k,dir:k==='prov'?1:-1};refreshTabla();});
+  bindArchivo();
 }
 function th(k,lbl,r){const a=state.sort.k===k?(state.sort.dir>0?'▲':'▼'):'';return`<th class="srt ${r?'r':''}" data-sort="${k}">${lbl}<span class="arr">${a}</span></th>`;}
 // Buscar «OIGO» no traía la de OUIGO y parecía que faltaban facturas (Paqui,
@@ -1840,7 +1849,10 @@ function tablaFacturas(ff,full){
   const rows=ff.map(f=>{
     const dif=f.diferencia_importe!=null?+f.diferencia_importe:null;
     const warn=dif!=null&&Math.abs(dif)>TOL;
-    return `<tr data-id="${f.id}">
+    const arch=full&&modoArchivo()?(()=>{const ia=f.json_extraccion_ia||{},nom=nombreRegistroIva(f);
+      return `<td class="sel-c" style="width:30px"><input type="checkbox" data-selfac="${f.id}" ${nom?'':'disabled'} ${state.selArchivo.has(f.id)?'checked':''}
+        title="${esc(nom?'Se guardará como: '+nom:'Sin nº de registro de IVA: se podrá descargar cuando entre en un Excel del AS400')}"></td>`;})():'';
+    return `<tr data-id="${f.id}">${arch}
       <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
@@ -1851,10 +1863,13 @@ function tablaFacturas(ff,full){
       ${full?(()=>{const v=validacion(f),c=fechaContabilizada(f);
         return `<td class="mono" style="white-space:nowrap" title="${v?esc('Validada '+v.como+(v.por?' por '+v.por:'')):''}">${v?(v.fecha?dt(v.fecha):'<span style="color:var(--muted)">auto</span>'):'—'}</td>
       <td class="mono" style="white-space:nowrap">${c?`<b title="Contabilizada">C</b> ${dt(c)}`:'—'}</td>`;})():''}
-      <td>${badgePago(f)}<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${sinCondiciones(f)?'<span class="bdg sincond" title="Este proveedor no está en el Excel de condiciones: hay que homologarlo">SIN CONDICIONES</span>':''}${badgesSenales(f)}</td>
+      <td>${full&&modoArchivo()?(()=>{const ia=f.json_extraccion_ia||{},d=ia._descargada_registro;
+        return d?`<span class="bdg" style="background:var(--gr-s,#e8f5ee);color:var(--green);margin-right:5px" title="${esc((d.nombre||'')+' · '+(d.carpeta||''))}">Descargada ${dt(d.fecha)}</span>`
+          :(nombreRegistroIva(f)?'':`<span class="bdg" style="background:var(--amber-s);color:var(--amber);margin-right:5px" title="Se marcó contabilizada sin pasar por el Excel del AS400">Sin nº registro IVA</span>`);})():''}${badgePago(f)}<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${sinCondiciones(f)?'<span class="bdg sincond" title="Este proveedor no está en el Excel de condiciones: hay que homologarlo">SIN CONDICIONES</span>':''}${badgesSenales(f)}</td>
     </tr>`;
   }).join('');
   return `<div class="tbl-wrap"><table><thead><tr>
+    ${full&&modoArchivo()?'<th style="width:30px"><input type="checkbox" id="arch-todas" title="Seleccionar todas las que se pueden descargar"></th>':''}
     ${full?th('fecha','Fecha fra.'):'<th>Fecha fra.</th>'}
     ${full?th('cargada','Cargada'):'<th>Cargada</th>'}
     <th>Nº Factura</th>
@@ -2753,6 +2768,7 @@ function bindContent(){
     const c=$('#s-cuenta');if(c)c.textContent=`${n} documento${n===1?'':'s'}`;
   };
   document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));
+  bindArchivo();
   document.querySelectorAll('.inc[data-id]').forEach(el=>el.onclick=()=>openDrawer(el.dataset.id));
   document.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{const g=el.dataset.go;if(['revision','cerradas','validadas','contabilizadas','domic','sospecha'].includes(g)){setView('facturas');state.quickFilter=g;render();}else setView(g);});
   document.querySelectorAll('[data-chip]').forEach(el=>el.onclick=()=>{
@@ -3060,22 +3076,114 @@ function documentosDe(f){
 // soportado no van ni el pedido ni el albarán. Lo dice la lectura página a
 // página, que tienen todas. Se quitan también las hojas de OTRA factura metida
 // en el mismo PDF. Si no queda ninguna, va el PDF entero: mejor de más que nada.
-function paginasFactura(f,total){
+// Con «estricto» (archivo del registro de IVA, Rubén 22/10/2026) no hay «de más»:
+// si la lectura no dice con seguridad qué hojas son ESTA factura, devuelve null y
+// esa factura no se descarga; nunca se archiva un PDF con albaranes mezclados.
+function paginasFactura(f,total,estricto){
   const ia=f.json_extraccion_ia||{};
   const prop=ia._paginas_propias||null;
   const desde=prop&&prop.desde?prop.desde:1, hasta=prop&&prop.hasta?prop.hasta:total;
   const rango=[];for(let i=desde;i<=Math.min(hasta,total);i++)rango.push(i);
-  const pp=((ia._respaldo_verificado||{}).por_pagina)||[];
-  if(!pp.length)return rango;
+  // Solo las hojas de ESTE PDF: la lectura también describe los otros archivos del
+  // correo (llevan «archivo»), y su «página 1» no es la página 1 de este.
+  const pp=(((ia._respaldo_verificado||{}).por_pagina)||[]).filter(p=>p&&!p.archivo);
+  if(!pp.length)return estricto?null:rango;
   const cifras=x=>String(x||'').replace(/\D/g,'');
   const mia=cifras(f.numero_factura);
   const suya=p=>{const c=cifras(p.numero);return !c||!mia||c===mia||c.includes(mia)||mia.includes(c);};
   // Una misma hoja puede ser factura y albarán a la vez (la 1 29093 de NADINE):
   // cuenta como factura si CUALQUIERA de sus entradas lo es.
-  const deHoja=n=>pp.filter(p=>+p.pagina===n&&/FACTURA|ABONO|RECTIFICATIVA|CONDICIONES/.test(String(p.que_es||'').toUpperCase()));
+  // Para el archivo del registro de IVA tampoco van las condiciones generales del
+  // dorso: solo la factura (Rubén, 22/10/2026).
+  const esFra=estricto?/FACTURA|ABONO|RECTIFICATIVA/:/FACTURA|ABONO|RECTIFICATIVA|CONDICIONES/;
+  const deHoja=n=>pp.filter(p=>+p.pagina===n&&esFra.test(String(p.que_es||'').toUpperCase()));
   let ok=rango.filter(n=>deHoja(n).some(suya));
+  if(estricto)return ok.length?ok:null;
   if(!ok.length)ok=rango.filter(n=>deHoja(n).length);
   return ok.length?ok:rango;
+}
+// Nombre del PDF que se archiva en «REGISTRO IVA SOPORTADO», como lo hacía Paqui a
+// mano: «3085 (8195) SUBIAS PERNA FRA 367 2026-09-30.pdf» (Rubén, 22/10/2026). Todo
+// sale de la línea del Excel del AS400 que la contabilizó (_registro_iva): nº de
+// registro sin ceros delante, (código), nombre, nº de factura y fecha tal cual.
+function nombreRegistroIva(f){
+  const r=(f.json_extraccion_ia||{})._registro_iva||{};
+  if(!r.numero_registro)return null;
+  const partes=[String(r.numero_registro).trim().replace(/^0+(?=\d)/,''),
+    r.codigo_proveedor?`(${r.codigo_proveedor})`:'',r.proveedor||'',r.numero_factura||'',r.fecha_factura||''];
+  return partes.map(x=>String(x).trim()).filter(Boolean).join(' ').replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,' ')+'.pdf';
+}
+const modoArchivo=()=>state.view==='facturas'&&state.quickFilter==='contabilizadas';
+// Descarga las contabilizadas seleccionadas: un PDF por factura, solo con sus hojas.
+// Con Chrome o Edge se elige una vez la carpeta (la de red) y se guardan ahí; si el
+// navegador no lo permite, van a Descargas. Lo descargado queda apuntado.
+async function descargarSeleccionRegistro(btn){
+  const ff=[...state.selArchivo].map(facturaLocal).filter(Boolean);
+  if(!ff.length){toast('No hay facturas seleccionadas','err');return;}
+  if(typeof PDFLib==='undefined'){toast('Recarga la página: no se ha cargado el lector de PDF','err');return;}
+  let dir=null;
+  if(window.showDirectoryPicker){
+    try{dir=await window.showDirectoryPicker({id:'registro-iva',mode:'readwrite'});}
+    catch(e){if(e&&e.name==='AbortError')return;dir=null;}
+  }
+  const txt=btn.innerHTML;btn.disabled=true;
+  const hechos=[],fallos=[];
+  for(const f of ff){
+    try{
+      const nombre=nombreRegistroIva(f);
+      if(!nombre)throw new Error('no tiene nº de registro de IVA');
+      const url=(f.json_extraccion_ia||{})._documento_url;
+      if(!url)throw new Error('no tiene PDF');
+      const r=await fetch(await urlFirmada(url));
+      if(!r.ok)throw new Error('no se ha podido bajar su PDF');
+      const src=await PDFLib.PDFDocument.load(await r.arrayBuffer(),{ignoreEncryption:true});
+      const pags=paginasFactura(f,src.getPageCount(),true);
+      if(!pags)throw new Error('no se sabe con seguridad qué hoja es la factura: descárgala a mano desde su ficha');
+      const out=await PDFLib.PDFDocument.create();
+      (await out.copyPages(src,pags.map(n=>n-1))).forEach(p=>out.addPage(p));
+      const bytes=await out.save();
+      if(dir){
+        const fh=await dir.getFileHandle(nombre,{create:true});
+        const w=await fh.createWritable();await w.write(bytes);await w.close();
+      }else{
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));a.download=nombre;
+        document.body.appendChild(a);a.click();a.remove();
+        setTimeout(()=>URL.revokeObjectURL(a.href),15000);
+        await new Promise(ok=>setTimeout(ok,400));
+      }
+      hechos.push({f,nombre,hojas:pags.length});
+    }catch(e){fallos.push(`${f.numero_factura||'?'} · ${nombreProv(f)}: ${e.message}`);}
+    btn.textContent=`Descargando ${hechos.length+fallos.length}/${ff.length}…`;
+  }
+  const quien=(_session?.user?.email||'Panel'),ahora=new Date().toISOString();
+  for(const h of hechos){
+    const ia=Object.assign({},h.f.json_extraccion_ia||{});
+    ia._descargada_registro={fecha:ahora,por:quien,nombre:h.nombre,hojas:h.hojas,carpeta:dir?dir.name:'Descargas'};
+    try{await guardarIA(h.f.id,ia);}catch(e){console.error(e);}
+  }
+  hechos.forEach(h=>state.selArchivo.delete(h.f.id));
+  btn.disabled=false;btn.innerHTML=txt;
+  await loadAll();
+  const donde=dir?`en la carpeta «${dir.name}»`:'en Descargas';
+  if(fallos.length)alert(`${hechos.length} factura${hechos.length!==1?'s':''} guardada${hechos.length!==1?'s':''} ${donde}.\n\nNo se han descargado ${fallos.length}:\n- ${fallos.join('\n- ')}`);
+  else toast(`${hechos.length} factura${hechos.length!==1?'s':''} guardada${hechos.length!==1?'s':''} ${donde}`);
+}
+function bindArchivo(){
+  if(!modoArchivo())return;
+  const pinta=()=>{const n=state.selArchivo.size;const b=$('#arch-desc');if(b){b.disabled=!n;b.textContent=`Descargar facturas (${n})`;}
+    const t=$('#arch-todas');if(t){const c=[...document.querySelectorAll('[data-selfac]:not(:disabled)')];t.checked=c.length>0&&c.every(x=>x.checked);}};
+  document.querySelectorAll('[data-selfac]').forEach(c=>{
+    c.onclick=e=>e.stopPropagation();
+    c.onchange=()=>{c.checked?state.selArchivo.add(c.dataset.selfac):state.selArchivo.delete(c.dataset.selfac);pinta();};
+  });
+  document.querySelectorAll('.sel-c').forEach(td=>td.onclick=e=>e.stopPropagation());
+  const t=$('#arch-todas');
+  if(t)t.onchange=()=>{document.querySelectorAll('[data-selfac]:not(:disabled)').forEach(c=>{c.checked=t.checked;
+    t.checked?state.selArchivo.add(c.dataset.selfac):state.selArchivo.delete(c.dataset.selfac);});pinta();};
+  const sd=$('#arch-sin');if(sd)sd.onchange=()=>{state.soloSinDescargar=sd.checked;render();};
+  const b=$('#arch-desc');if(b)b.onclick=()=>descargarSeleccionRegistro(b);
+  pinta();
 }
 async function descargarFacturasIva(ff,btn,opc={}){
   if(typeof JSZip==='undefined'||typeof PDFLib==='undefined')return ' · OJO: sin los PDF (recarga la página y vuelve a descargar)';
@@ -4058,13 +4166,13 @@ function viewRegistro(){
   const R=state.registro, fil=state.regFiltro||'';
   const casadas=R.filter(r=>r.factura_id).length;
   const ver=R.filter(r=>fil==='sin'?!r.factura_id:fil==='casadas'?!!r.factura_id:true)
-    .filter(r=>coincide(`${r.numero_factura} ${r.proveedor} ${r.nif} ${r.numero_registro}`,state.regBuscar||''));
+    .filter(r=>coincide(`${r.numero_factura} ${r.proveedor} ${r.nif} ${r.numero_registro} ${r.codigo_proveedor||''}`,state.regBuscar||''));
   const porId=new Map((state.todasFacturas||[]).map(f=>[f.id,f]));
   const kpi=(cls,v,l)=>`<div class="kpi"><div class="kpi-top"><div class="kpi-ic ${cls}">${svg(ICN.file)}</div></div><div class="kpi-val">${v}</div><div class="kpi-lbl">${l}</div></div>`;
   return `<div class="kpis">${kpi('blue',R.length,'Líneas del registro')}${kpi('green',casadas,'Casadas con su factura (contabilizadas)')}${kpi('amber',R.length-casadas,'Sin casar')}${kpi('green',eurS(R.reduce((s,r)=>s+(+r.cuota||0),0)),'IVA soportado')}</div>
     <div class="card" style="margin-bottom:14px"><div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">
       Sube el Excel del registro de IVA soportado que saca el AS400 después de contabilizar. Cada línea se guarda con su número de registro y se busca
-      su factura en la plataforma (mismo número y además mismo CIF o mismo total): la que casa pasa sola a <b>contabilizada</b>, con su PDF enlazado.
+      su factura en la plataforma (mismo número y además mismo código de proveedor, CIF o total). Las validadas (y las pagadas) pasan solas a <b>contabilizada</b>; las que están en revisión se quedan «sin casar» con el motivo y se contabilizan solas al validarlas.
       Si una factura llega después que su asiento, se casa sola al entrar. Subir el mismo Excel dos veces no duplica nada.</div>
       <label class="btn-s ok" style="display:inline-flex;align-items:center">Subir Excel del AS400<input type="file" id="r-subir" accept=".xlsx,.xls,.csv" style="display:none"></label>
       <div id="r-mapa"></div></div>
@@ -4072,11 +4180,11 @@ function viewRegistro(){
       ${[['','Todas'],['sin','Sin casar'],['casadas','Casadas']].map(([k,l])=>`<button class="chip ${fil===k?'active':''}" data-regf="${k}">${l}</button>`).join('')}
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="r-buscar" placeholder="Buscar…" value="${esc(state.regBuscar||'')}"></div>
       <span class="card-meta" style="margin-left:auto">${ver.length} línea${ver.length===1?'':'s'}</span></div>
-    ${ver.length?`<div class="tbl-wrap"><table><thead><tr><th>Nº registro</th><th>Fecha reg.</th><th>Proveedor</th><th>CIF</th><th>Nº factura</th><th class="r">Base</th><th class="r">Cuota IVA</th><th class="r">Total</th><th>Factura en la plataforma</th></tr></thead><tbody>
+    ${ver.length?`<div class="tbl-wrap"><table><thead><tr><th>Nº registro</th><th>Fecha reg.</th><th>Código</th><th>Proveedor</th><th>CIF</th><th>Nº factura</th><th class="r">Base</th><th class="r">Cuota IVA</th><th class="r">Total</th><th>Factura en la plataforma</th></tr></thead><tbody>
       ${ver.slice(0,1500).map(r=>{const f=r.factura_id&&porId.get(r.factura_id);return `<tr ${f?`data-reg-fac="${r.factura_id}" style="cursor:pointer"`:''}>
-        <td class="mono">${esc(r.numero_registro||'—')}</td><td class="mono">${dt(r.fecha_registro)}</td><td>${esc(r.proveedor||'')}</td><td class="mono">${esc(r.nif||'')}</td>
+        <td class="mono">${esc(r.numero_registro||'—')}</td><td class="mono">${dt(r.fecha_registro)}</td><td class="mono">${esc(r.codigo_proveedor||'')}</td><td>${esc(r.proveedor||'')}</td><td class="mono">${esc(r.nif||'')}</td>
         <td class="mono cell-strong">${esc(r.numero_factura||'')}</td><td class="r">${eur(r.base)}</td><td class="r">${eur(r.cuota)}</td><td class="r">${eur(r.total)}</td>
-        <td>${f?`<b>${esc(f.numero_factura||'')}</b> <span style="color:var(--muted);font-size:12px">${esc(r.casado_como||'')}</span>`:'<span class="bdg alerta" style="margin:0">sin casar</span>'}</td></tr>`;}).join('')}
+        <td>${f?`<b>${esc(f.numero_factura||'')}</b> <span style="color:var(--muted);font-size:12px">${esc(r.casado_como||'')}</span>`:`<span class="bdg alerta" style="margin:0">sin casar</span>${r.motivo?`<div style="font-size:11.5px;color:var(--muted);margin-top:3px">${esc(r.motivo)}</div>`:''}`}</td></tr>`;}).join('')}
     </tbody></table></div>`:'<div class="empty">Todavía no se ha subido ningún registro.</div>'}</div>`;
 }
 function bindRegistro(){
@@ -4131,17 +4239,20 @@ async function cargarRegistroLeido(){
   const b=$('#r-cargar');if(b)b.disabled=true;
   try{const r=await rpc('cargar_registro_iva',{p_filas:filas,p_fichero:L.archivo});
     toast(`${r.nuevas} líneas nuevas (${r.repetidas} ya estaban) · ${r.casadas} facturas contabilizadas · ${r.sin_casar} sin casar`);
-    state.registro=null;state._regLeido=null;await loadAll();
-    // Paqui, 20/10/2026: las imágenes de las facturas se guardan con el registro de
-    // IVA. Sale un ZIP con el PDF de cada factura casada, nombrado por su nº de
-    // registro («003035 - BOMAG… - 9330003380.pdf») para archivarlo en ese orden.
+    state.registro=null;state._regLeido=null;
+    // Lo recién contabilizado se abre ya seleccionado en «Contabilizadas», listo para
+    // descargar (Rubén, 22/10/2026). Sin periodo: el registro puede traer facturas
+    // de cualquier mes.
     const ids=Array.isArray(r.facturas)?r.facturas:[];
     if(ids.length){
-      const ff=[];for(const id of ids){const f=await facturaPorId(id);if(f)ff.push(f);}
-      const nota=await descargarFacturasIva(ff,b,{zip:`Registro_IVA_PDF_${hoyISO()}.zip`,
-        nombre:f=>`${((f.json_extraccion_ia||{})._registro_iva||{}).numero_registro||''} - ${nombreProv(f)} - ${f.numero_factura||'sin numero'}`});
-      toast(`${r.casadas} facturas contabilizadas${nota}`);
-    }}
+      state.selArchivo=new Set(ids);state.soloSinDescargar=false;
+      state.dias=0;state.desde='';state.hasta='';state.verEliminadas=false;
+      document.querySelectorAll('#period button').forEach(x=>x.classList.toggle('active',x.dataset.d==='0'));
+      ['#rg-desde','#rg-hasta'].forEach(id=>{const el=$(id);if(el)el.value='';});if(typeof pintaRango==='function')pintaRango();
+      setView('facturas');state.quickFilter='contabilizadas';
+    }
+    await loadAll();
+    if(r.sin_casar)toast(`${r.casadas} contabilizadas · ${r.sin_casar} líneas sin casar: mira el motivo en «Registro IVA»`,'err');}
   catch(e){toast(e.message,'err');if(b)b.disabled=false;}
 }
 

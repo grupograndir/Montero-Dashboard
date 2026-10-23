@@ -4208,7 +4208,9 @@ function viewRegistro(){
   const casadas=R.filter(r=>r.factura_id).length;
   const porId=new Map((state.todasFacturas||[]).map(f=>[f.id,f]));
   const ver=R.filter(r=>fil==='sin'?!r.factura_id:fil==='casadas'?!!r.factura_id:fil==='pend'?!!(r.factura_id&&porId.get(r.factura_id)&&!porId.get(r.factura_id).guardada):true)
-    .filter(r=>coincide(`${r.numero_factura} ${r.proveedor} ${r.nif} ${r.numero_registro} ${r.codigo_proveedor||''}`,state.regBuscar||''));
+    .filter(r=>coincide(`${r.numero_factura} ${r.proveedor} ${r.nif} ${r.numero_registro} ${r.codigo_proveedor||''}`,state.regBuscar||''))
+    // De mayor a menor nº de registro, como quedan en la carpeta de Truenas (Verónica, 23/10/2026).
+    .sort((a,b)=>(parseInt(String(b.numero_registro||'').replace(/\D/g,''),10)||-1)-(parseInt(String(a.numero_registro||'').replace(/\D/g,''),10)||-1));
   const sel=state.selTruenas;
   const kpi=(cls,v,l)=>`<div class="kpi"><div class="kpi-top"><div class="kpi-ic ${cls}">${svg(ICN.file)}</div></div><div class="kpi-val">${v}</div><div class="kpi-lbl">${l}</div></div>`;
   return `<div class="kpis">${kpi('blue',R.length,'Líneas del registro')}${kpi('green',casadas,'Casadas con su factura (contabilizadas)')}${kpi('amber',R.length-casadas,'Sin casar')}</div>

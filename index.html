@@ -4169,7 +4169,7 @@ function viewRegistro(){
     .filter(r=>coincide(`${r.numero_factura} ${r.proveedor} ${r.nif} ${r.numero_registro} ${r.codigo_proveedor||''}`,state.regBuscar||''));
   const porId=new Map((state.todasFacturas||[]).map(f=>[f.id,f]));
   const kpi=(cls,v,l)=>`<div class="kpi"><div class="kpi-top"><div class="kpi-ic ${cls}">${svg(ICN.file)}</div></div><div class="kpi-val">${v}</div><div class="kpi-lbl">${l}</div></div>`;
-  return `<div class="kpis">${kpi('blue',R.length,'Líneas del registro')}${kpi('green',casadas,'Casadas con su factura (contabilizadas)')}${kpi('amber',R.length-casadas,'Sin casar')}${kpi('green',eurS(R.reduce((s,r)=>s+(+r.cuota||0),0)),'IVA soportado')}</div>
+  return `<div class="kpis">${kpi('blue',R.length,'Líneas del registro')}${kpi('green',casadas,'Casadas con su factura (contabilizadas)')}${kpi('amber',R.length-casadas,'Sin casar')}</div>
     <div class="card" style="margin-bottom:14px"><div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">
       Sube el Excel del registro de IVA soportado que saca el AS400 después de contabilizar. Cada línea se guarda con su número de registro y se busca
       su factura en la plataforma (mismo número y además mismo código de proveedor, CIF o total). Las validadas (y las pagadas) pasan solas a <b>contabilizada</b>; las que están en revisión se quedan «sin casar» con el motivo y se contabilizan solas al validarlas.
@@ -4180,10 +4180,10 @@ function viewRegistro(){
       ${[['','Todas'],['sin','Sin casar'],['casadas','Casadas']].map(([k,l])=>`<button class="chip ${fil===k?'active':''}" data-regf="${k}">${l}</button>`).join('')}
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="r-buscar" placeholder="Buscar…" value="${esc(state.regBuscar||'')}"></div>
       <span class="card-meta" style="margin-left:auto">${ver.length} línea${ver.length===1?'':'s'}</span></div>
-    ${ver.length?`<div class="tbl-wrap"><table><thead><tr><th>Nº registro</th><th>Fecha reg.</th><th>Código</th><th>Proveedor</th><th>CIF</th><th>Nº factura</th><th class="r">Base</th><th class="r">Cuota IVA</th><th class="r">Total</th><th>Factura en la plataforma</th></tr></thead><tbody>
+    ${ver.length?`<div class="tbl-wrap"><table><thead><tr><th>Nº registro</th><th>Código</th><th>Proveedor</th><th>Nº factura</th><th>Fecha fra.</th><th>Factura en la plataforma</th></tr></thead><tbody>
       ${ver.slice(0,1500).map(r=>{const f=r.factura_id&&porId.get(r.factura_id);return `<tr ${f?`data-reg-fac="${r.factura_id}" style="cursor:pointer"`:''}>
-        <td class="mono">${esc(r.numero_registro||'—')}</td><td class="mono">${dt(r.fecha_registro)}</td><td class="mono">${esc(r.codigo_proveedor||'')}</td><td>${esc(r.proveedor||'')}</td><td class="mono">${esc(r.nif||'')}</td>
-        <td class="mono cell-strong">${esc(r.numero_factura||'')}</td><td class="r">${eur(r.base)}</td><td class="r">${eur(r.cuota)}</td><td class="r">${eur(r.total)}</td>
+        <td class="mono">${esc(r.numero_registro||'—')}</td><td class="mono">${esc(r.codigo_proveedor||'')}</td><td>${esc(r.proveedor||'')}</td>
+        <td class="mono cell-strong">${esc(r.numero_factura||'')}</td><td class="mono">${dt(r.fecha_factura)}</td>
         <td>${f?`<b>${esc(f.numero_factura||'')}</b> <span style="color:var(--muted);font-size:12px">${esc(r.casado_como||'')}</span>`:`<span class="bdg alerta" style="margin:0">sin casar</span>${r.motivo?`<div style="font-size:11.5px;color:var(--muted);margin-top:3px">${esc(r.motivo)}</div>`:''}`}</td></tr>`;}).join('')}
     </tbody></table></div>`:'<div class="empty">Todavía no se ha subido ningún registro.</div>'}</div>`;
 }

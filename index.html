@@ -4156,11 +4156,20 @@ function bindExcel(){
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&state.excelCompleto&&state.view==='excel'){state.excelCompleto=false;render();}});
 async function guardarExcelProv(){
   const b=$('#x-guardar');if(b){b.disabled=true;b.textContent='Guardando…';}
+  const suelta=m=>{toast(m,'err');if(b){b.disabled=false;b.textContent='Guardar cambios';}};
+  let r;
+  try{r=await rpc('guardar_excel_proveedores',{p_excel:state.excel});}catch(e){suelta(e.message);return;}
+  // Con el Excel ya guardado se repasan las facturas abiertas por tandas de 40: de
+  // golpe pasaba de los 8 s que da la base y no se guardaba nada (Paqui, 23/10/2026).
+  let tras=null,hechas=0,fin=null;
   try{
-    const r=await rpc('guardar_excel_proveedores',{p_excel:state.excel});
-    toast(`Guardado: ${r.proveedores} proveedores${r.altas?` · ${r.altas} dados de alta`:''}${r.homologaciones_cambiadas?` · ${r.homologaciones_cambiadas} homologaciones cambiadas`:''}${r.facturas_unidas?` · ${r.facturas_unidas} facturas unidas a su proveedor`:''}`);
-    state.excelSucio=false;state.excel=null;await loadAll();
-  }catch(e){toast(e.message,'err');if(b){b.disabled=false;b.textContent='Guardar cambios';}}
+    do{fin=await rpc('recalcular_facturas_abiertas',{p_tras:tras,p_limite:40});hechas+=fin.hechas;tras=fin.ultimo;
+      if(b)b.textContent=`Repasando facturas ${hechas}/${r.por_recalcular||hechas}…`;}
+    while(fin.hechas&&fin.quedan>0);
+  }catch(e){suelta(`El Excel está guardado, pero faltan facturas por repasar (${e.message}). Pulsa otra vez «Guardar cambios».`);return;}
+  const unidas=Math.max(0,(r.sin_proveedor||0)-(fin.sin_proveedor||0));
+  toast(`Guardado: ${r.proveedores} proveedores${r.altas?` · ${r.altas} dados de alta`:''}${r.homologaciones_cambiadas?` · ${r.homologaciones_cambiadas} homologaciones cambiadas`:''}${unidas?` · ${unidas} facturas unidas a su proveedor`:''}`);
+  state.excelSucio=false;state.excel=null;await loadAll();
 }
 // Otra versión del Excel que llegue por correo: se sube entera, con sus hojas.
 async function importarExcelProv(archivo){

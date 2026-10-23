@@ -123,6 +123,7 @@ body.side-off .sidebar{display:none}
 /* Incidencias de Paqui (14/10/2026): avisos, formularios y tablas editables */
 .bdg.alerta{background:var(--rd-s);color:var(--rd);margin-left:5px}
 .bdg.domic{background:var(--violet-s);color:var(--violet);margin-left:5px}
+.bdg.truenas{background:#fef08a;color:#713f12;margin-right:5px}
 .act-btn.neu{background:var(--card);color:var(--ink);border:1px solid var(--line)}
 .act-btn.neu:hover{border-color:var(--ink)}
 .btn-s{height:30px;padding:0 11px;font-size:12.5px;border-radius:8px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;white-space:nowrap;font-family:inherit}
@@ -585,7 +586,7 @@ async function cambiarClave(){
   finally{btn.disabled=false;btn.textContent='Guardar contraseña';}
 }
 
-const state={selArchivo:new Set(),soloSinDescargar:false,view:'resumen',dias:0,desde:'',hasta:'',verEliminadas:false,facturas:[],incidencias:[],proveedoresBD:[],search:'',fProv:'',fEstado:'',fPago:[],fValida:'',provSel:null,quickFilter:'',sort:{k:'fecha',dir:-1},
+const state={selArchivo:new Set(),selTruenas:new Set(),soloSinDescargar:false,view:'resumen',dias:0,desde:'',hasta:'',verEliminadas:false,facturas:[],incidencias:[],proveedoresBD:[],search:'',fProv:'',fEstado:'',fPago:[],fValida:'',provSel:null,quickFilter:'',sort:{k:'fecha',dir:-1},
   apDesde:'',apHasta:'',pgDesde:'',pgHasta:'',pgProv:'',pgMin:'',pgMax:'',pgBuscar:'',pgDomic:false};
 let chartMes=null;
 const PEND=['ILEGIBLE','EN_REVISION','DUPLICADO_PENDIENTE','PENDIENTE_CRITERIO'];
@@ -982,7 +983,7 @@ async function loadAll(){
       // de una factura de julio o de septiembre salía como suelto. Paqui vio 422
       // "sin asignar" en agosto (23/09/2026) cuando de verdad eran unos 170, y
       // la mayoría de hoy mismo, esperando a su factura.
-      const todas=await api(`facturas_procesadas?select=id,documento_recibido_id,eliminada,es_duplicado,estado,motivo_eliminacion,numero_factura,total_factura,fecha_factura,prov:json_extraccion_ia->proveedor->>nombre,nif:json_extraccion_ia->proveedor->>nif_cif,proveedor_id,adj:json_extraccion_ia->_adjuntos,sug:json_extraccion_ia->_sugeridos&limit=20000`);
+      const todas=await api(`facturas_procesadas?select=id,documento_recibido_id,eliminada,es_duplicado,estado,motivo_eliminacion,numero_factura,total_factura,fecha_factura,prov:json_extraccion_ia->proveedor->>nombre,nif:json_extraccion_ia->proveedor->>nif_cif,proveedor_id,adj:json_extraccion_ia->_adjuntos,sug:json_extraccion_ia->_sugeridos,guardada:json_extraccion_ia->_descargada_registro->>fecha&limit=20000`);
       state.todasFacturas=todas.filter(f=>!f.eliminada);
       state.ligeras=todas;
       // Menos las retiradas por NO SER facturas: un albarán que entró como factura
@@ -1610,7 +1611,7 @@ function colaTrabajo(ff){
       <td class="mono">${dt(f.fecha_factura)}</td>
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
-      <td>${badgePago(f)}<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${badgesSenales(f)}</td>
+      <td>${etiquetaTruenas(f)}${badgePago(f)}<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${badgesSenales(f)}</td>
       <td style="max-width:300px;color:var(--muted);font-size:12.5px"><div class="trunc" style="max-width:300px">${esc(motivoDe(f.id))}</div></td>
     </tr>`).join('');
   return`<div class="tbl-wrap"><table><thead><tr><th>Proveedor</th><th>Nº Factura</th><th>Fecha fra.</th><th>Cargada</th><th class="r">Total</th><th>Estado</th><th>Motivo</th></tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -1864,8 +1865,8 @@ function tablaFacturas(ff,full){
       ${full?(()=>{const v=validacion(f),c=fechaContabilizada(f);
         return `<td class="mono" style="white-space:nowrap" title="${v?esc('Validada '+v.como+(v.por?' por '+v.por:'')):''}">${v?(v.fecha?dt(v.fecha):'<span style="color:var(--muted)">auto</span>'):'—'}</td>
       <td class="mono" style="white-space:nowrap">${c?`<b title="Contabilizada">C</b> ${dt(c)}`:'—'}</td>`;})():''}
-      <td>${full&&modoArchivo()?(()=>{const ia=f.json_extraccion_ia||{},d=ia._descargada_registro;
-        return d?`<span class="bdg" style="background:var(--gr-s,#e8f5ee);color:var(--green);margin-right:5px" title="${esc((d.nombre||'')+' · '+(d.carpeta||''))}">Descargada ${dt(d.fecha)}</span>`
+      <td>${etiquetaTruenas(f)}${full&&modoArchivo()?(()=>{const ia=f.json_extraccion_ia||{},d=ia._descargada_registro;
+        return d?''
           :(nombreRegistroIva(f)?'':`<span class="bdg" style="background:var(--amber-s);color:var(--amber);margin-right:5px" title="Se marcó contabilizada sin pasar por el Excel del AS400">Sin nº registro IVA</span>`);})():''}${badgePago(f)}<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${sinCondiciones(f)?'<span class="bdg sincond" title="Este proveedor no está en el Excel de condiciones: hay que homologarlo">SIN CONDICIONES</span>':''}${badgesSenales(f)}</td>
     </tr>`;
   }).join('');
@@ -2095,7 +2096,7 @@ async function openDrawer(id){
   $('#ov').classList.add('open');$('#drawer').classList.add('open');
   const dif=f.diferencia_importe!=null?+f.diferencia_importe:null;
   const warn=dif!=null&&Math.abs(dif)>TOL;
-  $('#dr-head').innerHTML=`<div><div class="dr-title">${esc(f.numero_factura||'Factura')}</div><div class="dr-sub"><span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${f.es_duplicado?'<span class="bdg s-DUPLICADO_PENDIENTE">Duplicado</span>':''}${f.exportada_as400?'<span class="bdg s-VALIDADA">Exportada AS400</span>':''}</div></div><button class="x" id="dr-close">${svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>')}</button>`;
+  $('#dr-head').innerHTML=`<div><div class="dr-title">${esc(f.numero_factura||'Factura')}</div><div class="dr-sub">${etiquetaTruenas(f)}<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${f.es_duplicado?'<span class="bdg s-DUPLICADO_PENDIENTE">Duplicado</span>':''}${f.exportada_as400?'<span class="bdg s-VALIDADA">Exportada AS400</span>':''}</div></div><button class="x" id="dr-close">${svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>')}</button>`;
   $('#dr-close').onclick=closeDrawer;
 
   const inc=state.incidencias.filter(i=>i.factura_id===id);
@@ -3107,26 +3108,57 @@ function paginasFactura(f,total,estricto){
 // mano: «3085 (8195) SUBIAS PERNA FRA 367 2026-09-30.pdf» (Rubén, 22/10/2026). Todo
 // sale de la línea del Excel del AS400 que la contabilizó (_registro_iva): nº de
 // registro sin ceros delante, (código), nombre, nº de factura y fecha tal cual.
-function nombreRegistroIva(f){
-  const r=(f.json_extraccion_ia||{})._registro_iva||{};
+function nombreRegistroIva(f){return nombreLineaRegistro((f.json_extraccion_ia||{})._registro_iva||{});}
+function nombreLineaRegistro(r){
   if(!r.numero_registro)return null;
   const partes=[String(r.numero_registro).trim().replace(/^0+(?=\d)/,''),
     r.codigo_proveedor?`(${r.codigo_proveedor})`:'',r.proveedor||'',r.numero_factura||'',r.fecha_factura||''];
   return partes.map(x=>String(x).trim()).filter(Boolean).join(' ').replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,' ')+'.pdf';
 }
 const modoArchivo=()=>state.view==='facturas'&&state.quickFilter==='contabilizadas';
+// Etiqueta amarilla «Descargada para Truenas» (Rubén, 23/10/2026): que se vea en
+// todas partes que esa factura ya se guardó para pasarla a Truenas.
+function etiquetaTruenas(f){
+  const d=(f.json_extraccion_ia||{})._descargada_registro;
+  return d?`<span class="bdg truenas" title="${esc(`Descargada el ${dt(d.fecha)}${d.por?' por '+d.por:''}: ${d.nombre||''}`)}">Descargada para Truenas</span>`:'';
+}
 // Descarga las contabilizadas seleccionadas: un PDF por factura, solo con sus hojas.
 // Con Chrome o Edge se elige una vez la carpeta (la de red) y se guardan ahí; si el
 // navegador no lo permite, van a Descargas. Lo descargado queda apuntado.
+// Carpeta donde guardar (Chrome/Edge). null = Descargas; false = cancelado.
+// Se pide lo primero tras el clic: el navegador solo la deja abrir justo después.
+async function elegirCarpetaRegistro(){
+  if(!window.showDirectoryPicker)return null;
+  try{return await window.showDirectoryPicker({id:'registro-iva',mode:'readwrite'});}
+  catch(e){return e&&e.name==='AbortError'?false:null;}
+}
 async function descargarSeleccionRegistro(btn){
   const ff=[...state.selArchivo].map(facturaLocal).filter(Boolean);
   if(!ff.length){toast('No hay facturas seleccionadas','err');return;}
   if(typeof PDFLib==='undefined'){toast('Recarga la página: no se ha cargado el lector de PDF','err');return;}
-  let dir=null;
-  if(window.showDirectoryPicker){
-    try{dir=await window.showDirectoryPicker({id:'registro-iva',mode:'readwrite'});}
-    catch(e){if(e&&e.name==='AbortError')return;dir=null;}
-  }
+  const dir=await elegirCarpetaRegistro();if(dir===false)return;
+  await guardarFacturasRegistro(btn,ff,dir);
+}
+// Botón «Truenas» de Registro IVA: SOLO las facturas marcadas con su casilla, por
+// tandas (Verónica, 23/10/2026). Solo hay casilla en las líneas casadas: lo que se
+// descarga viene siempre del Excel del AS400.
+async function guardarRegistroTruenas(btn){
+  const ids=[...state.selTruenas];
+  if(!ids.length){toast('Marca primero las facturas que quieres descargar','err');return;}
+  if(typeof PDFLib==='undefined'){toast('Recarga la página: no se ha cargado el lector de PDF','err');return;}
+  const dir=await elegirCarpetaRegistro();if(dir===false)return;
+  const ff=[];btn.disabled=true;btn.textContent='Preparando…';
+  try{
+    for(let i=0;i<ids.length;i+=60){
+      const trozo=ids.slice(i,i+60);
+      const faltan=trozo.filter(id=>!facturaLocal(id));
+      const bajadas=faltan.length?await api(`facturas_procesadas?select=*&id=in.(${faltan.join(',')})`):[];
+      trozo.forEach(id=>{const f=facturaLocal(id)||bajadas.find(x=>x.id===id);if(f)ff.push(f);});
+    }
+  }catch(e){toast('No se han podido leer las facturas: '+e.message,'err');render();return;}
+  await guardarFacturasRegistro(btn,ff,dir);
+}
+async function guardarFacturasRegistro(btn,ff,dir){
   const txt=btn.innerHTML;btn.disabled=true;
   const hechos=[],fallos=[];
   for(const f of ff){
@@ -3160,7 +3192,7 @@ async function descargarSeleccionRegistro(btn){
     ia._descargada_registro={fecha:ahora,por:quien,nombre:h.nombre,hojas:h.hojas,carpeta:dir?dir.name:'Descargas'};
     try{await guardarIA(h.f.id,ia);}catch(e){console.error(e);}
   }
-  hechos.forEach(h=>state.selArchivo.delete(h.f.id));
+  hechos.forEach(h=>{state.selArchivo.delete(h.f.id);state.selTruenas.delete(h.f.id);});
   btn.disabled=false;btn.innerHTML=txt;
   await loadAll();
   const donde=dir?`en la carpeta «${dir.name}»`:'en Descargas';
@@ -4165,26 +4197,29 @@ function viewRegistro(){
   if(!state.registro){cargarRegistro().then(render);return `<div class="card"><div class="empty">Cargando…</div></div>`;}
   const R=state.registro, fil=state.regFiltro||'';
   const casadas=R.filter(r=>r.factura_id).length;
-  const ver=R.filter(r=>fil==='sin'?!r.factura_id:fil==='casadas'?!!r.factura_id:true)
-    .filter(r=>coincide(`${r.numero_factura} ${r.proveedor} ${r.nif} ${r.numero_registro} ${r.codigo_proveedor||''}`,state.regBuscar||''));
   const porId=new Map((state.todasFacturas||[]).map(f=>[f.id,f]));
+  const ver=R.filter(r=>fil==='sin'?!r.factura_id:fil==='casadas'?!!r.factura_id:fil==='pend'?!!(r.factura_id&&porId.get(r.factura_id)&&!porId.get(r.factura_id).guardada):true)
+    .filter(r=>coincide(`${r.numero_factura} ${r.proveedor} ${r.nif} ${r.numero_registro} ${r.codigo_proveedor||''}`,state.regBuscar||''));
+  const sel=state.selTruenas;
   const kpi=(cls,v,l)=>`<div class="kpi"><div class="kpi-top"><div class="kpi-ic ${cls}">${svg(ICN.file)}</div></div><div class="kpi-val">${v}</div><div class="kpi-lbl">${l}</div></div>`;
   return `<div class="kpis">${kpi('blue',R.length,'Líneas del registro')}${kpi('green',casadas,'Casadas con su factura (contabilizadas)')}${kpi('amber',R.length-casadas,'Sin casar')}</div>
     <div class="card" style="margin-bottom:14px"><div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">
       Sube el Excel del registro de IVA soportado que saca el AS400 después de contabilizar. Cada línea se guarda con su número de registro y se busca
       su factura en la plataforma (mismo número y además mismo código de proveedor, CIF o total). Las validadas (y las pagadas) pasan solas a <b>contabilizada</b>; las que están en revisión se quedan «sin casar» con el motivo y se contabilizan solas al validarlas.
-      Si una factura llega después que su asiento, se casa sola al entrar. Subir el mismo Excel dos veces no duplica nada.</div>
+      Si una factura llega después que su asiento, se casa sola al entrar. Subir el mismo Excel dos veces no duplica nada.<br>
+      Para guardar las facturas en Truenas: marca las casillas (todas o por tandas) y pulsa <b>📥 Truenas</b>. Se guarda un PDF por factura, solo con sus hojas de factura, y queda la etiqueta amarilla <b>Descargada para Truenas</b>.</div>
       <label class="btn-s ok" style="display:inline-flex;align-items:center">Subir Excel del AS400<input type="file" id="r-subir" accept=".xlsx,.xls,.csv" style="display:none"></label>
       <div id="r-mapa"></div></div>
     <div class="card"><div class="filtros">
-      ${[['','Todas'],['sin','Sin casar'],['casadas','Casadas']].map(([k,l])=>`<button class="chip ${fil===k?'active':''}" data-regf="${k}">${l}</button>`).join('')}
+      ${[['','Todas'],['sin','Sin casar'],['casadas','Casadas'],['pend','Sin descargar']].map(([k,l])=>`<button class="chip ${fil===k?'active':''}" data-regf="${k}">${l}</button>`).join('')}
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="r-buscar" placeholder="Buscar…" value="${esc(state.regBuscar||'')}"></div>
-      <span class="card-meta" style="margin-left:auto">${ver.length} línea${ver.length===1?'':'s'}</span></div>
-    ${ver.length?`<div class="tbl-wrap"><table><thead><tr><th>Nº registro</th><th>Código</th><th>Proveedor</th><th>Nº factura</th><th>Fecha fra.</th><th>Factura en la plataforma</th></tr></thead><tbody>
+      <span class="card-meta" style="margin-left:auto">${ver.length} línea${ver.length===1?'':'s'}</span>
+      <button class="btn-s ok" id="r-truenas" ${sel.size?'':'disabled'} title="Guarda el PDF de las facturas marcadas (solo sus hojas de factura) con el nombre «nº registro (código) proveedor FRA nº fecha».pdf">📥 Truenas (${sel.size})</button></div>
+    ${ver.length?`<div class="tbl-wrap"><table><thead><tr><th style="width:30px"><input type="checkbox" id="r-todas" title="Marcar todas las casadas de la lista"></th><th>Nº registro</th><th>Código</th><th>Proveedor</th><th>Nº factura</th><th>Fecha fra.</th><th>Factura en la plataforma</th></tr></thead><tbody>
       ${ver.slice(0,1500).map(r=>{const f=r.factura_id&&porId.get(r.factura_id);return `<tr ${f?`data-reg-fac="${r.factura_id}" style="cursor:pointer"`:''}>
-        <td class="mono">${esc(r.numero_registro||'—')}</td><td class="mono">${esc(r.codigo_proveedor||'')}</td><td>${esc(r.proveedor||'')}</td>
+        <td>${f?`<input type="checkbox" data-seltru="${f.id}" ${sel.has(f.id)?'checked':''} title="${esc('Se guardará como: '+(nombreLineaRegistro(r)||''))}">`:''}</td><td class="mono">${esc(r.numero_registro||'—')}</td><td class="mono">${esc(r.codigo_proveedor||'')}</td><td>${esc(r.proveedor||'')}</td>
         <td class="mono cell-strong">${esc(r.numero_factura||'')}</td><td class="mono">${dt(r.fecha_factura)}</td>
-        <td>${f?`<b>${esc(f.numero_factura||'')}</b> <span style="color:var(--muted);font-size:12px">${esc(r.casado_como||'')}</span>`:`<span class="bdg alerta" style="margin:0">sin casar</span>${r.motivo?`<div style="font-size:11.5px;color:var(--muted);margin-top:3px">${esc(r.motivo)}</div>`:''}`}</td></tr>`;}).join('')}
+        <td>${f?`<b>${esc(f.numero_factura||'')}</b> <span style="color:var(--muted);font-size:12px">${esc(r.casado_como||'')}</span>${f.guardada?` <span class="bdg truenas" style="margin:0" title="Descargada el ${dt(f.guardada)}">Descargada para Truenas</span>`:''}`:`<span class="bdg alerta" style="margin:0">sin casar</span>${r.motivo?`<div style="font-size:11.5px;color:var(--muted);margin-top:3px">${esc(r.motivo)}</div>`:''}`}</td></tr>`;}).join('')}
     </tbody></table></div>`:'<div class="empty">Todavía no se ha subido ningún registro.</div>'}</div>`;
 }
 function bindRegistro(){
@@ -4193,6 +4228,14 @@ function bindRegistro(){
   document.querySelectorAll('[data-reg-fac]').forEach(tr=>tr.onclick=async()=>{const id=tr.dataset.regFac;
     const f=await facturaPorId(id);if(f&&!state.facturas.some(x=>x.id===id))state.facturas.push(f);openDrawer(id);});
   const s=$('#r-subir');if(s)s.onchange=()=>leerRegistro(s.files[0]);
+  const t=$('#r-truenas');if(t)t.onclick=()=>guardarRegistroTruenas(t);
+  const cs=()=>[...document.querySelectorAll('[data-seltru]')];
+  const pinta=()=>{if(t){t.disabled=!state.selTruenas.size;t.textContent=`📥 Truenas (${state.selTruenas.size})`;}
+    const td=$('#r-todas');if(td){const c=cs();td.checked=c.length>0&&c.every(x=>x.checked);}};
+  cs().forEach(c=>{c.onclick=e=>e.stopPropagation();
+    c.onchange=()=>{c.checked?state.selTruenas.add(c.dataset.seltru):state.selTruenas.delete(c.dataset.seltru);pinta();};});
+  const td=$('#r-todas');if(td)td.onchange=()=>{cs().forEach(c=>{c.checked=td.checked;td.checked?state.selTruenas.add(c.dataset.seltru):state.selTruenas.delete(c.dataset.seltru);});pinta();};
+  pinta();
 }
 async function leerRegistro(archivo){
   if(!archivo)return;
@@ -4240,17 +4283,10 @@ async function cargarRegistroLeido(){
   try{const r=await rpc('cargar_registro_iva',{p_filas:filas,p_fichero:L.archivo});
     toast(`${r.nuevas} líneas nuevas (${r.repetidas} ya estaban) · ${r.casadas} facturas contabilizadas · ${r.sin_casar} sin casar`);
     state.registro=null;state._regLeido=null;
-    // Lo recién contabilizado se abre ya seleccionado en «Contabilizadas», listo para
-    // descargar (Rubén, 22/10/2026). Sin periodo: el registro puede traer facturas
-    // de cualquier mes.
+    // Lo recién contabilizado queda marcado en «Registro IVA», listo para el botón
+    // Truenas; se puede desmarcar y bajar por tandas (Verónica, 23/10/2026).
     const ids=Array.isArray(r.facturas)?r.facturas:[];
-    if(ids.length){
-      state.selArchivo=new Set(ids);state.soloSinDescargar=false;
-      state.dias=0;state.desde='';state.hasta='';state.verEliminadas=false;
-      document.querySelectorAll('#period button').forEach(x=>x.classList.toggle('active',x.dataset.d==='0'));
-      ['#rg-desde','#rg-hasta'].forEach(id=>{const el=$(id);if(el)el.value='';});if(typeof pintaRango==='function')pintaRango();
-      setView('facturas');state.quickFilter='contabilizadas';
-    }
+    state.selTruenas=new Set(ids);
     await loadAll();
     if(r.sin_casar)toast(`${r.casadas} contabilizadas · ${r.sin_casar} líneas sin casar: mira el motivo en «Registro IVA»`,'err');}
   catch(e){toast(e.message,'err');if(b)b.disabled=false;}

@@ -1533,7 +1533,7 @@ function viewSueltos(){
     <tr data-form="${d.id}" style="display:none"><td colspan="6" style="background:var(--bg)">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:4px 0">
         <span style="font-size:12.5px">Este documento es</span>
-        <select class="sel" data-tipo><option value="ALBARAN">el albarán</option><option value="PEDIDO">el pedido</option><option value="OTRO">otro papel</option></select>
+        <select class="sel" data-tipo><option value="" selected disabled>— ¿qué es? —</option><option value="ALBARAN">el albarán</option><option value="PEDIDO">el pedido</option><option value="OTRO">otro papel</option></select>
         <span style="font-size:12.5px">de la factura</span>
         <input class="sel" list="dl-facturas" data-fac placeholder="Escribe el número o el proveedor…" style="flex:1 1 18rem;min-width:14rem">
         <button class="act-btn ok" data-asig-ok="${d.id}" style="${BTN}">Guardar</button>
@@ -1552,7 +1552,11 @@ async function asignarDocumento(docId,boton){
   if(!form)return;
   const fac=(state.opcionesFac||new Map()).get(form.querySelector('[data-fac]').value.trim());
   if(!fac){toast('Elige la factura de la lista: escribe su número o el proveedor y pulsa la que sea','err');return;}
-  await pedirTarea('asignar',boton,{documento_id:docId,factura_id:fac,tipo:form.querySelector('[data-tipo]').value});
+  // Sin opción marcada de antemano: el «albarán» por defecto dejó pedidos como albaranes
+  // y la factura seguía con «falta el pedido» (RB 26/04336, 26/10/2026).
+  const tipo=form.querySelector('[data-tipo]').value;
+  if(!tipo){toast('Di qué es el papel: albarán, pedido u otro','err');return;}
+  await pedirTarea('asignar',boton,{documento_id:docId,factura_id:fac,tipo});
 }
 
 /* ---------- metrics ---------- */
@@ -2142,7 +2146,7 @@ async function openDrawer(id){
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">Añadir un documento a esta factura</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input type="file" id="manual-archivo" accept=".pdf,application/pdf,image/jpeg,image/png" style="flex:1 1 14rem;min-width:12rem;font-size:12.5px">
-        <select class="sel" id="manual-tipo"><option value="ALBARAN">Es el albarán</option><option value="PEDIDO">Es el pedido</option><option value="OTRO">Otro papel</option></select>
+        <select class="sel" id="manual-tipo"><option value="" selected disabled>— ¿qué es? —</option><option value="ALBARAN">Es el albarán</option><option value="PEDIDO">Es el pedido</option><option value="OTRO">Otro papel</option></select>
         <button class="act-btn ok" id="manual-subir" data-fac="${f.id}">Subir y añadir</button>
       </div>
       <div style="font-size:11.5px;color:var(--muted);margin-top:6px">PDF, JPG o PNG. Queda puesto con esta factura y cuenta como revisado por ti.</div>
@@ -2203,35 +2207,23 @@ async function openDrawer(id){
       </div></div>`;})()}
     ${(f.direccion_fiscal_detectada||f.delegacion_detectada)?`<div class="dr-sec"><div class="dr-sec-t">${svg(ICN.pin)}Direcciones</div><div class="kv one"><div class="kv-item"><div class="k">Dirección fiscal detectada</div><div class="v" style="font-weight:500;font-size:13px">${esc(f.direccion_fiscal_detectada||'—')}</div></div>${f.delegacion_detectada?`<div class="kv-item"><div class="k">Delegación (texto leído)</div><div class="v" style="font-weight:500;font-size:13px">${esc(f.delegacion_detectada)}</div></div>`:''}</div></div>`:''}
     ${(()=>{
+      // El descuento pactado sale del Excel de proveedores (condicionDe: código del AS400,
+      // CIF o nombre), no de la comprobación que hizo la lectura al entrar: esa buscaba al
+      // proveedor por el nombre en la lista antigua y se quedaba congelada. Dos facturas de
+      // RB del mismo día salían una con «RAPPEL 5% MENSUAL» y otra sin nada (26/10/2026).
       const vd=(j._descuento_validacion||j?.datos_extraidos?._descuento_validacion)||null;
-      if(!vd)return '';
-      // La comprobación del descuento la hizo la lectura buscando el proveedor por
-      // parecido de nombre: a la notaría de Ramón Marín Casanova le aplicó las
-      // condiciones de Carlos Casanova (Alcitex). Si el proveedor que usó no es el
-      // de esta factura, esa comprobación no vale y no se enseña como si valiera.
-      if(vd.proveedor_nombre_bd){
-        const a=normProv(vd.proveedor_nombre_bd), b=normProv(nombreProv(f)), c=normProv(nombreLeido(f));
-        const casa=x=>x&&(x===a||x.startsWith(a+' ')||a.startsWith(x+' '));
-        if(!casa(b)&&!casa(c))return `<div class="dr-sec"><div class="dr-sec-t">Validación de descuento</div><div style="font-size:12.5px;color:var(--muted)">La lectura comparó el descuento con las condiciones de otro proveedor («${esc(vd.proveedor_nombre_bd)}»), así que esa comprobación no sirve para esta factura. Compruébalo con las condiciones de ${esc(nombreProv(f))}.</div></div>`;
-      }
-      const VMAP={OK:'Correcto',DESCUENTO_INCORRECTO:'Descuento incorrecto',DESCUENTO_NO_APLICADO:'Descuento no aplicado',DESCUENTO_NO_ESPERADO:'Descuento no esperado',DESCUENTO_FUERA_RANGO:'Descuento fuera de rango',PROVEEDOR_NO_ENCONTRADO:'Proveedor no encontrado en BD',NO_NUMERICO:'Tipo especial (rappel/precio fijo)',SIN_DATOS:'Sin datos de descuento'};
-      const ok=vd.validacion==='OK';
-      const warn=['DESCUENTO_INCORRECTO','DESCUENTO_NO_APLICADO','DESCUENTO_NO_ESPERADO','DESCUENTO_FUERA_RANGO'].includes(vd.validacion);
-      const color=ok?'var(--green)':warn?'var(--amber)':'var(--muted)';
-      const bgColor=ok?'var(--green-s)':warn?'var(--amber-s)':'var(--line-2)';
+      const c=condicionDe(f), pactado=c?String(c.descuento??'').trim():'';
+      const enFactura=vd&&vd.descuento_factura_pct!=null&&!isNaN(+vd.descuento_factura_pct)?+vd.descuento_factura_pct:null;
+      if(!pactado&&enFactura==null)return '';
+      const porVolumen=/MENSUAL|RAPPEL|ANUAL|TRIMESTR|SEMESTR/i.test(pactado);
+      const kv=(k,v)=>`<div class="kv-item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
       return `<div class="dr-sec">
-        <div class="dr-sec-t">${svg('<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>')}Validación de descuento</div>
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:${bgColor};margin-bottom:10px">
-          <span style="font-weight:700;color:${color};font-size:13px">${esc(VMAP[vd.validacion]||vd.validacion)}</span>
-        </div>
+        <div class="dr-sec-t">${svg('<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>')}Descuento</div>
         <div class="kv">
-          ${vd.proveedor_nombre_bd?`<div class="kv-item"><div class="k">Proveedor en BD</div><div class="v">${esc(vd.proveedor_nombre_bd)}</div></div>`:''}
-          ${vd.descuento_tipo_bd?`<div class="kv-item"><div class="k">Tipo acordado</div><div class="v">${esc(vd.descuento_tipo_bd)}</div></div>`:''}
-          ${vd.descuento_min_pct!=null?`<div class="kv-item"><div class="k">Descuento acordado</div><div class="v">${vd.descuento_max_pct&&vd.descuento_max_pct!==vd.descuento_min_pct?esc(vd.descuento_min_pct+'% – '+vd.descuento_max_pct+'%'):esc(vd.descuento_min_pct+'%')}</div></div>`:''}
-          ${vd.descuento_texto_bd?`<div class="kv-item"><div class="k">Texto acordado</div><div class="v">${esc(vd.descuento_texto_bd)}</div></div>`:''}
-          ${vd.descuento_factura_pct!=null?`<div class="kv-item"><div class="k">Descuento en factura</div><div class="v" style="color:${warn?'var(--amber)':'inherit'};font-weight:${warn?700:400}">${esc(vd.descuento_factura_pct+'%')}</div></div>`:''}
-          ${vd.motivo?`<div class="kv-item" style="grid-column:1/-1"><div class="k">Motivo</div><div class="v" style="color:${color}">${esc(vd.motivo)}</div></div>`:''}
+          ${kv('Pactado (Excel de proveedores)',pactado?`<b>${esc(pactado)}</b>`:`<span style="color:var(--muted)">${c?'El Excel no pone descuento':'Este proveedor no está en el Excel'}</span>`)}
+          ${enFactura!=null?kv('En la factura',esc(enFactura.toLocaleString('es-ES',{maximumFractionDigits:2}))+' %'+(vd.descuento_factura_txt?`<br><span style="color:var(--muted);font-size:12px">${esc(vd.descuento_factura_txt)}</span>`:'')):''}
         </div>
+        ${porVolumen?'<div style="font-size:12.5px;color:var(--muted);margin-top:6px">Es un descuento por volumen: no se aplica factura a factura, así que aquí no se puede comprobar.</div>':''}
       </div>`;
     })()}
     <div class="dr-sec">
@@ -2550,8 +2542,9 @@ async function aPdf(archivo){
 async function anadirManual(facId,boton){
   const f=facturaLocal(facId);if(!f)return;
   const archivo=$('#manual-archivo')?.files?.[0];
-  const tipo=$('#manual-tipo')?.value||'ALBARAN';
+  const tipo=$('#manual-tipo')?.value||'';
   if(!archivo){toast('Elige primero el archivo','err');return;}
+  if(!tipo){toast('Di qué es el papel: albarán, pedido u otro','err');return;}
   if(!/pdf|jpe?g|png/i.test(archivo.type+archivo.name)){toast('Solo PDF, JPG o PNG','err');return;}
   if(archivo.size>25*1024*1024){toast('El archivo pasa de 25 MB','err');return;}
   const antes=boton.textContent;boton.disabled=true;boton.textContent='Subiendo…';
@@ -3963,7 +3956,7 @@ async function abrirSeparar(facId){
       <div><button class="btn-s ok" id="sp-fac">Crear una factura nueva con las páginas marcadas</button></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button class="btn-s" id="sp-adj">Ponerlas como</button>
-        <select class="sel" id="sp-tipo" style="height:30px"><option value="ALBARAN">albarán</option><option value="PEDIDO">pedido</option><option value="OTRO">otro papel</option></select>
+        <select class="sel" id="sp-tipo" style="height:30px"><option value="" selected disabled>— ¿qué es? —</option><option value="ALBARAN">albarán</option><option value="PEDIDO">pedido</option><option value="OTRO">otro papel</option></select>
         <span style="font-size:12.5px">de la factura</span>
         <input class="sel" id="sp-dest" list="dl-sep" value="${esc(esta?esta[0]:'')}" style="flex:1 1 14rem;height:30px">
         <datalist id="dl-sep">${opts}</datalist></div>
@@ -3991,6 +3984,7 @@ async function abrirSeparar(facId){
     const dest=(state.opcionesFac||new Map()).get($('#sp-dest').value.trim());
     if(!dest){toast('Elige la factura de la lista','err');return;}
     const tipo=$('#sp-tipo').value;
+    if(!tipo){toast('Di qué es el papel: albarán, pedido u otro','err');return;}
     $('#sp-adj').disabled=true;
     try{
       const doc=await subirDocumento(await cortar(pags),`${base}_${tipo.toLowerCase()}_pags_${pags.join('-')}.pdf`,tipo,`Separado de la factura ${f.numero_factura||''}`);

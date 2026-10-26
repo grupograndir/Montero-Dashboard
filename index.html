@@ -942,6 +942,9 @@ async function loadAll(){
   }catch(e){
     if(e instanceof SesionCaducada){clearSession();showLogin();return;}
     console.error(e);setConn(false,e.message);state.facturas=[];}
+  // Aprobar para pago solo Manuel y Paqui (migración 026): la lista vive en la base,
+  // que además rechaza la aprobación de cualquier otro usuario.
+  try{state.puedeAprobar=(await rpc('puede_aprobar_pago'))===true;}catch(e){state.puedeAprobar=false;}
   // Aprobadas y Pagadas no dependen del periodo: una factura de julio aprobada hoy
   // tiene que salir en la remesa de hoy (revisión 21/10/2026).
   state.facturasPago=null;
@@ -1921,7 +1924,7 @@ function viewAprobadas(){
       <b style="font-size:13px">Aprobadas entre el</b><input type="date" id="ap-desde" value="${esc(state.apDesde)}"><span>y el</span><input type="date" id="ap-hasta" value="${esc(state.apHasta)}">
       <span style="font-size:13px;margin-left:8px">Total a pagar de lo filtrado: <b>${eur(ff.reduce((s,f)=>s+(+f.total_factura||0),0))}</b> (${ff.length} de ${todas.length} factura${todas.length===1?'':'s'})</span>
       <button class="btn-s" id="ap-excel" style="margin-left:auto" ${ff.length?'':'disabled'}>Excel de lo filtrado</button></div></div>`;
-  if(!ff.length)return filtro+`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">${todas.length?'Ninguna aprobada con estos filtros':'No hay facturas aprobadas pendientes de pago'}</p><small>Cuando pulses «APROBADA PAGAR» en una factura, aparecerá aquí</small></div></div>`;
+  if(!ff.length)return filtro+`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">${todas.length?'Ninguna aprobada con estos filtros':'No hay facturas aprobadas pendientes de pago'}</p><small>${state.puedeAprobar?'Cuando pulses «APROBADA PAGAR» en una factura, aparecerá aquí':'Aquí salen las facturas que Manuel o Paqui aprueban para pago'}</small></div></div>`;
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
   const rows=ff.map(f=>{const a=f.json_extraccion_ia._aprobada_pago;return `<tr data-id="${f.id}">
       <td class="mono cell-strong" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)} <span style="color:var(--faint);font-weight:400">${a.fecha?new Date(a.fecha).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):''}</span></td>
@@ -1933,7 +1936,7 @@ function viewAprobadas(){
       <td style="font-size:12.5px;white-space:nowrap">${esc(validadorDe(f)||'—')}</td>
       <td>${badgePago(f)}<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(estadoLbl(f.estado))}</div>${badgesSenales(f)}</td>
       <td style="text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="act-btn pay" data-pagar="${f.id}" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap" title="Ya se ha pagado. Pasa a «Pagadas» cuando esté contabilizada; mientras, sigue en el listado como «Pagada · sin contabilizar»">${svg(ICN.card)}Marcar pagada</button>
-        <button class="act-btn del" data-desaprobar-fila="${f.id}" title="Vuelve a su sitio en el listado de facturas" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">Deshacer aprobación</button></div></td>
+        ${state.puedeAprobar?`<button class="act-btn del" data-desaprobar-fila="${f.id}" title="Vuelve a su sitio en el listado de facturas" style="height:30px;padding:0 12px;font-size:12.5px;white-space:nowrap">Deshacer aprobación</button>`:''}</div></td>
     </tr>`;}).join('');
   const filtrado=ff.length!==todas.length||state.apDesde||state.apHasta;
   return filtro+`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
@@ -2125,7 +2128,7 @@ async function openDrawer(id){
       ${(f.estado==='VALIDADA'||f.estado==='RECHAZADA')?`<button class="act-btn" data-act="EN_REVISION" data-id="${f.id}" title="Quitarle el estado y volver a dejarla pendiente">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Devolver a revisión</button>`:''}
       ${f.estado==='VALIDADA'?`<button class="act-btn cont" data-act="CONTABILIZADA" data-id="${f.id}" title="El asiento ya está hecho en el AS400">${svg('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h4"/>')}Marcar contabilizada</button>`:''}
       ${f.estado==='CONTABILIZADA'?`<button class="act-btn del" data-act="VALIDADA" data-id="${f.id}" title="Deshacer: volver a dejarla pendiente de contabilizar">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer contabilizada</button>`:''}
-      ${!f.json_extraccion_ia?._pago&&(pagable(f)||f.json_extraccion_ia?._aprobada_pago)?(f.json_extraccion_ia?._aprobada_pago
+      ${state.puedeAprobar&&!f.json_extraccion_ia?._pago&&(pagable(f)||f.json_extraccion_ia?._aprobada_pago)?(f.json_extraccion_ia?._aprobada_pago
         ?`<button class="act-btn del" data-desaprobar="${f.id}" title="Deshacer la aprobación: vuelve a su sitio en el listado de facturas">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}Deshacer aprobación</button>`
         :`<button class="act-btn cont" data-aprobar="${f.id}" style="white-space:nowrap" title="Aprobarla para pago: pasa a la sección «Aprobadas»">${svg(ICN.check)}APROBADA PAGAR</button>`):''}
       ${f.json_extraccion_ia?._pago||pagable(f)?(!f.json_extraccion_ia?._pago?`<button class="act-btn pay" data-act="PAGADA" data-id="${f.id}" title="Ya se ha pagado. Pasa a «Pagadas» cuando esté contabilizada; mientras, sigue en el listado como «Pagada · sin contabilizar»">${svg(ICN.card)}Marcar pagada</button>`:`<button class="act-btn del" data-despagada="${f.id}" title="Deshacer: devolver la factura al listado general">${svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>')}No pagada</button>`):''}
@@ -2509,7 +2512,7 @@ async function guardarIA(id,ia){
   if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
 }
 async function aprobarPago(id,aprobar){
-  const f=facturaLocal(id);if(!f)return;
+  const f=facturaLocal(id);if(!f||!state.puedeAprobar)return;
   if(!confirm(aprobar?`¿Aprobar para pago la factura ${f.numero_factura||''}?\n\nPasará a la sección «Aprobadas».`
                      :`¿Deshacer la aprobación de pago de la factura ${f.numero_factura||''}?\n\nVolverá a su sitio en el listado de facturas.`))return;
   const ia=Object.assign({},f.json_extraccion_ia||{});

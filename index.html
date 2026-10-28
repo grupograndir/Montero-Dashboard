@@ -3527,11 +3527,12 @@ function botonesExtraFicha(f){
 /* ---------- quitar un papel puesto por error ---------- */
 // María, 15/10/2026: puso un albarán con la factura de Omenar que no era suyo y no
 // había forma de quitarlo. Se quita de la ficha y vuelve a «Sin asignar»; queda
-// anotado para que el emparejado no lo vuelva a poner con esta factura.
+// anotado para que el emparejado no lo vuelva a poner con esta factura (con otra
+// sí, si casa: Verónica, 28/10/2026).
 async function quitarDocumento(facId,docId,boton){
   const f=facturaLocal(facId);
   const a=((f&&f.json_extraccion_ia||{})._adjuntos||[]).find(x=>x.documento_id===docId)||{};
-  if(!confirm(`¿Quitar «${a.nombre||'este documento'}» de la factura ${f&&f.numero_factura||''}?\n\nVuelve a «Sin asignar», desde donde se puede poner con la factura que toque.`))return;
+  if(!confirm(`¿Quitar «${a.nombre||'este documento'}» de la factura ${f&&f.numero_factura||''}?\n\nVuelve a «Sin asignar» y ya no se pondrá con esta factura. Cuando entre la suya, se pondrá o se propondrá solo; también se puede poner a mano.`))return;
   if(boton)boton.disabled=true;
   try{await rpc('quitar_documento_factura',{p_factura:facId,p_doc:docId});
     toast('Quitado: está en «Sin asignar»');await loadAll();openDrawer(facId);}

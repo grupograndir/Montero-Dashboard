@@ -2195,7 +2195,7 @@ async function openDrawer(id){
       ${f.total_calculado!=null?`<div class="imp-row"><span class="l">Total calculado</span><span class="v">${eur(f.total_calculado)}</span></div>`:''}
       ${dif!=null?`<div class="imp-row diff ${warn?'warn':''}"><span class="l">Diferencia ${warn?'(supera tolerancia)':'(dentro de tolerancia)'}</span><span class="v">${eur(dif)}</span></div>`:''}
     </div>
-    ${(()=>{const dg=Array.isArray(j._desglose_iva)?j._desglose_iva:[];const amb=j._ambito_iva;if(!dg.length&&!amb)return '';return `<div class="dr-sec"><div class="dr-sec-t">${svg(ICN.euro)}Desglose de IVA y régimen</div>${amb?`<div class="kv"><div class="kv-item"><div class="k">Ámbito (a efectos de IVA)</div><div class="v">${esc(amb)}</div></div>${j._delegacion?`<div class="kv-item"><div class="k">Delegación</div><div class="v">${esc(j._delegacion)}</div></div>`:''}</div>`:''}${dg.length?`<table class="mini-tbl" style="margin-top:12px"><thead><tr><th>Tipo IVA</th><th class="r">Base</th><th class="r">Cuota</th></tr></thead><tbody>${dg.map(x=>`<tr><td>${Math.round(+x.tipo)===0?'Exento':Math.round(+x.tipo)+'%'}</td><td class="r">${eur(x.base)}</td><td class="r">${x.cuota!=null?eur(x.cuota):'—'}</td></tr>`).join('')}</tbody></table>`:''}</div>`;})()}
+    ${(()=>{const dgTodo=Array.isArray(j._desglose_iva)?j._desglose_iva:[];const dg=dgTodo.filter(esIVA);const noIVA=dgTodo.filter(x=>!esIVA(x)&&(numES(x.cuota)||0)!==0);const amb=j._ambito_iva;if(!dg.length&&!noIVA.length&&!amb)return '';return `<div class="dr-sec"><div class="dr-sec-t">${svg(ICN.euro)}Desglose de IVA y régimen</div>${amb?`<div class="kv"><div class="kv-item"><div class="k">Ámbito (a efectos de IVA)</div><div class="v">${esc(amb)}</div></div>${j._delegacion?`<div class="kv-item"><div class="k">Delegación</div><div class="v">${esc(j._delegacion)}</div></div>`:''}</div>`:''}${dg.length?`<table class="mini-tbl" style="margin-top:12px"><thead><tr><th>Tipo IVA</th><th class="r">Base</th><th class="r">Cuota</th></tr></thead><tbody>${dg.map(x=>`<tr><td>${Math.round(+x.tipo)===0?'Exento':Math.round(+x.tipo)+'%'}</td><td class="r">${eur(x.base)}</td><td class="r">${x.cuota!=null?eur(x.cuota):'—'}</td></tr>`).join('')}</tbody></table>`:''}${noIVA.length?`<div style="font-size:11.5px;color:var(--muted);margin-top:6px">No es IVA (no sale en las columnas de IVA): ${noIVA.map(x=>`${String(Math.round(+x.tipo*100)/100).replace('.',',')} % → ${eur(numES(x.cuota))}`).join(' · ')}</div>`:''}</div>`;})()}
     ${(()=>{
       const p=formaPago(f), ir=j._irpf;
       const kv=(k,v)=>`<div class="kv-item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
@@ -2825,12 +2825,20 @@ $('#btn-side').onclick=()=>aplicarMenu(!document.body.classList.contains('side-o
 try{aplicarMenu(localStorage.getItem('mb_menu_oculto')==='1');}catch(e){aplicarMenu(false);}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
 
+// El IVA solo puede ser del 0, 10 o 21 % (Rubén, 28/10/2026). Lo demás que la lectura
+// apunte en el desglose no es IVA y no sale como IVA ni en la ficha ni en los Excel: el
+// impuesto de la electricidad de Endesa (5,11 %, ya va dentro de la base) o la casilla
+// vacía del recargo de equivalencia de Racing Oil (5,2 %).
+const TIPOS_IVA=[0,10,21];
+function tipoIVA(x){return /EXENT/i.test(String(x&&x.tipo))?0:Math.round(parseFloat(String(x&&x.tipo).replace(',','.'))||0);}
+const esIVA=x=>TIPOS_IVA.includes(tipoIVA(x));
+
 // Desglose de IVA por tipo (con fallback al IVA simple de la factura)
 // Texto compacto con todos los tipos de IVA de la factura en una sola celda
 // Ej: "21%: 836,00/175,56" o si hay varios: "21%: 600,00/126,00 | 10%: 200,00/20,00"
 function desgloseIVATexto(f){
   const ia=f.json_extraccion_ia||{};
-  let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva:[];
+  let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva.filter(esIVA):[];
   if(!d.length) d=[{tipo:f.porcentaje_iva||0, base:f.base_imponible, cuota:f.importe_iva}];
   return d.map(x=>{
     const t=Math.round(+x.tipo);
@@ -2854,7 +2862,7 @@ function exportExcel(){
   const rows=ff.map(f=>{
     const ia=f.json_extraccion_ia||{};
     const albs=albaranesDe(ia);
-    let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva:[];
+    let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva.filter(esIVA):[];
     if(!d.length) d=[{tipo:f.porcentaje_iva||0, base:f.base_imponible, cuota:f.importe_iva}];
     const iva=d[0]||{};
     const row=[
@@ -2926,14 +2934,18 @@ async function exportAS400(){
   // Paqui, 14/10/2026: la fecha de cada albarán en la columna de al lado.
   for(let i=1;i<=MAX_ALBARANES_EXCEL;i++) head.push('Albarán '+i,'Fecha albarán '+i);
   const rows=[];
-  // El AS400 lee las columnas por posición: un IVA del 4 % o del 5 % no tiene
-  // columna. No se inventa una: se avisa (revisión 21/10/2026).
+  // El AS400 lee las columnas por posición y solo hay IVA del 0, 10 y 21 %. Lo que
+  // no es IVA (impuesto de la luz, recargo) no sale en esas columnas; solo se avisa
+  // si sin ello la factura no cuadra, porque entonces hay un importe que grabar a mano.
   const tiposRaros=new Set();
   ff.forEach(f=>{
     const ia=f.json_extraccion_ia||{};
     const prov=ia.proveedor||{};
     let d=Array.isArray(ia._desglose_iva)?ia._desglose_iva:[];
     if(!d.length && ia.factura?.importes?.desglose_iva) d=ia.factura.importes.desglose_iva;
+    if(!Array.isArray(d)) d=[];
+    const noIVA=d.filter(x=>!esIVA(x)&&(numES(x.cuota)||0)!==0);
+    d=d.filter(esIVA);
     if(!d.length){
       const tiposEnBD=[];
       if(f.base_iva_21>0) tiposEnBD.push({tipo:21,base:f.base_iva_21,cuota:f.cuota_iva_21});
@@ -2944,7 +2956,7 @@ async function exportAS400(){
     // Construir arrays de IVA por tipo
     const ivaMap={0:{on:false,cuota:0,base:0},10:{on:false,cuota:0,base:0},21:{on:false,cuota:0,base:0}};
     d.forEach(item=>{
-      const tipo=/EXENT/i.test(String(item.tipo))?0:Math.round(parseFloat(String(item.tipo).replace(',','.'))||0);
+      const tipo=tipoIVA(item);
       if(!ivaMap[tipo]){tiposRaros.add(f.numero_factura||f.id);return;}
       {
         ivaMap[tipo].on=true;
@@ -2952,6 +2964,11 @@ async function exportAS400(){
         ivaMap[tipo].base=Math.round((ivaMap[tipo].base+(numES(item.base)||0))*100)/100;
       }
     });
+    if(noIVA.length){
+      const irpf=Math.abs(numES(ia._irpf?.importe||ia.factura?.importes?.irpf?.importe||f.importe_irpf)||0);
+      const suma=(+f.base_imponible||0)+ivaMap[0].cuota+ivaMap[10].cuota+ivaMap[21].cuota-irpf;
+      if(Math.abs(Math.abs(suma)-Math.abs(+f.total_factura||0))>0.05) tiposRaros.add(f.numero_factura||f.id);
+    }
     // El tipo va como número, sin el símbolo % (Paqui, 15/10/2026).
     // Abono: base y cuota en negativo, como el total (venían en positivo).
     const sg=v=>(+f.total_factura<0&&+v>0)?-v:v;
@@ -2992,7 +3009,7 @@ async function exportAS400(){
   XLSX.utils.book_append_sheet(wb,ws,'AS400');
   XLSX.writeFile(wb,`AS400_asientos_montero_${hoyISO()}.xlsx`);
   avisoMuchosAlbaranes(ff);
-  if(tiposRaros.size)alert(`Ojo: ${tiposRaros.size} factura${tiposRaros.size!==1?'s':''} con un IVA distinto de 0, 10 o 21 % (${[...tiposRaros].slice(0,8).join(', ')}).\n\nEse tipo no tiene columna en el Excel del AS400: su base y su cuota NO salen en las columnas de IVA. Grábalas a mano.`);
+  if(tiposRaros.size)alert(`Ojo: ${tiposRaros.size} factura${tiposRaros.size!==1?'s':''} con un importe que no es IVA del 0, 10 o 21 % y que cambia el total (${[...tiposRaros].slice(0,8).join(', ')}).\n\nEse importe (por ejemplo, un recargo de equivalencia) no tiene columna en el Excel del AS400. Grábalo a mano.`);
   // Las facturas en PDF acompañan al Excel: se guardan en el registro de IVA
   // soportado (Paqui, 25/09/2026). Si fallan, el Excel ya está descargado.
   const notaPdf=await descargarFacturasIva(ff,btn);

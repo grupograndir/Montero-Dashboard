@@ -2212,15 +2212,19 @@ async function openDrawer(id){
       // proveedor por el nombre en la lista antigua y se quedaba congelada. Dos facturas de
       // RB del mismo día salían una con «RAPPEL 5% MENSUAL» y otra sin nada (26/10/2026).
       const vd=(j._descuento_validacion||j?.datos_extraidos?._descuento_validacion)||null;
-      const c=condicionDe(f), pactado=c?String(c.descuento??'').trim():'';
+      // La tarifa también sale de ahí (columna TARIFAS): «PEDIDO» quiere decir que el precio
+      // es el del pedido; si no, es la tarifa fija con la que hay que cotejar los precios
+      // (EcoVall: «ALQ.MES=16€/VACIADO 98€…», Paqui 29/10/2026).
+      const c=condicionDe(f), pactado=c?String(c.descuento??'').trim():'', tarifa=c?String(c.tarifas??'').trim():'';
       const enFactura=vd&&vd.descuento_factura_pct!=null&&!isNaN(+vd.descuento_factura_pct)?+vd.descuento_factura_pct:null;
-      if(!pactado&&enFactura==null)return '';
+      if(!pactado&&!tarifa&&enFactura==null)return '';
       const porVolumen=/MENSUAL|RAPPEL|ANUAL|TRIMESTR|SEMESTR/i.test(pactado);
       const kv=(k,v)=>`<div class="kv-item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
       return `<div class="dr-sec">
-        <div class="dr-sec-t">${svg('<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>')}Descuento</div>
+        <div class="dr-sec-t">${svg('<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>')}Condiciones pactadas</div>
+        ${tarifa?`<div class="kv one"><div class="kv-item"><div class="k">Tarifa (Excel de proveedores)</div><div class="v">${/^PEDIDO$/i.test(tarifa)?'Según el pedido: los precios son los del pedido autorizado':`<b>${esc(tarifa)}</b>`}</div></div></div>`:''}
         <div class="kv">
-          ${kv('Pactado (Excel de proveedores)',pactado?`<b>${esc(pactado)}</b>`:`<span style="color:var(--muted)">${c?'El Excel no pone descuento':'Este proveedor no está en el Excel'}</span>`)}
+          ${kv('Descuento pactado (Excel)',pactado?`<b>${esc(pactado)}</b>`:`<span style="color:var(--muted)">${c?'El Excel no pone descuento':'Este proveedor no está en el Excel'}</span>`)}
           ${enFactura!=null?kv('En la factura',esc(enFactura.toLocaleString('es-ES',{maximumFractionDigits:2}))+' %'+(vd.descuento_factura_txt?`<br><span style="color:var(--muted);font-size:12px">${esc(vd.descuento_factura_txt)}</span>`:'')):''}
         </div>
         ${porVolumen?'<div style="font-size:12.5px;color:var(--muted);margin-top:6px">Es un descuento por volumen: no se aplica factura a factura, así que aquí no se puede comprobar.</div>':''}

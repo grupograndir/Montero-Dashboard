@@ -1099,8 +1099,13 @@ function badgeSinCodigo(f){
 function esDeGiro(f){
   const k=normProv(nombreProv(f));
   if(k&&(state.giro||[]).some(x=>x&&(x===k||k.includes(x)||x.includes(k))))return true;
-  const c=condicionDe(f);
-  if(c&&/GIRO|DOMICIL|RECIBO/i.test(String(c.forma_pago||'')))return true;
+  const c=condicionDe(f), fp=String(c&&c.forma_pago||'').trim();
+  if(/GIRO|DOMICIL|RECIBO/i.test(fp))return true;
+  // Si el Excel ya dice cómo le paga Montero («60», «TRANSFERENCIA»…), manda el Excel aunque la
+  // factura imprima «GIRO» o una cuenta de domiciliación: Boyma 26524 pone «GIRO 60 días» y Montero
+  // le paga a 60 días (Verónica, 30/10/2026). Sin nada en el Excel decide la factura: luz, agua,
+  // alarmas… son recibos domiciliados de verdad.
+  if(fp)return false;
   return /\bGIRO\b|RECIBO|DOMICILI|\bSEPA\b|ADEUDO/i.test(String(f.forma_pago_factura||''));
 }
 // La forma de pago en pocas palabras y escrita siempre igual. Cada proveedor la

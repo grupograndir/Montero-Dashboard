@@ -1084,6 +1084,18 @@ function codigoProv(f){
   if(!_codCache.has(k))_codCache.set(k,String((proveedorDeFactura(f)||{}).codigo_proveedor||(condicionDe(f)||{}).codigo||''));
   return _codCache.get(k);
 }
+// Verónica (03/11/2026): a los proveedores se les conoce por su código AS400, así que
+// sale delante del nombre en todas las pantallas y «Proveedor» ordena por él, no por
+// el nombre. Los que aún no tienen código van al final, por nombre.
+function textoProv(f){const c=codigoProv(f);return (c?c+' ':'')+nombreProv(f);}
+function provConCodigo(f){const c=codigoProv(f);return (c?`<b class="mono" style="margin-right:6px">${esc(c)}</b>`:'')+esc(nombreProv(f));}
+function ordenCodigo(c){const n=parseInt(String(c||'').replace(/\D/g,''),10);return isNaN(n)?Infinity:n;}
+function porCodigo(ca,cb,na,nb){const a=ordenCodigo(ca),b=ordenCodigo(cb);
+  if(a!==b)return a===Infinity?1:b===Infinity?-1:a-b;return String(na||'').localeCompare(String(nb||''),'es');}
+// Lista de proveedores para los desplegables «Todos los proveedores»: «3767 BYG», por código.
+function listaProvs(ff){const cod={};ff.forEach(f=>{const k=claveProv(f);if(!cod[k])cod[k]=codigoProv(f);});
+  return Object.keys(cod).map(k=>({k,n:nombreCanonico(k),c:cod[k]})).sort((a,b)=>porCodigo(a.c,b.c,a.n,b.n));}
+const opcProv=p=>(p.c?p.c+' ':'')+p.n;
 function badgeSinCodigo(f){
   return codigoProv(f)?'':'<span class="bdg sincond" title="Proveedor sin código AS400: ábrela y escríbelo una vez">sin código</span>';
 }
@@ -1484,7 +1496,8 @@ function viewSueltos(){
     .map(f=>{
       // Dos facturas con el mismo texto se distinguen por su referencia: antes la
       // segunda pisaba a la primera y el papel iba a la que no era.
-      let et=`${f.numero_factura||'(sin número)'} · ${f.prov||'?'} · ${eur(f.total_factura)} · ${dt(f.fecha_factura)}`;
+      const fl=facturaLocal(f.id),cod=fl?codigoProv(fl):String(((state.provPorId&&state.provPorId.get(f.proveedor_id))||{}).codigo_proveedor||'');
+      let et=`${f.numero_factura||'(sin número)'} · ${cod?cod+' ':''}${f.prov||'?'} · ${eur(f.total_factura)} · ${dt(f.fecha_factura)}`;
       if(state.opcionesFac.has(et))et+=` · ref ${f.id.slice(0,6)}`;
       state.opcionesFac.set(et,f.id);
       return `<option value="${esc(et)}"></option>`;
@@ -1618,7 +1631,7 @@ function viewResumen(){
 function colaTrabajo(ff){
   if(!ff.length)return`<div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">Todo al día</p><small>No hay facturas pendientes de revisar</small></div>`;
   const rows=ff.slice(0,8).map(f=>`<tr data-id="${f.id}">
-      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
+      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${provConCodigo(f)}</span>${badgeSinCodigo(f)}</div></td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
       <td class="mono">${dt(f.fecha_factura)}</td>
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
@@ -1676,7 +1689,9 @@ function aplicarFiltros(ff,c){
     if(k==='fecha'){va=new Date(a.fecha_factura||a.fecha_recepcion);vb=new Date(b.fecha_factura||b.fecha_recepcion);}
     else if(k==='cargada'){va=new Date(a.fecha_recepcion||a.creado_en);vb=new Date(b.fecha_recepcion||b.creado_en);}
     else if(k==='total'){va=+a.total_factura||0;vb=+b.total_factura||0;}
-    else if(k==='prov'){va=nombreProv(a);vb=nombreProv(b);}
+    else if(k==='prov'){const o=porCodigo(codigoProv(a),codigoProv(b),nombreProv(a),nombreProv(b));
+      // Sin código, al final también en orden inverso.
+      if(!codigoProv(a)!==!codigoProv(b))return o;return o*dir;}
     else if(k==='pago'){va=formaPago(a).texto;vb=formaPago(b).texto;}
     else if(k==='validada'){va=((validacion(a)||{}).fecha)||'';vb=((validacion(b)||{}).fecha)||'';}
     else if(k==='contab'){va=fechaContabilizada(a)||'';vb=fechaContabilizada(b)||'';}
@@ -1698,8 +1713,7 @@ function filtradas(){
   return aplicarFiltros(ff,{chip:state.quickFilter,valida:state.fValida,prov:state.fProv,estado:state.fEstado,pago:state.fPago,search:state.search,sort:state.sort});
 }
 function viewFacturas(){
-  const provs=[...new Set(state.facturas.map(claveProv))]
-    .map(k=>({k,n:nombreCanonico(k)})).sort((a,b)=>a.n.localeCompare(b.n,'es'));
+  const provs=listaProvs(state.facturas);
   const estados=[...new Set(state.facturas.map(f=>f.estado).filter(Boolean))].sort();
   const hay=new Set(state.facturas.map(f=>formaPago(f).tipo));
   const pagos=FORMAS_PAGO.filter(p=>hay.has(p));
@@ -1753,7 +1767,7 @@ function viewFacturas(){
       <button class="btn-s ok" id="arch-desc" disabled>Descargar facturas (0)</button></div>`:''}
     <div class="tbl-tools">
       <div class="search">${svg(ICN.list).replace(ICN.list,'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>')}<input id="f-search" placeholder="Buscar nº factura, proveedor, NIF o forma de pago…" value="${esc(state.search)}"></div>
-      <select class="sel" id="f-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.fProv?'selected':''}>${esc(p.n)}</option>`).join('')}</select>
+      <select class="sel" id="f-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.fProv?'selected':''}>${esc(opcProv(p))}</option>`).join('')}</select>
       <select class="sel" id="f-estado"><option value="">Todos los estados</option>${estados.map(e=>`<option value="${esc(e)}" ${e===state.fEstado?'selected':''}>${esc(estadoLbl(e))}</option>`).join('')}</select>
       <select class="sel" id="f-valida" title="Quién tiene que validarla (Excel de condiciones)"><option value="">Valide quien valide</option>${validadores.map(v=>`<option value="${esc(v)}" ${v===state.fValida?'selected':''}>${esc(v)}</option>`).join('')}</select>
       <details class="multi" id="f-pago"><summary class="sel">${state.fPago.length?`Pago: ${esc(state.fPago.join(', '))}`:'Todas las formas de pago'}</summary>
@@ -1870,7 +1884,7 @@ function tablaFacturas(ff,full){
       <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
-      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
+      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${provConCodigo(f)}</span>${badgeSinCodigo(f)}</div></td>
       ${full?(()=>{const p=formaPago(f);return `<td style="font-size:12.5px" title="${esc(p.original?'La factura dice: '+p.original:'La factura no dice cómo se paga')}${p.acordado?' · días según lo acordado con el proveedor':''}">${esc(p.texto)}</td>`;})():''}
       <td class="r cell-strong">${eur(f.total_factura)} ${warn?`<span title="El total no cuadra: base + IVA = ${esc(eur(f.total_calculado))} y se ha leído ${esc(eur(f.total_factura))} (diferencia ${esc(eur(dif))}). Casi siempre es un importe mal leído: ábrela y corrígelo." style="color:var(--rd);cursor:help">${svg(ICN.alert).replace('viewBox','width="13" height="13" style="vertical-align:-2px" viewBox')}</span>`:''}</td>
       ${full?`<td style="font-size:12.5px;white-space:nowrap">${esc(validadorDe(f)||'—')}</td>`:''}
@@ -1913,7 +1927,7 @@ function viewAprobadas(){
   const ff=aprobadasFiltradas();
   const so=state.apSort||{k:'aprobada',dir:1};
   const thA=(k,l,r)=>`<th class="srt ${r?'r':''}" data-apsort="${k}">${l}<span class="arr">${so.k===k?(so.dir>0?'▲':'▼'):''}</span></th>`;
-  const provs=[...new Set(todas.map(claveProv))].map(k=>({k,n:nombreCanonico(k)})).sort((a,b)=>a.n.localeCompare(b.n,'es'));
+  const provs=listaProvs(todas);
   const estados=[...new Set(todas.map(f=>f.estado).filter(Boolean))].sort();
   const hay=new Set(todas.map(f=>formaPago(f).tipo)), pagos=FORMAS_PAGO.filter(p=>hay.has(p));
   const validadores=[...new Set(todas.map(f=>validadorDe(f)||'(nadie)'))].sort();
@@ -1922,7 +1936,7 @@ function viewAprobadas(){
     <div class="chips-row" style="padding:0 0 10px">${CHIPS.map(([k,l])=>`<button class="chip ${(state.apChip||'')===k?'active':''}" data-apchip="${k}">${l}</button>`).join('')}</div>
     <div class="filtros" style="border:0;padding:0">
       <div class="search">${svg('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>')}<input id="ap-buscar" placeholder="Buscar nº factura, proveedor, código, NIF o forma de pago…" value="${esc(state.apBuscar||'')}"></div>
-      <select class="sel" id="ap-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.apProv?'selected':''}>${esc(p.n)}</option>`).join('')}</select>
+      <select class="sel" id="ap-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.apProv?'selected':''}>${esc(opcProv(p))}</option>`).join('')}</select>
       <select class="sel" id="ap-estado"><option value="">Todos los estados</option>${estados.map(e=>`<option value="${esc(e)}" ${e===state.apEstado?'selected':''}>${esc(estadoLbl(e))}</option>`).join('')}</select>
       <select class="sel" id="ap-valida"><option value="">Valide quien valide</option>${validadores.map(v=>`<option value="${esc(v)}" ${v===state.apValida?'selected':''}>${esc(v)}</option>`).join('')}</select>
       <details class="multi" id="ap-pago"><summary class="sel">${apPago.length?`Pago: ${esc(apPago.join(', '))}`:'Todas las formas de pago'}</summary>
@@ -1939,7 +1953,7 @@ function viewAprobadas(){
       <td class="mono cell-strong" style="white-space:nowrap" title="${esc(a.por||'')}">${dt(a.fecha)} <span style="color:var(--faint);font-weight:400">${a.fecha?new Date(a.fecha).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):''}</span></td>
       <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
       <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
-      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${codigoProv(f)?`<b class="mono" style="margin-right:6px">${esc(codigoProv(f))}</b>`:''}${esc(nombreProv(f))}</span>${badgeSinCodigo(f)}</div></td>
+      <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${provConCodigo(f)}</span>${badgeSinCodigo(f)}</div></td>
       <td style="font-size:12.5px">${esc(formaPago(f).texto)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
       <td style="font-size:12.5px;white-space:nowrap">${esc(validadorDe(f)||'—')}</td>
@@ -1975,7 +1989,7 @@ function bindAprobadas(){
 // fechas de pago y búsqueda. Las domiciliadas se paga solas: se pueden ver aquí.
 function viewPagadas(){
   const todas=conPagos().filter(f=>!f.eliminada&&(enPagadas(f)||(state.pgDomic&&esDeGiro(f))));
-  const provs=[...new Set(todas.map(claveProv))].map(k=>({k,n:nombreCanonico(k)})).sort((a,b)=>a.n.localeCompare(b.n,'es'));
+  const provs=listaProvs(todas);
   const q=String(state.pgBuscar||'').trim();
   const min=numES(state.pgMin), max=numES(state.pgMax);
   const ff=todas.filter(f=>{
@@ -1989,7 +2003,7 @@ function viewPagadas(){
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
   const filtros=`<div class="card" style="margin-bottom:14px"><div class="filtros" style="border:0;padding:0">
     <input id="pg-buscar" placeholder="Nº factura, proveedor, CIF… (Intro)" value="${esc(state.pgBuscar)}" style="flex:1 1 14rem">
-    <select class="sel" id="pg-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.pgProv?'selected':''}>${esc(p.n)}</option>`).join('')}</select>
+    <select class="sel" id="pg-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.pgProv?'selected':''}>${esc(opcProv(p))}</option>`).join('')}</select>
     <input id="pg-min" inputmode="decimal" placeholder="Importe desde" value="${esc(state.pgMin)}" style="width:110px"><input id="pg-max" inputmode="decimal" placeholder="hasta" value="${esc(state.pgMax)}" style="width:90px">
     <span style="font-size:12.5px">Pagadas del</span><input type="date" id="pg-desde" value="${esc(state.pgDesde)}"><span style="font-size:12.5px">al</span><input type="date" id="pg-hasta" value="${esc(state.pgHasta)}">
     <label style="font-size:12.5px;display:flex;gap:5px;align-items:center"><input type="checkbox" id="pg-domic" ${state.pgDomic?'checked':''}> Incluir domiciliadas</label></div></div>`;
@@ -2040,7 +2054,7 @@ function listaIncidencias(inc){
           ${codigos.map(c=>`<span class="inc-code">${esc(c)}</span>`).join('')}
           <span class="bdg t-${tipo}">${items.length} incidencia${items.length!==1?'s':''}</span>
           ${abiertas===0?`<span class="bdg s-VALIDADA">RESUELTA</span>`:''}
-          ${f?`<span style="font-size:12px;color:var(--faint)">· ${esc(f.numero_factura||'(sin número)')} · ${esc(nombreProv(f))}</span>`:''}
+          ${f?`<span style="font-size:12px;color:var(--faint)">· ${esc(f.numero_factura||'(sin número)')} · ${esc(textoProv(f))}</span>`:''}
         </div>
         <div class="inc-desc">${esc(textos.join(' · '))}</div>
       </div>
@@ -2051,7 +2065,7 @@ function listaIncidencias(inc){
 /* ---------- PROVEEDORES ---------- */
 function statsProveedores(){
   const map={};
-  state.facturas.forEach(f=>{const k=claveProv(f);if(!map[k])map[k]={clave:k,nombre:nombreCanonico(k),nif:nifProv(f),num:0,imp:0,conf:[],estados:{},facturas:[]};const p=map[k];p.num++;p.imp+=+f.total_factura||0;if(f.confianza_extraccion!=null)p.conf.push(+f.confianza_extraccion);p.estados[f.estado]=(p.estados[f.estado]||0)+1;p.facturas.push(f);});
+  state.facturas.forEach(f=>{const k=claveProv(f);if(!map[k])map[k]={clave:k,nombre:nombreCanonico(k),nif:nifProv(f),cod:'',num:0,imp:0,conf:[],estados:{},facturas:[]};const p=map[k];if(!p.cod)p.cod=codigoProv(f);p.num++;p.imp+=+f.total_factura||0;if(f.confianza_extraccion!=null)p.conf.push(+f.confianza_extraccion);p.estados[f.estado]=(p.estados[f.estado]||0)+1;p.facturas.push(f);});
   return Object.values(map).sort((a,b)=>b.imp-a.imp);
 }
 function viewProveedores(){
@@ -2059,16 +2073,20 @@ function viewProveedores(){
   const provs=statsProveedores();
   if(!provs.length)return`<div class="card"><div class="empty">${svg(ICN.inbox)}<p>Sin proveedores</p></div></div>`;
   const maxImp=provs[0].imp||1;
+  const so=state.provSort||{k:'imp',dir:-1};
+  if(so.k==='prov'){provs.sort((a,b)=>{const o=porCodigo(a.cod,b.cod,a.nombre,b.nombre);return !a.cod!==!b.cod?o:o*so.dir;});}
+  else provs.sort((a,b)=>(a[so.k]-b[so.k])*so.dir);
+  const thP=(k,l,r)=>`<th class="srt ${r?'r':''}" data-psort="${k}">${l}<span class="arr">${so.k===k?(so.dir>0?'▲':'▼'):''}</span></th>`;
   const rows=provs.map(p=>{
     return `<tr data-prov="${esc(p.clave)}">
-      <td><div class="prov-cell"><div class="prov-av">${initials(p.nombre)}</div><div><div class="cell-strong">${esc(p.nombre)}</div>${p.nif?`<div class="mono" style="font-size:11px;color:var(--faint)">${esc(p.nif)}</div>`:''}</div></div></td>
+      <td><div class="prov-cell"><div class="prov-av">${initials(p.nombre)}</div><div><div class="cell-strong">${p.cod?`<b class="mono" style="margin-right:6px">${esc(p.cod)}</b>`:''}${esc(p.nombre)}</div>${p.nif?`<div class="mono" style="font-size:11px;color:var(--faint)">${esc(p.nif)}</div>`:''}</div></div></td>
       <td class="r cell-strong">${p.num}</td>
       <td class="r"><div style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><div class="rank-bar" style="width:90px;margin:0"><div class="rank-fill" style="width:${Math.round(p.imp/maxImp*100)}%"></div></div><b>${eur(p.imp)}</b></div></td>
       <td class="r" style="color:var(--faint)">${svg('<polyline points="9 18 15 12 9 6"/>').replace('viewBox','width="15" height="15" viewBox')}</td>
     </tr>`;
   }).join('');
   return `<div class="card"><div class="card-h"><div class="card-t">${svg('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/>')}Proveedores</div><span class="card-meta">${provs.length} activos · clic para ver detalle</span></div>
-  <div class="tbl-wrap"><table><thead><tr><th>Proveedor</th><th class="r">Facturas</th><th class="r">Importe total</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  <div class="tbl-wrap"><table><thead><tr>${thP('prov','Proveedor')}${thP('num','Facturas',1)}${thP('imp','Importe total',1)}<th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 function viewProveedorDetalle(clave){
   const p=statsProveedores().find(x=>x.clave===clave);
@@ -2082,7 +2100,7 @@ function viewProveedorDetalle(clave){
     <button class="ico-btn" id="prov-back">${svg('<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>')}Volver</button>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="prov-av" style="width:42px;height:42px;font-size:15px;border-radius:11px">${initials(p.nombre)}</div>
-      <div><div style="font-size:19px;font-weight:800;letter-spacing:-.3px">${esc(p.nombre)}</div>${p.nif?`<div class="mono" style="font-size:12px;color:var(--faint)">${esc(p.nif)}</div>`:''}</div>
+      <div><div style="font-size:19px;font-weight:800;letter-spacing:-.3px">${p.cod?`<span class="mono" style="margin-right:8px">${esc(p.cod)}</span>`:''}${esc(p.nombre)}</div>${p.nif?`<div class="mono" style="font-size:12px;color:var(--faint)">${esc(p.nif)}</div>`:''}</div>
     </div>
   </div>
   <div class="card" style="margin-bottom:18px;background:linear-gradient(135deg,var(--red),#e03250);border:none">
@@ -2097,7 +2115,7 @@ function viewProveedorDetalle(clave){
     </div>
   </div>
   <div class="card">
-    <div class="card-h"><div class="card-t">${svg(ICN.file)}Facturas de ${esc(p.nombre)}</div><span class="card-meta">${ff.length} facturas</span></div>
+    <div class="card-h"><div class="card-t">${svg(ICN.file)}Facturas de ${esc((p.cod?p.cod+' ':'')+p.nombre)}</div><span class="card-meta">${ff.length} facturas</span></div>
     ${tablaFacturas(ff,false)}
   </div>`;
 }
@@ -2812,6 +2830,8 @@ function bindContent(){
     if(state.verEliminadas){state.verEliminadas=false;loadAll();}else render();});
   document.querySelectorAll('[data-elim]').forEach(b=>b.onclick=()=>{state.verEliminadas=!state.verEliminadas;state.quickFilter='';loadAll();});
   document.querySelectorAll('tbody tr[data-prov]').forEach(tr=>tr.onclick=()=>{state.provSel=tr.dataset.prov;render();});
+  document.querySelectorAll('th[data-psort]').forEach(t=>t.onclick=()=>{const k=t.dataset.psort,o=state.provSort||{k:'imp',dir:-1};
+    state.provSort=o.k===k?{k,dir:-o.dir}:{k,dir:k==='prov'?1:-1};render();});
   const back=$('#prov-back');if(back)back.onclick=()=>{state.provSel=null;render();};
   document.querySelectorAll('th[data-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.sort;if(state.sort.k===k)state.sort.dir*=-1;else state.sort={k,dir:k==='prov'?1:-1};render();});
   const s=$('#f-search');if(s)s.oninput=e=>{state.search=e.target.value;refreshTabla();};

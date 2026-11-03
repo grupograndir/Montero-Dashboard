@@ -272,7 +272,7 @@ td.r{text-align:right}
 .dr-sub{font-size:13px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:8px}
 .dr-body{overflow-y:auto;flex:1;padding:8px 0}
 .dr-sec{padding:18px 24px;border-bottom:1px solid var(--line-2)}
-.dr-sec-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);margin-bottom:13px;display:flex;align-items:center;gap:7px}
+.dr-sec-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--red);margin-bottom:13px;display:flex;align-items:center;gap:7px}
 .dr-sec-t svg{width:14px;height:14px}
 .kv{display:grid;grid-template-columns:1fr 1fr;gap:13px 18px}
 .kv.one{grid-template-columns:1fr}
@@ -766,6 +766,51 @@ function claveProv(f){
 }
 function nombreCanonico(clave){return (state._provNombre||{})[clave]||clave.replace(/^[NF]:/,'');}
 function nifProv(f){const j=f.json_extraccion_ia||{};return j?.proveedor?.nif_cif||j?.datos_extraidos?.proveedor?.nif_cif||null;}
+// Unidades pedidas, recibidas y facturadas, para validar de un vistazo sin abrir los PDF
+// (Rubén y Verónica, 03/11/2026). El cotejo lo calcula el PC (scripts/cotejo_unidades.py)
+// y lo guarda en _cotejo_unidades; aquí solo se enseña. Quien lee guarda lo que ve, quien
+// recalcula decide: si el panel también sumara, acabaría diciendo otra cosa.
+function fmtU(n){return n==null||isNaN(+n)?'—':(+n).toLocaleString('es-ES',{maximumFractionDigits:3});}
+function tablaLineas(lineas,idx){
+  const ls=(idx||lineas.map((_,i)=>i)).map(i=>[i,lineas[i]]).filter(([,l])=>l);
+  if(!ls.length)return '';
+  return `<table class="mini-tbl"><thead><tr><th>#</th><th>Descripción</th><th class="r">Cant.</th><th class="r">Precio</th><th class="r">Importe</th></tr></thead><tbody>${ls.map(([i,l])=>`<tr><td>${esc(l.numero_linea??i+1)}</td><td>${esc(l.descripcion||l.referencia||'—')}</td><td class="r">${l.cantidad!=null?esc(fmtU(numES(l.cantidad))):'—'}</td><td class="r">${l.precio_unitario!=null?eur(l.precio_unitario):'—'}</td><td class="r">${l.importe_linea!=null?eur(l.importe_linea):'—'}</td></tr>`).join('')}</tbody></table>`;
+}
+function lineasConCotejo(f,lineas){
+  const co=(f.json_extraccion_ia||{})._cotejo_unidades;
+  const todas=lineas.length?tablaLineas(lineas):'<div style="color:var(--faint);font-size:13px;padding:6px 0">No se han extraído líneas de detalle.</div>';
+  if(!co)return `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Todavía no se han comparado las unidades del pedido, del albarán y de la factura.</div>${todas}`;
+  if(co.estado==='NO_APLICA')return `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">${esc(co.motivo||'Esta factura no lleva pedido ni albarán con los que comparar.')}</div>${todas}`;
+  const ESTADO={CUADRA:['var(--green)','var(--gr-s,#e8f5ee)','✓ Pedido, albarán y factura coinciden'],
+    PARCIAL:['var(--amber)','var(--amber-s)','Entrega parcial: faltan unidades por llegar o por facturar'],
+    NO_CUADRA:['var(--rd)','var(--rd-s)','✗ No coinciden: revisa antes de validar'],
+    SIN_LEER:['var(--amber)','var(--amber-s)','Faltan papeles por leer: todavía no se puede comparar'],
+    SIN_PAPELES:['var(--rd)','var(--rd-s)','Falta el pedido o el albarán: no se puede comparar']}[co.estado]||['var(--muted)','var(--bg)',esc(co.estado||'')];
+  const fila=(t,origen,v,nota)=>`<div class="imp-row"><span class="l">${t} <span style="color:var(--muted);font-size:12px">(${origen})</span></span><span class="v">${v!=null?esc(fmtU(v)):`<span style="color:var(--muted);font-weight:500">${esc(nota||'—')}</span>`}</span></div>`;
+  const filaE=(t,v,nota)=>`<div class="imp-row"><span class="l">${t}</span><span class="v">${v!=null?eur(v):`<span style="color:var(--muted);font-weight:500">${esc(nota||'—')}</span>`}</span></div>`;
+  const grupos=Array.isArray(co.grupos)?co.grupos:[];
+  const otras=Array.isArray(co.otras)?co.otras:[], noCuentan=Array.isArray(co.no_cuentan)?co.no_cuentan:[];
+  const cab=(t,sub)=>`<div style="margin:14px 0 6px;font-size:12.5px;font-weight:700;color:var(--ink)">${t}${sub?` <span style="font-weight:500;color:var(--muted)">· ${sub}</span>`:''}</div>`;
+  const detalle=grupos.length
+    ?grupos.map(g=>cab([g.pedido?`Pedido ${esc(g.pedido)}`:'',g.albaran?`Albarán ${esc(g.albaran)}`:''].filter(Boolean).join(' · ')||'Sin pedido ni albarán',
+        `pedidas ${esc(fmtU(g.pedidas))} · recibidas ${esc(fmtU(g.recibidas))} · facturadas ${esc(fmtU(g.facturadas))}`)
+        +(tablaLineas(lineas,g.lineas||[])||'<div style="font-size:12px;color:var(--muted)">Ninguna línea de la factura es de este albarán.</div>')).join('')
+      +(otras.length?cab('Líneas de la factura sin albarán identificado')+tablaLineas(lineas,otras):'')
+    :todas;
+  return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:6px">
+      ${fila('Unidades pedidas','del pedido',co.pedidas,co.pedidas_nota)}
+      ${fila('Unidades recibidas','del albarán',co.recibidas,co.recibidas_nota)}
+      ${fila('Unidades facturadas','de la factura',co.facturadas,co.facturadas_nota)}
+      <div style="height:6px"></div>
+      ${filaE('Importe del pedido',co.importe_pedido,co.pedidas_nota)}
+      ${co.importe_albaran!=null?filaE('Importe del albarán',co.importe_albaran):''}
+      ${filaE('Importe facturado (base imponible)',co.importe_facturado)}
+      <div style="margin-top:8px;padding:7px 10px;border-radius:8px;background:${ESTADO[1]};color:${ESTADO[0]};font-size:12.5px;font-weight:700">${ESTADO[2]}</div>
+      ${(co.avisos||[]).map(a=>`<div style="font-size:12px;margin-top:5px;color:${a.nivel==='rojo'?'var(--rd)':'var(--amber)'}">· ${esc(a.texto)}</div>`).join('')}
+    </div>
+    ${detalle}
+    ${noCuentan.length?cab('No cuentan como unidades','portes, tasas y similares')+tablaLineas(lineas,noCuentan):''}`;
+}
 function lineasDe(f){const j=f.json_extraccion_ia||{};return j?.factura?.lineas||j?.datos_extraidos?.factura?.lineas||[];}
 const ICN={
   file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
@@ -1159,8 +1204,8 @@ function nifLimpio(n){
 // La delegación, solo la ciudad. Primero lo que se leyó del pedido/factura
 // (nombre de ciudad o código postal); si no, la última letra del código de
 // homologación local del Excel de proveedores (HLGV -> Valencia).
-const DELEG_CIUDADES=[['SEVILLA',/SEVILLA/],['MALAGA',/MALAGA/],['MURCIA',/MURCIA/],['ALICANTE',/ALICANTE|ALACANT/],
-  ['VALENCIA',/VALENCIA/],['CASTELLON',/CASTELLO/],['MADRID',/MADRID/],['ZARAGOZA',/ZARAGOZA/],['BARCELONA',/BARCELONA/],['BILBAO',/BILBAO|BIZKAIA|VIZCAYA/]];
+const DELEG_CIUDADES=[['SEVILLA',/SEVILLA/],['MALAGA',/MALAGA/],['MURCIA',/MURCIA|ESPINARDO/],['ALICANTE',/ALICANTE|ALACANT/],
+  ['VALENCIA',/VALENCIA|ALFAFAR/],['CASTELLON',/CASTELLO/],['MADRID',/MADRID/],['ZARAGOZA',/ZARAGOZA/],['BARCELONA',/BARCELONA|\bBARNA\b/],['BILBAO',/BILBAO|BIZKAIA|VIZCAYA/]];
 const DELEG_CP={'41':'SEVILLA','29':'MALAGA','30':'MURCIA','03':'ALICANTE','46':'VALENCIA','12':'CASTELLON','28':'MADRID','50':'ZARAGOZA','08':'BARCELONA','48':'BILBAO'};
 const DELEG_LETRA={V:'VALENCIA',Z:'ZARAGOZA',B:'BARCELONA',G:'MALAGA',I:'BILBAO',C:'CASTELLON',A:'ALICANTE',U:'MURCIA',M:'MADRID',T:'CENTRAL'};
 function ciudadDe(txt){
@@ -2191,45 +2236,59 @@ async function openDrawer(id){
         <span id="obs-estado" style="font-size:12.5px;color:var(--muted)"></span>
       </div>
     </div>
-    <div class="dr-sec">
+    ${(()=>{
+      // Orden de la ficha (correo de Verónica, 03/11/2026): proveedor, clasificación, importes,
+      // IVA, condiciones pactadas y líneas. La delegación, siempre solo la ciudad.
+      const kv=(k,v,ancho)=>`<div class="kv-item"${ancho?' style="grid-column:1/-1"':''}><div class="k">${k}</div><div class="v">${v}</div></div>`;
+      const nada=t=>`<span style="color:var(--muted);font-weight:400">${t}</span>`;
+      const c=condicionDe(f), cod=codigoProv(f), p=formaPago(f), ir=j._irpf;
+      const fpEx=String(c&&c.forma_pago||'').trim();
+      const nifL=nifLimpio(nifProv(f)||'');
+      const cajaCodigo=`<div class="v" style="display:flex;gap:8px;align-items:center;margin-top:4px">
+            <input id="inp-cod-prov" type="text" inputmode="numeric" style="flex:1;padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit" value="${esc(cod)}" placeholder="Ej: 5613">
+            <button onclick="guardarCodigoProveedor('${f.id}')" style="padding:6px 14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;white-space:nowrap;font-weight:600">Guardar</button></div>`;
+      return `<div class="dr-sec">
       <div class="dr-sec-t">${svg('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/>')}Proveedor</div>
+      <div style="font-size:15px;font-weight:700;line-height:1.4">${cod?`<span class="mono">${esc(cod)}</span> · `:''}${esc(nombreProv(f))} · <span class="mono">${esc(cifDe(f)||'sin NIF')}</span></div>
+      ${nombreLeido(f)!==nombreProv(f)?`<div style="font-size:11.5px;color:var(--muted)">En la factura se leyó «${esc(nombreLeido(f))}»</div>`:''}
+      ${nifL&&nifL!==cifDe(f)?`<div style="font-size:11.5px;color:var(--amber)">NIF leído en la factura: ${esc(nifProv(f))}</div>`:''}
+      <div class="kv" style="margin-top:12px">
+        ${kv('Homologación',homologacionDe(f)?`<span class="mono">${esc(homologacionDe(f))}</span>`:'<span style="color:var(--rd)">FALTA</span>')}
+        ${kv('Forma de pago y plazo (Excel)',fpEx?esc(/^\d{1,3}$/.test(fpEx)?fpEx+' días':fpEx):nada(c?'El Excel no lo dice':'No está en el Excel'))}
+      </div>
+      ${cod?`<details style="margin-top:8px;font-size:12px"><summary style="cursor:pointer;color:var(--muted)">Cambiar el código AS400</summary>${cajaCodigo}</details>`
+        :`<div style="margin-top:10px"><div style="padding:8px 10px;border-radius:8px;background:var(--amber-s);color:var(--amber);font-size:12px;font-weight:600">Proveedor sin código AS400: en el Excel del AS400 saldrá en blanco. Escríbelo aquí una vez y valdrá para todas sus facturas.</div>${cajaCodigo}</div>`}
+    </div>
+    <div class="dr-sec">
+      <div class="dr-sec-t">${svg(ICN.bot)}Clasificación IA</div>
       <div class="kv">
-        <div class="kv-item"><div class="k">Nombre</div><div class="v">${esc(nombreProv(f))}${nombreLeido(f)!==nombreProv(f)?`<div style="font-size:11.5px;color:var(--muted);font-weight:400">En la factura se leyó «${esc(nombreLeido(f))}»</div>`:''}</div></div>
-        <div class="kv-item"><div class="k">NIF / CIF</div><div class="v mono">${esc(cifDe(f)||'—')}${nifLimpio(nifProv(f)||'')&&nifLimpio(nifProv(f)||'')!==cifDe(f)?`<div style="font-size:11.5px;color:var(--amber);font-weight:400">Leído: ${esc(nifProv(f))}</div>`:''}</div></div>
-        <div class="kv-item"><div class="k">Homologación</div><div class="v mono">${homologacionDe(f)?esc(homologacionDe(f)):'<span style="color:var(--rd)">FALTA</span>'}</div></div>
-        <div class="kv-item"><div class="k">Delegación</div><div class="v">${delegacionCiudad(f)?esc(delegacionCiudad(f)):'<span style="color:var(--rd)">SIN DELEGACIÓN</span>'}</div></div>
-        <div class="kv-item"><div class="k">Valida</div><div class="v">${esc(validadorDe(f)||'—')}</div></div>
-        <div class="kv-item"><div class="k">Nº pedido</div><div class="v mono">${esc(numeroPedido(f)||'—')}</div></div>
-        <div class="kv-item" style="grid-column:1/-1"><div class="k">Código de proveedor (AS400)</div>
-          ${codigoProv(f)?'':`<div style="margin:4px 0 6px;padding:8px 10px;border-radius:8px;background:var(--amber-s);color:var(--amber);font-size:12px;font-weight:600">Proveedor sin código AS400: en el Excel del AS400 saldrá en blanco. Escríbelo aquí una vez y valdrá para todas sus facturas.</div>`}
-          <div class="v" style="display:flex;gap:8px;align-items:center;margin-top:2px">
-            <input id="inp-cod-prov" type="text" inputmode="numeric" style="flex:1;padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit" value="${esc(codigoProv(f))}" placeholder="Ej: 5613">
-            <button onclick="guardarCodigoProveedor('${f.id}')" style="padding:6px 14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;white-space:nowrap;font-weight:600">Guardar</button>
-          </div></div>
-        <div class="kv-item"><div class="k">Fecha factura</div><div class="v">${dt(f.fecha_factura)}</div></div>
-        <div class="kv-item"><div class="k">Recibida</div><div class="v">${dt(f.fecha_recepcion)}</div></div>
+        ${kv('Tipo documento',esc(f.tipo_documento_ia||'—'))}
+        ${kv('Estado de validación',`<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado)||f.estado||'—')}</span>`)}
+        ${kv('Dirección fiscal (nuestra)',f.direccion_fiscal_detectada?`<span style="font-weight:500;font-size:13px">${esc(f.direccion_fiscal_detectada)}</span>`:'—',1)}
+        ${kv('Delegación',delegacionCiudad(f)?esc(delegacionCiudad(f)):'<span style="color:var(--rd)">SIN DELEGACIÓN</span>',1)}
+        ${kv('Fecha fra.',dt(f.fecha_factura))}
+        ${kv('Recibida',dt(f.fecha_recepcion))}
       </div>
     </div>
     <div class="dr-sec">
       <div class="dr-sec-t">${svg(ICN.euro)}Importes</div>
       <div class="imp-row"><span class="l">Base imponible</span><span class="v">${eur(f.base_imponible)}</span></div>
-      <div class="imp-row"><span class="l">IVA ${f.porcentaje_iva?`(${f.porcentaje_iva}%)`:''}</span><span class="v">${eur(f.importe_iva)}</span></div>
-      ${+f.recargo_equivalencia?`<div class="imp-row"><span class="l">Recargo equivalencia</span><span class="v">${eur(f.recargo_equivalencia)}</span></div>`:''}
-      <div class="imp-row total"><span class="l">Total factura</span><span class="v">${eur(f.total_factura)}</span></div>
-      ${f.total_calculado!=null?`<div class="imp-row"><span class="l">Total calculado</span><span class="v">${eur(f.total_calculado)}</span></div>`:''}
-      ${dif!=null?`<div class="imp-row diff ${warn?'warn':''}"><span class="l">Diferencia ${warn?'(supera tolerancia)':'(dentro de tolerancia)'}</span><span class="v">${eur(dif)}</span></div>`:''}
+      ${+f.recargo_equivalencia?`<div class="imp-row"><span class="l">Recargo de equivalencia</span><span class="v">${eur(f.recargo_equivalencia)}</span></div>`:''}
+      ${ir?`<div class="imp-row"><span class="l">Retención IRPF (${esc(String(ir.pct??'?'))} %)</span><span class="v">−${eur(Math.abs(+ir.importe||0))}</span></div>`:''}
+      <div class="imp-row total"><span class="l">Total fra.</span><span class="v">${eur(f.total_factura)}</span></div>
+      ${warn?`<div class="imp-row diff warn"><span class="l">No cuadra: base + IVA da ${eur(f.total_calculado)} (diferencia)</span><span class="v">${eur(dif)}</span></div>`:''}
     </div>
-    ${(()=>{const dgTodo=Array.isArray(j._desglose_iva)?j._desglose_iva:[];const dg=dgTodo.filter(esIVA);const noIVA=dgTodo.filter(x=>!esIVA(x)&&(numES(x.cuota)||0)!==0);const amb=j._ambito_iva;if(!dg.length&&!noIVA.length&&!amb)return '';return `<div class="dr-sec"><div class="dr-sec-t">${svg(ICN.euro)}Desglose de IVA y régimen</div>${amb?`<div class="kv"><div class="kv-item"><div class="k">Ámbito (a efectos de IVA)</div><div class="v">${esc(amb)}</div></div>${j._delegacion?`<div class="kv-item"><div class="k">Delegación</div><div class="v">${esc(j._delegacion)}</div></div>`:''}</div>`:''}${dg.length?`<table class="mini-tbl" style="margin-top:12px"><thead><tr><th>Tipo IVA</th><th class="r">Base</th><th class="r">Cuota</th></tr></thead><tbody>${dg.map(x=>`<tr><td>${Math.round(+x.tipo)===0?'Exento':Math.round(+x.tipo)+'%'}</td><td class="r">${eur(x.base)}</td><td class="r">${x.cuota!=null?eur(x.cuota):'—'}</td></tr>`).join('')}</tbody></table>`:''}${noIVA.length?`<div style="font-size:11.5px;color:var(--muted);margin-top:6px">No es IVA (no sale en las columnas de IVA): ${noIVA.map(x=>`${String(Math.round(+x.tipo*100)/100).replace('.',',')} % → ${eur(numES(x.cuota))}`).join(' · ')}</div>`:''}</div>`;})()}
     ${(()=>{
-      const p=formaPago(f), ir=j._irpf;
-      const kv=(k,v)=>`<div class="kv-item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
-      return `<div class="dr-sec"><div class="dr-sec-t">${svg(ICN.card)}Pago</div><div class="kv">
-        ${kv('Forma de pago',esc(p.texto)+(p.original?`<br><span style="color:var(--muted);font-size:12px">La factura dice: «${esc(p.original)}»</span>`:''))}
-        ${kv('Plazo',esc(f.plazo_pago_factura||(p.acordado?`${p.dias} días (acordado)`:'—')))}
-        ${ir?kv('Retención IRPF',`${esc(String(ir.pct??'?'))} % · ${eur(ir.importe)}`):''}
-        ${j._autoriza_pedido?kv('Autoriza el pedido',esc(j._autoriza_pedido)):''}
-      </div></div>`;})()}
-    ${(f.direccion_fiscal_detectada||f.delegacion_detectada)?`<div class="dr-sec"><div class="dr-sec-t">${svg(ICN.pin)}Direcciones</div><div class="kv one"><div class="kv-item"><div class="k">Dirección fiscal detectada</div><div class="v" style="font-weight:500;font-size:13px">${esc(f.direccion_fiscal_detectada||'—')}</div></div>${f.delegacion_detectada?`<div class="kv-item"><div class="k">Delegación (texto leído)</div><div class="v" style="font-weight:500;font-size:13px">${esc(f.delegacion_detectada)}</div></div>`:''}</div></div>`:''}
+      // Sin desglose leído, la línea de IVA de la factura: si no, el IVA no se veía en ningún sitio.
+      const dgTodo=Array.isArray(j._desglose_iva)?j._desglose_iva:[];
+      let dg=dgTodo.filter(esIVA);
+      if(!dg.length&&f.importe_iva!=null)dg=[{tipo:f.porcentaje_iva,base:f.base_imponible,cuota:f.importe_iva}];
+      const noIVA=dgTodo.filter(x=>!esIVA(x)&&(numES(x.cuota)||0)!==0), amb=j._ambito_iva;
+      if(!dg.length&&!noIVA.length&&!amb)return '';
+      return `<div class="dr-sec"><div class="dr-sec-t">${svg(ICN.euro)}Desglose de IVA y régimen</div>
+        ${amb?`<div class="kv">${kv('Ámbito (a efectos de IVA)',esc(amb))}</div>`:''}
+        ${dg.length?`<table class="mini-tbl" style="margin-top:12px"><thead><tr><th>Tipo IVA</th><th class="r">Base</th><th class="r">Cuota</th></tr></thead><tbody>${dg.map(x=>`<tr><td>${x.tipo==null?'—':Math.round(+x.tipo)===0?'Exento':Math.round(+x.tipo)+'%'}</td><td class="r">${eur(x.base)}</td><td class="r">${x.cuota!=null?eur(x.cuota):'—'}</td></tr>`).join('')}</tbody></table>`:''}
+        ${noIVA.length?`<div style="font-size:11.5px;color:var(--muted);margin-top:6px">No es IVA (no sale en las columnas de IVA): ${noIVA.map(x=>`${String(Math.round(+x.tipo*100)/100).replace('.',',')} % → ${eur(numES(x.cuota))}`).join(' · ')}</div>`:''}</div>`;})()}
     ${(()=>{
       // El descuento pactado sale del Excel de proveedores (condicionDe: código del AS400,
       // CIF o nombre), no de la comprobación que hizo la lectura al entrar: esa buscaba al
@@ -2239,27 +2298,27 @@ async function openDrawer(id){
       // La tarifa también sale de ahí (columna TARIFAS): «PEDIDO» quiere decir que el precio
       // es el del pedido; si no, es la tarifa fija con la que hay que cotejar los precios
       // (EcoVall: «ALQ.MES=16€/VACIADO 98€…», Paqui 29/10/2026).
-      const c=condicionDe(f), pactado=c?String(c.descuento??'').trim():'', tarifa=c?String(c.tarifas??'').trim():'';
+      const pactado=c?String(c.descuento??'').trim():'', tarifa=c?String(c.tarifas??'').trim():'';
       const enFactura=vd&&vd.descuento_factura_pct!=null&&!isNaN(+vd.descuento_factura_pct)?+vd.descuento_factura_pct:null;
-      if(!pactado&&!tarifa&&enFactura==null)return '';
       const porVolumen=/MENSUAL|RAPPEL|ANUAL|TRIMESTR|SEMESTR/i.test(pactado);
-      const kv=(k,v)=>`<div class="kv-item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+      const autoriza=j._autoriza_pedido||(c&&c.autoriza_pedido)||'';
       return `<div class="dr-sec">
         <div class="dr-sec-t">${svg('<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>')}Condiciones pactadas</div>
-        ${tarifa?`<div class="kv one"><div class="kv-item"><div class="k">Tarifa (Excel de proveedores)</div><div class="v">${/^PEDIDO$/i.test(tarifa)?'Según el pedido: los precios son los del pedido autorizado':`<b>${esc(tarifa)}</b>`}</div></div></div>`:''}
         <div class="kv">
-          ${kv('Descuento pactado (Excel)',pactado?`<b>${esc(pactado)}</b>`:`<span style="color:var(--muted)">${c?'El Excel no pone descuento':'Este proveedor no está en el Excel'}</span>`)}
-          ${enFactura!=null?kv('En la factura',esc(enFactura.toLocaleString('es-ES',{maximumFractionDigits:2}))+' %'+(vd.descuento_factura_txt?`<br><span style="color:var(--muted);font-size:12px">${esc(vd.descuento_factura_txt)}</span>`:'')):''}
+          ${kv('Tarifa (Excel de proveedores)',tarifa?(/^PEDIDO$/i.test(tarifa)?'Según el pedido: los precios son los del pedido autorizado':`<b>${esc(tarifa)}</b>`):nada(c?'El Excel no pone tarifa':'Este proveedor no está en el Excel'))}
+          ${kv('Descuento pactado (Excel)',(pactado?`<b>${esc(pactado)}</b>`:nada(c?'El Excel no pone descuento':'Este proveedor no está en el Excel'))
+            +(enFactura!=null?`<div style="font-size:12px;color:var(--muted);font-weight:400">En la factura: ${esc(enFactura.toLocaleString('es-ES',{maximumFractionDigits:2}))} %${vd.descuento_factura_txt?' · '+esc(vd.descuento_factura_txt):''}</div>`:''))}
+          ${kv('Forma de pago (factura)',esc(p.tipo)+(p.original&&p.original.toUpperCase()!==p.tipo.toUpperCase()?`<div style="font-size:12px;color:var(--muted);font-weight:400">La factura dice: «${esc(p.original)}»</div>`:''))}
+          ${kv('Plazo (factura)',esc(f.plazo_pago_factura||(p.dias?`${p.dias} días${p.acordado?' (acordado)':''}`:'—')))}
+          ${kv('Autoriza pedido',esc(autoriza||'—'))}
+          ${kv('Valida factura',esc(validadorDe(f)||'—'))}
         </div>
-        ${porVolumen?'<div style="font-size:12.5px;color:var(--muted);margin-top:6px">Es un descuento por volumen: no se aplica factura a factura, así que aquí no se puede comprobar.</div>':''}
+        ${porVolumen?'<div style="font-size:12.5px;color:var(--muted);margin-top:6px">El descuento es por volumen: no se aplica factura a factura, así que aquí no se puede comprobar.</div>':''}
       </div>`;
     })()}
     <div class="dr-sec">
-      <div class="dr-sec-t">${svg(ICN.bot)}Clasificación IA</div>
-      <div class="kv">
-        <div class="kv-item"><div class="k">Tipo documento</div><div class="v">${esc(f.tipo_documento_ia||'—')}</div></div>
-        <div class="kv-item"><div class="k">Estado de validación</div><div class="v"><span class="bdg s-${f.estado}">${esc(f.estado||'—')}</span></div></div>
-      </div>
+      <div class="dr-sec-t">${svg(ICN.list)}Líneas de detalle (${lineas.length})</div>
+      ${lineasConCotejo(f,lineas)}
     </div>
     <div class="dr-sec">
       <div class="dr-sec-t">${svg('<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>')}Gestión interna</div>
@@ -2273,11 +2332,7 @@ async function openDrawer(id){
           <div style="font-size:11px;color:var(--muted);margin-top:5px">Número de pedido propio de Montero — aparece en el export AS400 para asientos contables</div>
         </div>
       </div>
-    </div>
-    <div class="dr-sec">
-      <div class="dr-sec-t">${svg(ICN.list)}Líneas de detalle (${lineas.length})</div>
-      ${lineas.length?`<table class="mini-tbl"><thead><tr><th>#</th><th>Descripción</th><th class="r">Cant.</th><th class="r">Precio</th><th class="r">Importe</th></tr></thead><tbody>${lineas.map((l,i)=>`<tr><td>${l.numero_linea??i+1}</td><td>${esc(l.descripcion||l.referencia||'—')}</td><td class="r">${l.cantidad??'—'}</td><td class="r">${l.precio_unitario!=null?eur(l.precio_unitario):'—'}</td><td class="r">${l.importe_linea!=null?eur(l.importe_linea):'—'}</td></tr>`).join('')}</tbody></table>`:'<div style="color:var(--faint);font-size:13px;padding:6px 0">No se han extraído líneas de detalle.</div>'}
-    </div>
+    </div>`;})()}
     <div class="dr-sec">
       <div class="dr-sec-t">${svg(ICN.alert)}Incidencias (${inc.length})</div>
       ${inc.length?inc.map(i=>`<div class="inc-mini"><div class="inc-ic ${i.tipo}" style="width:30px;height:30px">${svg(i.tipo==='AVISO'?ICN.info:ICN.alert)}</div><div class="inc-body"><div class="inc-top"><span class="bdg t-${i.tipo}">${esc(i.tipo)}</span><span class="inc-code">${esc(i.codigo_validacion||'')}</span></div><div style="font-size:13px;font-weight:600;margin-top:3px">${esc(i.descripcion||'')}</div>${(i.dato_esperado!=null||i.dato_recibido!=null)?`<div style="font-size:12px;color:var(--muted);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap">${i.dato_esperado!=null?`<span>Esperado: <b style="color:var(--ink-2)">${esc(String(i.dato_esperado))}</b></span>`:''}${i.dato_recibido!=null?`<span>Recibido: <b style="color:var(--ink-2)">${esc(String(i.dato_recibido))}</b></span>`:''}</div>`:''}${ayudaDe(i,f)}</div></div>`).join(''):'<div style="color:var(--green);font-size:13px;display:flex;align-items:center;gap:7px;padding:4px 0">'+svg('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>','var(--green)').replace('viewBox','width="16" height="16" viewBox')+'Sin incidencias. Validación correcta.</div>'}

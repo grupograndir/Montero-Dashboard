@@ -622,6 +622,8 @@ const AYUDA={
        h:'El que emite el proveedor dice lo que él mandó, no lo que vosotros recibisteis. Esto se le pide a quien lo recogió en el almacén, no al proveedor.'},
   V33:{q:'Lo que hay es una nota de entrega, no el albarán conformado.',
        h:'Vale como respaldo, pero échale un ojo antes de validarla.'},
+  V70:{q:'Las unidades o los importes del pedido, el albarán y la factura no coinciden (o falta leer algún papel).',
+       h:'Mira «Líneas de detalle»: arriba salen las unidades pedidas, recibidas y facturadas y en rojo lo que no cuadra. Si está bien (por ejemplo, el albarán va en kilos y la factura en unidades), valídala a mano.'},
   V35:{q:'La factura cuesta más que el pedido autorizado.',
        h:'La base imponible supera al neto del pedido. Abre el PDF y compara: puede ser un precio distinto al acordado, unos portes que no estaban, o que se ha servido más de lo pedido. Si no está justificado, reclámaselo al proveedor antes de validarla. Si lo autorizó alguien aparte, valídala y déjalo anotado.'},
   V40:{q:'Las líneas no suman el subtotal que declara la factura.',
@@ -785,7 +787,8 @@ function lineasConCotejo(f,lineas){
     PARCIAL:['var(--amber)','var(--amber-s)','Entrega parcial: faltan unidades por llegar o por facturar'],
     NO_CUADRA:['var(--rd)','var(--rd-s)','✗ No coinciden: revisa antes de validar'],
     SIN_LEER:['var(--amber)','var(--amber-s)','Faltan papeles por leer: todavía no se puede comparar'],
-    SIN_PAPELES:['var(--rd)','var(--rd-s)','Falta el pedido o el albarán: no se puede comparar']}[co.estado]||['var(--muted)','var(--bg)',esc(co.estado||'')];
+    SIN_PAPELES:['var(--rd)','var(--rd-s)','Falta el pedido o el albarán: no se puede comparar'],
+    REVISAR:['var(--amber)','var(--amber-s)','No se puede comparar solo: revísalo a mano']}[co.estado]||['var(--muted)','var(--bg)',esc(co.estado||'')];
   const fila=(t,origen,v,nota)=>`<div class="imp-row"><span class="l">${t} <span style="color:var(--muted);font-size:12px">(${origen})</span></span><span class="v">${v!=null?esc(fmtU(v)):`<span style="color:var(--muted);font-weight:500">${esc(nota||'—')}</span>`}</span></div>`;
   const filaE=(t,v,nota)=>`<div class="imp-row"><span class="l">${t}</span><span class="v">${v!=null?eur(v):`<span style="color:var(--muted);font-weight:500">${esc(nota||'—')}</span>`}</span></div>`;
   const grupos=Array.isArray(co.grupos)?co.grupos:[];
@@ -806,7 +809,10 @@ function lineasConCotejo(f,lineas){
       ${co.importe_albaran!=null?filaE('Importe del albarán',co.importe_albaran):''}
       ${filaE('Importe facturado (base imponible)',co.importe_facturado)}
       <div style="margin-top:8px;padding:7px 10px;border-radius:8px;background:${ESTADO[1]};color:${ESTADO[0]};font-size:12.5px;font-weight:700">${ESTADO[2]}</div>
-      ${(co.avisos||[]).map(a=>`<div style="font-size:12px;margin-top:5px;color:${a.nivel==='rojo'?'var(--rd)':'var(--amber)'}">· ${esc(a.texto)}</div>`).join('')}
+      ${(co.avisos||[]).map(a=>`<div style="font-size:12px;margin-top:5px;color:${a.nivel==='rojo'?'var(--rd)':a.nivel==='ambar'?'var(--amber)':'var(--muted)'}">· ${esc(a.texto)}</div>`).join('')}
+      ${(co.detalle||[]).length?`<details style="margin-top:8px;font-size:12px"><summary style="cursor:pointer;color:var(--muted)">Diferencias por artículo (${co.detalle.length})</summary>
+        <div style="color:var(--muted);margin:4px 0">Cada papel describe el artículo a su manera: esto ayuda a encontrar la diferencia, pero lo que cuenta son los totales de arriba.</div>
+        ${co.detalle.map(a=>`<div style="margin-top:3px;color:${a.nivel==='rojo'?'var(--rd)':a.nivel==='ambar'?'var(--amber)':'var(--muted)'}">· ${esc(a.texto)}</div>`).join('')}</details>`:''}
     </div>
     ${detalle}
     ${noCuentan.length?cab('No cuentan como unidades','portes, tasas y similares')+tablaLineas(lineas,noCuentan):''}`;

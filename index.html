@@ -995,9 +995,27 @@ function periodFilter(){
     return rangoFechas(state.desde,state.hasta);
   }
   if(!state.dias)return'';
-  const d=new Date();d.setDate(d.getDate()-state.dias);
-  return rangoFechas(hoyISO(d),null);
+  return rangoFechas(desdePeriodo(),null);
 }
+// El periodo de arriba (Hoy, 7d… Todo, o Del/al) vale en TODAS las secciones (Rubén,
+// 04/11/2026: «cambio de Todo a 7d en Pagadas y no pasa nada»). Cada una mira su fecha:
+// facturas, incidencias y registro de IVA la de la factura; Aprobadas la de aprobación;
+// Pagadas la de pago; Sin asignar la de llegada. Así una factura de julio aprobada hoy
+// sigue saliendo en la remesa de hoy (revisión 21/10/2026).
+function desdePeriodo(){
+  if(state.desde||state.hasta)return state.desde||'';
+  if(!state.dias)return'';
+  const d=new Date();if(state.dias>1)d.setDate(d.getDate()-state.dias);   // «Hoy» es solo hoy
+  return hoyISO(d);
+}
+function enPeriodo(fecha,sinFechaVale=true){
+  const f=String(fecha||'').slice(0,10);
+  if(!f)return sinFechaVale;
+  const d=desdePeriodo(),h=state.desde||state.hasta?(state.hasta||''):'';
+  return (!d||f>=d)&&(!h||f<=h);
+}
+const fechaPago=f=>(((f.json_extraccion_ia||{})._pago||{}).fecha)||f.fecha_factura;
+const fechaAprobada=f=>((f.json_extraccion_ia||{})._aprobada_pago||{}).fecha;
 async function loadAll(){
   setConn(true);
   try{
@@ -1449,9 +1467,9 @@ function updateNav(){
   // el contador refleja FACTURAS afectadas, no incidencias sueltas (coherente con la vista agrupada)
   $('#nav-inc').textContent=new Set(state.incidencias.filter(i=>i.estado==='ABIERTA').map(i=>i.factura_id)).size;
   const provs=new Set(state.facturas.map(claveProv));$('#nav-prov').textContent=provs.size;
-  $('#nav-sueltos').textContent=state.sueltos===null?'?':state.sueltos.length;
-  $('#nav-pagadas').textContent=state.facturas.filter(f=>enPagadas(f)&&!f.eliminada).length;
-  $('#nav-aprobadas').textContent=state.facturas.filter(f=>aprobadaPago(f)&&!f.eliminada).length;
+  $('#nav-sueltos').textContent=state.sueltos===null?'?':state.sueltos.filter(d=>enPeriodo(d.fecha_recepcion,false)).length;
+  $('#nav-pagadas').textContent=conPagos().filter(f=>enPagadas(f)&&!f.eliminada&&enPeriodo(fechaPago(f))).length;
+  $('#nav-aprobadas').textContent=conPagos().filter(f=>aprobadaPago(f)&&!f.eliminada&&enPeriodo(fechaAprobada(f))).length;
 }
 // Aprobada para pago a mano y todavía sin pagar. Al pagarla pasa a «Pagadas»; la
 // aprobación se conserva para saber quién la autorizó.
@@ -1528,7 +1546,7 @@ function viewSueltos(){
         Se arregla ejecutando una vez <b>sql/permisos_panel.sql</b> en Supabase.
       </div></div></div>`;
   }
-  const ds=state.sueltos||[];
+  const ds=(state.sueltos||[]).filter(d=>enPeriodo(d.fecha_recepcion,false));
   const hoy=ds.filter(d=>String(d.fecha_recepcion||'').slice(0,10)===hoyISO()).length;
   // Solo las peticiones de emparejar: las demás (soporte) no son de esta pantalla.
   const t=(state.tareas||[]).filter(x=>x.evento==='TAREA: emparejar');
@@ -1546,7 +1564,7 @@ function viewSueltos(){
     <div style="padding:18px 22px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-bottom:1px solid var(--line-2)">
       <div style="min-width:0">
         <div style="font-size:16px;font-weight:700">Documentos sin asignar</div>
-        <div style="font-size:12.5px;color:var(--muted);margin-top:3px">Papeles recibidos que aún no están puestos con ninguna factura, de cualquier mes.</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:3px">Papeles llegados en el periodo elegido arriba que aún no están puestos con ninguna factura.</div>
       </div>
       <button class="act-btn ok" data-tarea="emparejar" ${enCurso?'disabled':''} style="flex:none;height:38px;padding:0 18px;font-size:13.5px">Reintentar emparejado</button>
     </div>
@@ -1967,7 +1985,7 @@ const CHIPS=[['','Todas'],['revision','Requieren revisión'],['sospecha','¿Pedi
 // periodo y cuánto suma (Paqui, 14/10/2026). Y con los mismos filtros y el mismo
 // orden que el listado general (15/10/2026).
 function aprobadasFiltradas(){
-  const ff=conPagos().filter(f=>aprobadaPago(f)&&!f.eliminada&&enRango(f.json_extraccion_ia._aprobada_pago.fecha,state.apDesde,state.apHasta));
+  const ff=conPagos().filter(f=>aprobadaPago(f)&&!f.eliminada&&enPeriodo(fechaAprobada(f))&&enRango(f.json_extraccion_ia._aprobada_pago.fecha,state.apDesde,state.apHasta));
   const sel=state.apChips||[];
   return porVariosFiltros(aplicarFiltros(ff,{chip:'',conDuplicados:sel.includes('duplicados'),valida:state.apValida||'',prov:state.apProv||'',
     estado:state.apEstado||'',pago:state.apPago||[],search:state.apBuscar||'',sort:state.apSort||{k:'aprobada',dir:1}}),sel);
@@ -2008,7 +2026,7 @@ function porVariosFiltros(ff,sel){
   return ok?ff.filter(f=>ok.has(f.id)):ff;
 }
 function viewAprobadas(){
-  const todas=conPagos().filter(f=>aprobadaPago(f)&&!f.eliminada);
+  const todas=conPagos().filter(f=>aprobadaPago(f)&&!f.eliminada&&enPeriodo(fechaAprobada(f)));
   const ff=aprobadasFiltradas();
   const so=state.apSort||{k:'aprobada',dir:1};
   const thA=(k,l,r)=>`<th class="srt ${r?'r':''}" data-apsort="${k}">${l}<span class="arr">${so.k===k?(so.dir>0?'▲':'▼'):''}</span></th>`;
@@ -2074,7 +2092,7 @@ function bindAprobadas(){
 // Con los mismos filtros que el listado (Paqui, 14/10/2026): proveedor, importe,
 // fechas de pago y búsqueda. Las domiciliadas se paga solas: se pueden ver aquí.
 function viewPagadas(){
-  const todas=conPagos().filter(f=>!f.eliminada&&(enPagadas(f)||(state.pgDomic&&esDeGiro(f))));
+  const todas=conPagos().filter(f=>!f.eliminada&&(enPagadas(f)||(state.pgDomic&&esDeGiro(f)))&&enPeriodo(fechaPago(f)));
   const provs=listaProvs(todas);
   const q=String(state.pgBuscar||'').trim();
   const min=numES(state.pgMin), max=numES(state.pgMax);
@@ -4402,7 +4420,7 @@ async function cargarRegistro(){
 }
 function viewRegistro(){
   if(!state.registro){cargarRegistro().then(render);return `<div class="card"><div class="empty">Cargando…</div></div>`;}
-  const R=state.registro, fil=state.regFiltro||'';
+  const R=state.registro.filter(r=>enPeriodo(r.fecha_factura)), fil=state.regFiltro||'';
   const casadas=R.filter(r=>r.factura_id).length;
   const porId=new Map((state.todasFacturas||[]).map(f=>[f.id,f]));
   const ver=R.filter(r=>fil==='sin'?!r.factura_id:fil==='casadas'?!!r.factura_id:fil==='pend'?!!(r.factura_id&&porId.get(r.factura_id)&&!porId.get(r.factura_id).guardada):true)

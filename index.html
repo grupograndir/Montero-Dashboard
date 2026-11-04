@@ -1788,45 +1788,14 @@ function viewFacturas(){
   const chips=CHIPS;
   const validadores=[...new Set(state.facturas.map(f=>validadorDe(f)||'(nadie)'))].sort();
   const chipElim=`<button class="chip ${state.verEliminadas?'active':''}" data-elim="1" title="Facturas quitadas del listado">Eliminadas</button>`;
-  // Cuántas facturas están a medio comprobar. Sale aquí y no en un log del
-  // servidor: si el proceso que las lee se para, el atasco se ve crecer solo. Un
-  // automatismo que falla en silencio es peor que no tenerlo, porque se da por
-  // hecho que funciona.
-  const sinLeer=state.facturas.filter(f=>{
-    const ia=f.json_extraccion_ia||{};
-    return !f.eliminada&&!((ia._respaldo_verificado||{}).por_pagina);
-  }).length;
-  const atascadas=state.facturas.filter(f=>((f.json_extraccion_ia||{})._verificacion||{}).intentos>=3).length;
-  const avisoVerif=sinLeer?`<div style="margin:0 0 12px;padding:9px 12px;border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:8px;background:var(--card);font-size:12.5px;color:var(--muted);line-height:1.5">
-      <b style="color:var(--ink)">${sinLeer} factura${sinLeer>1?'s':''} sin comprobar del todo.</b>
-      Se ha leído su factura, pero todavía no se ha mirado página a página si trae más facturas dentro,
-      si el albarán que cita está de verdad y si viene firmado. Se hace solo cada pocos minutos.
-      ${atascadas?`<span style="color:var(--rd)"> ${atascadas} no se han podido leer tras varios intentos.</span>`:''}
-    </div>`:'';
-  // Salud del sistema. Lo escribe scripts/salud.py en cada pasada y se enseña
-  // aquí arriba porque un aviso que hay que ir a buscar no es un aviso: el
-  // 07/09/2026 el proceso estuvo 23 horas parado y el panel siguió enseñando lo
-  // de ayer con toda normalidad. Que no aparezca nada significa que se comprobó
-  // y estaba bien; si ni siquiera hay comprobación reciente, también se dice.
-  const avisoSalud=(()=>{
-    const S=state.salud;
-    if(!S) return '';
-    const viejo=(Date.now()-new Date(S.fecha).getTime())/36e5;
-    if(viejo>2) return `<div style="margin:0 0 12px;padding:9px 12px;border:1px solid var(--rd);border-left:3px solid var(--rd);border-radius:8px;background:var(--rd-s);font-size:12.5px;line-height:1.5">
-      <b style="color:var(--rd)">El sistema no se comprueba desde hace ${viejo.toFixed(0)} horas.</b>
-      Puede que el proceso automático esté parado: lo que ves puede no estar al día.</div>`;
-    if(!S.problemas||!S.problemas.length) return '';
-    const grave=S.estado==='GRAVE';
-    return `<div style="margin:0 0 12px;padding:9px 12px;border:1px solid ${grave?'var(--rd)':'var(--line)'};border-left:3px solid ${grave?'var(--rd)':'var(--amber)'};border-radius:8px;background:${grave?'var(--rd-s)':'var(--card)'};font-size:12.5px;line-height:1.55">
-      <b style="color:${grave?'var(--rd)':'var(--ink)'}">${grave?'El sistema tiene un problema':'El sistema pide atención'}</b>
-      ${S.problemas.map(x=>`<div style="margin-top:6px"><b style="color:var(--ink)">${esc(x.que)}</b><br><span style="color:var(--muted)">${esc(x.que_hacer)}</span>${x.soporte?`<br><span style="color:var(--muted);font-size:11px;font-family:ui-monospace,monospace">Para soporte: ${esc(x.soporte)}</span>`:''}</div>`).join('')}
-    </div>`;
-  })();
+  // Los avisos del sistema (salud.py: proceso parado, documentos sin leer, sueltos con dueño…)
+  // ya no se enseñan aquí: Rubén, 04/11/2026, «no quiero que le salgan a los usuarios de Montero;
+  // que los tenga en cuenta el sistema y los vaya arreglando él mismo». Siguen en
+  // configuracion.salud_sistema y en logs/PROBLEMAS.txt para soporte.
   return `<div class="card">
     <div class="chips-row">
       ${chips.map(([k,l])=>`<button class="chip ${(state.quickFilter||'')===k?'active':''}" data-chip="${k}">${l}</button>`).join('')}${chipElim}
     </div>
-    ${avisoSalud}${avisoVerif}
     ${modoArchivo()?`<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 12px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:12.5px">
       <span style="color:var(--muted);flex:1;min-width:240px">Marca las facturas y pulsa <b>Descargar</b>: se guarda un PDF por factura, solo con la hoja de la factura,
         con el nombre del registro de IVA («3085 (8195) PROVEEDOR FRA 367 2026-09-30.pdf»). Con Chrome o Edge eliges la carpeta donde guardarlas.</span>

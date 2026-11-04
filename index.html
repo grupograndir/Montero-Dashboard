@@ -1606,31 +1606,27 @@ function viewSueltos(){
     const accion=a&&['PENDIENTE','EN_CURSO'].includes(a.estado)
       ? `<span style="font-size:12px;color:var(--muted)">Se pone con la <b>${esc(nFac(a.factura_id))}</b> en la próxima pasada</span>`
       : `${a&&a.estado==='ERROR'?`<div style="font-size:11.5px;color:var(--rd);margin-bottom:4px">No se pudo: ${esc(a.resultado||'error')}</div>`:''}${sugHtml}<button class="act-btn cont" data-asignar="${d.id}" style="${BTN}">${sugHtml?'Es de otra factura':'Poner con una factura'}</button>`;
-    // Texto largo en varias líneas: en una sola, la tabla medía 2.300 px y el
-    // botón quedaba fuera de la pantalla.
+    // Rubén, 04/11/2026: columnas con aire y filas bajas. «Qué parece» es lo que leyó la IA;
+    // «Qué es realmente» lo dice una persona con un desplegable (antes, cuatro botones por fila).
     const W='white-space:normal;word-break:break-word';
+    const n1=cifras(String(d.resumen_ia||'').split('|')[0]);
+    const copia=esFactura&&n1.length>=4&&(state.todasFacturas||[]).find(x=>cifras(x.numero_factura)===n1);
+    const parece=/ALBAR/i.test(tipo)&&/PEDIDO/i.test(tipo)?['Albarán y pedido','amber']
+      :/ALBAR/i.test(tipo)?['Albarán','amber']:/PEDIDO/i.test(tipo)?['Pedido','blue']
+      :esFactura?['Factura','red']:/ABONO/i.test(tipo)?['Abono','red']:tipo?['Otro','grey']:['Sin identificar','grey'];
+    const COL={amber:'background:var(--amber-s);color:var(--amber)',blue:'background:var(--blue-s);color:var(--blue)',
+      red:'background:var(--rd-s);color:var(--rd)',grey:'background:var(--bg);color:var(--muted)'};
     return `<tr data-suelto="${d.id}">
-      <td style="${W};min-width:14rem;max-width:22rem"><button class="doc-link" data-pdf="${pdf}" title="Abrir el documento" style="background:none;border:none;padding:0;font:inherit;color:var(--rd);cursor:pointer;text-align:left;text-decoration:underline">${esc(d.nombre_archivo||'(sin nombre)')}</button></td>
-      <td style="${W};max-width:12rem">${accion}</td>
-      <td style="${W};min-width:13rem;max-width:16rem">${(()=>{
-        // Una «factura» suelta cuyo número ya está registrado suele ser la misma
-        // que llegó dos veces: se dice, para descartarla en vez de darla de alta.
-        const n1=cifras(String(d.resumen_ia||'').split('|')[0]);
-        const copia=esFactura&&n1.length>=4&&(state.todasFacturas||[]).find(x=>cifras(x.numero_factura)===n1);
-        const marca=d.clasificado_por?`<div style="font-size:11.5px;color:var(--muted);margin-top:3px">Marcado como ${esc(tipo.toLowerCase())} por ${esc(d.clasificado_por)}</div>`:'';
-        return `${esFactura?'<span class="bdg" style="background:var(--rd-s);color:var(--rd)">Parece una factura</span> ':''}${esc(tipo||'sin identificar')}${marca}
-          ${copia?`<div style="font-size:11.5px;color:var(--amber);margin-top:3px">Ya está registrada como factura <b>${esc(copia.numero_factura)}</b> (${esc(copia.prov||'')}): seguramente es una copia.</div>
-            <button class="btn-s" data-descartar="${d.id}" data-motivo="Copia de la factura ${esc(copia.numero_factura)}" style="margin-top:4px">Es una copia: descartar</button>`:''}
-          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">
-            <button class="btn-s" data-docfac="${d.id}" title="Es una factura: recuperar o dar de alta su ficha">Es factura</button>
-            <button class="btn-s" data-doctipo="PEDIDO" data-doc="${d.id}">Es pedido</button>
-            <button class="btn-s" data-doctipo="ALBARAN" data-doc="${d.id}">Es albarán</button>
-            <button class="btn-s rojo" data-descartar="${d.id}" title="Logos, capturas de pantalla, firmas… No se borra: se puede recuperar">Descartar</button></div>`;})()}</td>
-      <td style="${W};font-size:12px;color:var(--muted);min-width:12rem;max-width:22rem">${esc(d.resumen_ia||'—')}</td>
-      <td style="white-space:nowrap">${dtL(d.fecha_recepcion)}</td>
-      <td style="${W};font-size:12px;color:var(--muted);max-width:14rem">${esc((d.email_asunto||'').slice(0,60))}</td>
+      <td style="${W};min-width:13rem;max-width:20rem"><button class="doc-link" data-pdf="${pdf}" title="Abrir el documento" style="background:none;border:none;padding:0;font:inherit;color:var(--rd);cursor:pointer;text-align:left;text-decoration:underline">${esc(d.nombre_archivo||'(sin nombre)')}</button></td>
+      <td style="white-space:nowrap"><span class="bdg" style="${COL[parece[1]]};margin:0" title="${esc(d.clasificado_por?`Marcado como ${tipo.toLowerCase()} por ${d.clasificado_por}`:'Lo que leyó la IA')}">${parece[0]}</span>${copia?`<div style="font-size:11.5px;color:var(--amber);margin-top:4px;white-space:normal;max-width:13rem">Ya registrada: <b>${esc(copia.numero_factura)}</b></div>`:''}</td>
+      <td><select class="sel" data-quees="${d.id}" ${copia?`data-copia="Copia de la factura ${esc(copia.numero_factura)}"`:''} style="min-width:9.5rem">
+        <option value="" selected disabled>Seleccionar</option><option value="ALBARAN">Albarán</option><option value="PEDIDO">Pedido</option><option value="FACTURA">Factura</option><option value="DESCARTAR">Descartar</option></select></td>
+      <td style="${W};min-width:11rem;max-width:16rem">${accion}</td>
+      <td style="${W};font-size:12.5px;color:var(--muted);min-width:12rem;max-width:20rem">${esc(d.resumen_ia||'—')}</td>
+      <td style="white-space:nowrap;font-size:12.5px">${dtL(d.fecha_recepcion)}</td>
+      <td style="${W};font-size:12px;color:var(--muted);min-width:12rem;max-width:18rem">${esc((d.email_asunto||'').slice(0,70))}</td>
     </tr>
-    <tr data-form="${d.id}" style="display:none"><td colspan="6" style="background:var(--bg)">
+    <tr data-form="${d.id}" style="display:none"><td colspan="7" style="background:var(--bg)">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:4px 0">
         <span style="font-size:12.5px">Este documento es</span>
         <select class="sel" data-tipo><option value="" selected disabled>— ¿qué es? —</option><option value="ALBARAN">el albarán</option><option value="PEDIDO">el pedido</option><option value="OTRO">otro papel</option></select>
@@ -1644,7 +1640,7 @@ function viewSueltos(){
     <span class="card-meta" style="margin-left:auto" id="s-cuenta">${ds.length} documento${ds.length===1?'':'s'}</span></div>
     <datalist id="dl-facturas">${opciones}</datalist>
     <div class="tbl-wrap"><table>
-    <thead><tr><th>Archivo</th><th></th><th>Qué es</th><th>Qué trae dentro</th><th>Llegó</th><th>Correo</th></tr></thead>
+    <thead><tr><th>Archivo</th><th>Qué parece</th><th>Qué es realmente</th><th>Factura</th><th>Qué trae dentro</th><th>Llegó</th><th>Correo</th></tr></thead>
     <tbody>${filas}</tbody></table></div></div>`+descHtml;
 }
 async function asignarDocumento(docId,boton){
@@ -1719,7 +1715,7 @@ function colaTrabajo(ff){
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
       <td>${etiquetaTruenas(f)}${badgePago(f)}<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${badgesSenales(f)}</td>
-      <td><button type="button" data-motivo="${f.id}" title="${esc(motivoDe(f.id))}" style="background:none;border:0;padding:0;color:var(--red);text-decoration:underline;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap">Leer motivo</button></td>
+      <td><button type="button" data-leer-motivo="${f.id}" title="${esc(motivoDe(f.id))}" style="background:none;border:0;padding:0;color:var(--red);text-decoration:underline;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap">Leer motivo</button></td>
     </tr>`).join('');
   return`<div class="tbl-wrap"><table><thead><tr><th>Proveedor</th><th>Nº Factura</th><th>Fecha fra.</th><th>Cargada</th><th class="r">Total</th><th>Estado</th><th>Motivo</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
@@ -2875,6 +2871,13 @@ function bindContent(){
   document.querySelectorAll('#content [data-descartar]').forEach(b=>b.onclick=()=>{
     const m=b.dataset.motivo||prompt('¿Por qué se descarta? (opcional: «logo», «captura de pantalla»…)','');
     if(m===null)return; clasificarDoc(b.dataset.descartar,'DESCARTADO',m||null,b);});
+  document.querySelectorAll('#content [data-quees]').forEach(sel=>sel.onchange=()=>{
+    const id=sel.dataset.quees,v=sel.value;
+    if(v==='FACTURA')return docEsFactura(id,sel);
+    if(v==='ALBARAN'||v==='PEDIDO')return clasificarDoc(id,v,null,sel);
+    const m=sel.dataset.copia||prompt('¿Por qué se descarta? (opcional: «logo», «captura de pantalla»…)','');
+    if(m===null){sel.value='';return;}
+    clasificarDoc(id,'DESCARTADO',m||null,sel);});
   document.querySelectorAll('#content [data-recuperar]').forEach(b=>b.onclick=()=>clasificarDoc(b.dataset.recuperar,'RESTAURAR',null,b));
   // Aprobadas y pagadas: filtros
   const ap=(id,k)=>{const el=$('#'+id);if(el)el.onchange=e=>{state[k]=e.target.value;render();};};
@@ -2896,9 +2899,9 @@ function bindContent(){
   };
   document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));
   // «Leer motivo» (Rubén, 04/11/2026: nada de textos largos en la tabla): abre la ficha por sus incidencias.
-  document.querySelectorAll('[data-motivo]').forEach(b=>b.onclick=async e=>{
+  document.querySelectorAll('[data-leer-motivo]').forEach(b=>b.onclick=async e=>{
     e.stopPropagation();
-    await openDrawer(b.dataset.motivo);
+    await openDrawer(b.dataset.leerMotivo);
     const ir=()=>{const s=$('#dr-incid');if(s)s.scrollIntoView({block:'start',behavior:'smooth'});return !!s;};
     if(!ir())setTimeout(ir,300);
   });

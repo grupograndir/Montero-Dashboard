@@ -119,6 +119,8 @@ body.side-off .sidebar{display:none}
 .sel{height:36px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:0 30px 0 11px;font-size:13px;font-weight:500;color:var(--ink-2);font-family:inherit;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center}
 /* Varias formas de pago a la vez: un desplegable con casillas */
 .multi{position:relative}
+/* Un desplegable abierto no se corta en el borde de su tarjeta (overflow:hidden) */
+.card:has(details.multi[open]){overflow:visible}
 .multi>summary{list-style:none;display:flex;align-items:center;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .multi>summary::-webkit-details-marker{display:none}
 .multi-op{position:absolute;z-index:30;top:40px;left:0;min-width:220px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px}
@@ -592,7 +594,7 @@ async function cambiarClave(){
   finally{btn.disabled=false;btn.textContent='Guardar contraseña';}
 }
 
-const state={selArchivo:new Set(),selTruenas:new Set(),soloSinDescargar:false,view:'resumen',dias:0,desde:'',hasta:'',verEliminadas:false,facturas:[],incidencias:[],proveedoresBD:[],search:'',fProv:'',fEstado:'',fPago:[],fValida:'',provSel:null,quickFilter:'',sort:{k:'fecha',dir:-1},
+const state={selArchivo:new Set(),selTruenas:new Set(),soloSinDescargar:false,view:'resumen',dias:0,desde:'',hasta:'',verEliminadas:false,facturas:[],incidencias:[],proveedoresBD:[],search:'',fProv:'',fEstado:'',fPago:[],fValida:'',provSel:null,quickFilter:'',filtros:[],sort:{k:'fecha',dir:-1},
   apDesde:'',apHasta:'',pgDesde:'',pgHasta:'',pgProv:'',pgMin:'',pgMax:'',pgBuscar:'',pgDomic:false};
 let chartMes=null;
 const PEND=['ILEGIBLE','EN_REVISION','DUPLICADO_PENDIENTE','PENDIENTE_CRITERIO'];
@@ -1482,7 +1484,7 @@ function setView(v){
   if(v==='excel'&&state.view!=='excel'&&!state.excelSucio)state.excel=null;
   if(v!=='excel')state.excelCompleto=false;
   if(v==='registro')state.registro=null;
-  state.view=v;state.provSel=null;state.quickFilter='';
+  state.view=v;state.provSel=null;ponerFiltros([]);
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   document.title=`${TITLES[v][0]} · Montero`;
   render();
@@ -1724,7 +1726,7 @@ function colaTrabajo(ff){
 // Los mismos filtros y el mismo orden para el listado general y para Aprobadas
 // (Paqui, 15/10/2026): una sola implementación.
 function aplicarFiltros(ff,c){
-  if(c.chip!=='duplicados')
+  if(c.chip!=='duplicados'&&!c.conDuplicados)
     ff=ff.filter(f=>f.estado!=='DUPLICADO_PENDIENTE');
   if(c.chip==='revision')ff=ff.filter(f=>PEND.includes(f.estado));
   else if(c.chip==='duplicados')ff=ff.filter(f=>f.es_duplicado||f.estado==='DUPLICADO_PENDIENTE');
@@ -1786,9 +1788,11 @@ function aplicarFiltros(ff,c){
 function filtradas(){
   // En «Contabilizadas» salen todas, también las pagadas y aprobadas: es la lista
   // de lo que se archiva con el registro de IVA (22/10/2026).
-  let ff=state.quickFilter==='contabilizadas'?conPagos():state.facturas.filter(f=>!enPagadas(f)&&!aprobadaPago(f));
-  if(state.quickFilter==='contabilizadas'&&state.soloSinDescargar)ff=ff.filter(f=>!(f.json_extraccion_ia||{})._descargada_registro);
-  return aplicarFiltros(ff,{chip:state.quickFilter,valida:state.fValida,prov:state.fProv,estado:state.fEstado,pago:state.fPago,search:state.search,sort:state.sort});
+  const sel=state.filtros||[];
+  let ff=sel.includes('contabilizadas')?conPagos():state.facturas.filter(f=>!enPagadas(f)&&!aprobadaPago(f));
+  if(modoArchivo()&&state.soloSinDescargar)ff=ff.filter(f=>!(f.json_extraccion_ia||{})._descargada_registro);
+  return porVariosFiltros(aplicarFiltros(ff,{chip:'',conDuplicados:sel.includes('duplicados'),valida:state.fValida,prov:state.fProv,
+    estado:state.fEstado,pago:state.fPago,search:state.search,sort:state.sort}),sel);
 }
 function viewFacturas(){
   const provs=listaProvs(state.facturas);
@@ -1796,17 +1800,14 @@ function viewFacturas(){
   const hay=new Set(state.facturas.map(f=>formaPago(f).tipo));
   const pagos=FORMAS_PAGO.filter(p=>hay.has(p));
   const ff=filtradas();
-  const chips=CHIPS;
   const validadores=[...new Set(state.facturas.map(f=>validadorDe(f)||'(nadie)'))].sort();
-  const chipElim=`<button class="chip ${state.verEliminadas?'active':''}" data-elim="1" title="Facturas quitadas del listado">Eliminadas</button>`;
+  const verElim=`<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:12px 8px 4px">Otras</div>
+    <label title="Facturas quitadas del listado"><input type="checkbox" id="f-elim" ${state.verEliminadas?'checked':''}> Eliminadas</label>`;
   // Los avisos del sistema (salud.py: proceso parado, documentos sin leer, sueltos con dueño…)
   // ya no se enseñan aquí: Rubén, 04/11/2026, «no quiero que le salgan a los usuarios de Montero;
   // que los tenga en cuenta el sistema y los vaya arreglando él mismo». Siguen en
   // configuracion.salud_sistema y en logs/PROBLEMAS.txt para soporte.
   return `<div class="card">
-    <div class="chips-row">
-      ${chips.map(([k,l])=>`<button class="chip ${(state.quickFilter||'')===k?'active':''}" data-chip="${k}">${l}</button>`).join('')}${chipElim}
-    </div>
     ${modoArchivo()?`<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 12px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:12.5px">
       <span style="color:var(--muted);flex:1;min-width:240px">Marca las facturas y pulsa <b>Descargar</b>: se guarda un PDF por factura, solo con la hoja de la factura,
         con el nombre del registro de IVA («3085 (8195) PROVEEDOR FRA 367 2026-09-30.pdf»). Con Chrome o Edge eliges la carpeta donde guardarlas.</span>
@@ -1814,7 +1815,8 @@ function viewFacturas(){
       <button class="btn-s ok" id="arch-desc" disabled>Descargar facturas (0)</button></div>`:''}
     <div class="tbl-tools">
       <div class="search">${svg(ICN.list).replace(ICN.list,'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>')}<input id="f-search" placeholder="Buscar nº factura, proveedor, NIF o forma de pago…" value="${esc(state.search)}"></div>
-      <select class="sel" id="f-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.fProv?'selected':''}>${esc(opcProv(p))}</option>`).join('')}</select>
+      ${desplegableFiltros('f-chips',state.filtros||[],verElim)}
+      <select class="sel" id="f-prov" style="width:15rem"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.fProv?'selected':''}>${esc(opcProv(p))}</option>`).join('')}</select>
       <select class="sel" id="f-estado"><option value="">Todos los estados</option>${estados.map(e=>`<option value="${esc(e)}" ${e===state.fEstado?'selected':''}>${esc(estadoLbl(e))}</option>`).join('')}</select>
       <select class="sel" id="f-valida" title="Quién tiene que validarla (Excel de condiciones)"><option value="">Valide quien valide</option>${validadores.map(v=>`<option value="${esc(v)}" ${v===state.fValida?'selected':''}>${esc(v)}</option>`).join('')}</select>
       <details class="multi" id="f-pago"><summary class="sel">${state.fPago.length?`Pago: ${esc(state.fPago.join(', '))}`:'Todas las formas de pago'}</summary>
@@ -1910,8 +1912,8 @@ document.addEventListener('click',e=>{
   e.preventDefault();
   if(a.dataset.busca!=null){state.search=a.dataset.busca;render();return;}
   const p=a.dataset.pista,q=state.search;
-  if(p==='filtros'){state.quickFilter='';state.fValida='';state.fProv='';state.fEstado='';state.fPago=[];render();}
-  else if(p==='eliminadas'){state.verEliminadas=true;state.quickFilter='';loadAll();}
+  if(p==='filtros'){ponerFiltros([]);state.fValida='';state.fProv='';state.fEstado='';state.fPago=[];render();}
+  else if(p==='eliminadas'){state.verEliminadas=true;ponerFiltros([]);loadAll();}
   else if(p==='periodo'){state.dias=0;state.desde='';state.hasta='';state.verEliminadas=false;
     document.querySelectorAll('#period button').forEach(b=>b.classList.toggle('active',b.dataset.d==='0'));
     ['#rg-desde','#rg-hasta'].forEach(id=>{const el=$(id);if(el)el.value='';});if(typeof pintaRango==='function')pintaRango();loadAll();}
@@ -1966,8 +1968,44 @@ const CHIPS=[['','Todas'],['revision','Requieren revisión'],['sospecha','¿Pedi
 // orden que el listado general (15/10/2026).
 function aprobadasFiltradas(){
   const ff=conPagos().filter(f=>aprobadaPago(f)&&!f.eliminada&&enRango(f.json_extraccion_ia._aprobada_pago.fecha,state.apDesde,state.apHasta));
-  return aplicarFiltros(ff,{chip:state.apChip||'',valida:state.apValida||'',prov:state.apProv||'',estado:state.apEstado||'',
-    pago:state.apPago||[],search:state.apBuscar||'',sort:state.apSort||{k:'aprobada',dir:1}});
+  const sel=state.apChips||[];
+  return porVariosFiltros(aplicarFiltros(ff,{chip:'',conDuplicados:sel.includes('duplicados'),valida:state.apValida||'',prov:state.apProv||'',
+    estado:state.apEstado||'',pago:state.apPago||[],search:state.apBuscar||'',sort:state.apSort||{k:'aprobada',dir:1}}),sel);
+}
+// «Filtrar por» con varias opciones a la vez (Rubén, 04/11/2026): dentro de un grupo vale
+// cualquiera («Validadas» o «Contabilizadas»); entre grupos, todas («Validadas» y además
+// «Sin código»). Cada opción es el mismo filtro de siempre (aplicarFiltros).
+const GRUPOS_FILTRO=[['Estado',['revision','sospecha','duplicados','posdup','cerradas','validadas','contabilizadas','domic','pagsincont','sinconformar','conformadas']],
+  ['Le falta',['sincond','sincodigo','sinhomol','sindeleg','faltapedido','dudoso']],['Fecha',['mes']]];
+// El desplegable y su enlace, los mismos en Facturas y en Aprobadas. «extra» va al final
+// de la segunda columna (en Facturas, «Ver eliminadas»).
+function desplegableFiltros(id,sel,extra=''){
+  const etq=new Map(CHIPS);
+  const grupo=([g,ks])=>`<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:8px 8px 4px">${g}</div>`
+    +ks.map(k=>`<label><input type="checkbox" data-fk value="${k}" ${sel.includes(k)?'checked':''}> ${esc(etq.get(k))}</label>`).join('');
+  return `<details class="multi" id="${id}"><summary class="sel">${sel.length?`Filtrar por (${sel.length})`:'Filtrar por'}</summary>
+    <div class="multi-op" style="display:grid;grid-template-columns:repeat(2,minmax(210px,1fr));gap:0 8px;min-width:460px">
+      <div>${GRUPOS_FILTRO.slice(0,1).map(grupo).join('')}</div>
+      <div>${GRUPOS_FILTRO.slice(1).map(grupo).join('')}${extra}
+        ${sel.length?`<button type="button" class="multi-limpiar" id="${id}-limpiar" style="margin-top:10px">Quitar filtros</button>`:''}</div>
+    </div></details>`;
+}
+function bindFiltros(id,alCambiar){
+  const d=$('#'+id);if(!d)return;
+  const tras=()=>{const n=$('#'+id);if(n)n.open=true;};
+  d.querySelectorAll('input[data-fk]').forEach(c=>c.onchange=()=>{alCambiar([...d.querySelectorAll('input[data-fk]:checked')].map(x=>x.value));tras();});
+  const l=$('#'+id+'-limpiar');if(l)l.onclick=()=>alCambiar([]);
+}
+function porVariosFiltros(ff,sel){
+  if(!sel.length)return ff;
+  const uno=k=>aplicarFiltros(ff,{chip:k,valida:'',prov:'',estado:'',pago:[],search:'',sort:{k:'fecha',dir:-1}}).map(f=>f.id);
+  let ok=null;
+  for(const [,claves] of GRUPOS_FILTRO){
+    const ks=sel.filter(k=>claves.includes(k));if(!ks.length)continue;
+    const u=new Set(ks.flatMap(uno));
+    ok=ok?new Set([...ok].filter(id=>u.has(id))):u;
+  }
+  return ok?ff.filter(f=>ok.has(f.id)):ff;
 }
 function viewAprobadas(){
   const todas=conPagos().filter(f=>aprobadaPago(f)&&!f.eliminada);
@@ -1979,18 +2017,19 @@ function viewAprobadas(){
   const hay=new Set(todas.map(f=>formaPago(f).tipo)), pagos=FORMAS_PAGO.filter(p=>hay.has(p));
   const validadores=[...new Set(todas.map(f=>validadorDe(f)||'(nadie)'))].sort();
   const apPago=state.apPago||[];
-  const filtro=`<div class="card" style="margin-bottom:14px">
-    <div class="chips-row" style="padding:0 0 10px">${CHIPS.map(([k,l])=>`<button class="chip ${(state.apChip||'')===k?'active':''}" data-apchip="${k}">${l}</button>`).join('')}</div>
-    <div class="filtros" style="border:0;padding:0">
+  const apChips=state.apChips||[];
+  const filtro=`<div class="card" style="margin-bottom:14px;padding:16px 20px">
+    <div class="filtros" style="border:0;padding:0;gap:10px">
+      ${desplegableFiltros('ap-chips',apChips)}
       <div class="search">${svg('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>')}<input id="ap-buscar" placeholder="Buscar nº factura, proveedor, código, NIF o forma de pago…" value="${esc(state.apBuscar||'')}"></div>
-      <select class="sel" id="ap-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.apProv?'selected':''}>${esc(opcProv(p))}</option>`).join('')}</select>
+      <select class="sel" id="ap-prov" style="width:15rem"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.apProv?'selected':''}>${esc(opcProv(p))}</option>`).join('')}</select>
       <select class="sel" id="ap-estado"><option value="">Todos los estados</option>${estados.map(e=>`<option value="${esc(e)}" ${e===state.apEstado?'selected':''}>${esc(estadoLbl(e))}</option>`).join('')}</select>
       <select class="sel" id="ap-valida"><option value="">Valide quien valide</option>${validadores.map(v=>`<option value="${esc(v)}" ${v===state.apValida?'selected':''}>${esc(v)}</option>`).join('')}</select>
       <details class="multi" id="ap-pago"><summary class="sel">${apPago.length?`Pago: ${esc(apPago.join(', '))}`:'Todas las formas de pago'}</summary>
         <div class="multi-op">${pagos.map(p=>`<label><input type="checkbox" value="${esc(p)}" ${apPago.includes(p)?'checked':''}> ${esc(p)}</label>`).join('')}
         ${apPago.length?'<button type="button" class="multi-limpiar" id="ap-pago-limpiar">Quitar filtro</button>':''}</div></details>
     </div>
-    <div class="filtros" style="border:0;padding:10px 0 0">
+    <div class="filtros" style="border:0;padding:12px 0 0;margin-top:12px;border-top:1px solid var(--line-2);gap:10px">
       <b style="font-size:13px">Aprobadas entre el</b><input type="date" id="ap-desde" value="${esc(state.apDesde)}"><span>y el</span><input type="date" id="ap-hasta" value="${esc(state.apHasta)}">
       <span style="font-size:13px;margin-left:8px">Total a pagar de lo filtrado: <b>${eur(ff.reduce((s,f)=>s+(+f.total_factura||0),0))}</b> (${ff.length} de ${todas.length} factura${todas.length===1?'':'s'})</span>
       <button class="btn-s" id="ap-excel" style="margin-left:auto" ${ff.length?'':'disabled'}>Excel de lo filtrado</button></div></div>`;
@@ -2018,7 +2057,7 @@ function viewAprobadas(){
   </tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 function bindAprobadas(){
-  document.querySelectorAll('[data-apchip]').forEach(b=>b.onclick=()=>{state.apChip=b.dataset.apchip;render();});
+  bindFiltros('ap-chips',v=>{state.apChips=v;render();});
   document.querySelectorAll('[data-apsort]').forEach(t=>t.onclick=()=>{const k=t.dataset.apsort,o=state.apSort||{k:'aprobada',dir:1};
     state.apSort=o.k===k?{k,dir:-o.dir}:{k,dir:['prov','num','pago','valida','estado'].includes(k)?1:-1};render();});
   const sel=(id,k)=>{const el=$('#'+id);if(el)el.onchange=e=>{state[k]=e.target.value;render();};};
@@ -2048,12 +2087,13 @@ function viewPagadas(){
     return true;
   }).sort((a,b)=>{const da=new Date(a.fecha_factura||a.fecha_recepcion),db=new Date(b.fecha_factura||b.fecha_recepcion);return db-da;});
   const total=ff.reduce((s,f)=>s+(+f.total_factura||0),0);
-  const filtros=`<div class="card" style="margin-bottom:14px"><div class="filtros" style="border:0;padding:0">
-    <input id="pg-buscar" placeholder="Nº factura, proveedor, CIF… (Intro)" value="${esc(state.pgBuscar)}" style="flex:1 1 14rem">
-    <select class="sel" id="pg-prov"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.pgProv?'selected':''}>${esc(opcProv(p))}</option>`).join('')}</select>
+  // Una sola línea, con aire (Rubén, 04/11/2026): proveedores más estrecho y «Incluir domiciliadas» al lado.
+  const filtros=`<div class="card" style="margin-bottom:14px;padding:16px 20px"><div class="filtros" style="border:0;padding:0;gap:10px;align-items:center">
+    <input id="pg-buscar" placeholder="Nº factura, proveedor, CIF… (Intro)" value="${esc(state.pgBuscar)}" style="flex:1 1 13rem;min-width:11rem">
+    <select class="sel" id="pg-prov" style="width:15rem"><option value="">Todos los proveedores</option>${provs.map(p=>`<option value="${esc(p.k)}" ${p.k===state.pgProv?'selected':''}>${esc(opcProv(p))}</option>`).join('')}</select>
     <input id="pg-min" inputmode="decimal" placeholder="Importe desde" value="${esc(state.pgMin)}" style="width:110px"><input id="pg-max" inputmode="decimal" placeholder="hasta" value="${esc(state.pgMax)}" style="width:90px">
     <span style="font-size:12.5px">Pagadas del</span><input type="date" id="pg-desde" value="${esc(state.pgDesde)}"><span style="font-size:12.5px">al</span><input type="date" id="pg-hasta" value="${esc(state.pgHasta)}">
-    <label style="font-size:12.5px;display:flex;gap:5px;align-items:center"><input type="checkbox" id="pg-domic" ${state.pgDomic?'checked':''}> Incluir domiciliadas</label></div></div>`;
+    <label style="font-size:12.5px;display:flex;gap:6px;align-items:center;white-space:nowrap;margin-left:4px"><input type="checkbox" id="pg-domic" ${state.pgDomic?'checked':''}> Incluir domiciliadas</label></div></div>`;
   if(!ff.length)return filtros+`<div class="card"><div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">${todas.length?'Ninguna pagada con estos filtros':'Sin facturas pagadas todavía'}</p><small>Cuando marques una factura como pagada, aparecerá aquí</small></div></div>`;
   return filtros+`<div class="kpis" style="grid-template-columns:repeat(2,1fr)">
     <div class="kpi"><div class="kpi-top"><div class="kpi-ic blue">${svg(ICN.card)}</div></div><div class="kpi-val">${ff.length}</div><div class="kpi-lbl">Facturas pagadas</div></div>
@@ -2907,11 +2947,9 @@ function bindContent(){
   });
   bindArchivo();
   document.querySelectorAll('.inc[data-id]').forEach(el=>el.onclick=()=>openDrawer(el.dataset.id));
-  document.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{const g=el.dataset.go;if(['revision','cerradas','validadas','contabilizadas','domic','sospecha'].includes(g)){setView('facturas');state.quickFilter=g;render();}else setView(g);});
-  document.querySelectorAll('[data-chip]').forEach(el=>el.onclick=()=>{
-    state.quickFilter=el.dataset.chip;
-    if(state.verEliminadas){state.verEliminadas=false;loadAll();}else render();});
-  document.querySelectorAll('[data-elim]').forEach(b=>b.onclick=()=>{state.verEliminadas=!state.verEliminadas;state.quickFilter='';loadAll();});
+  document.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{const g=el.dataset.go;if(['revision','cerradas','validadas','contabilizadas','domic','sospecha'].includes(g)){setView('facturas');ponerFiltros([g]);render();}else setView(g);});
+  bindFiltros('f-chips',v=>{ponerFiltros(v);if(state.verEliminadas&&v.length){state.verEliminadas=false;loadAll();}else render();});
+  const fel=$('#f-elim');if(fel)fel.onchange=()=>{state.verEliminadas=fel.checked;ponerFiltros([]);loadAll();};
   document.querySelectorAll('tbody tr[data-prov]').forEach(tr=>tr.onclick=()=>{state.provSel=tr.dataset.prov;render();});
   document.querySelectorAll('th[data-psort]').forEach(t=>t.onclick=()=>{const k=t.dataset.psort,o=state.provSort||{k:'imp',dir:-1};
     state.provSort=o.k===k?{k,dir:-o.dir}:{k,dir:k==='prov'?1:-1};render();});
@@ -3269,6 +3307,9 @@ function nombreLineaRegistro(r){
     r.codigo_proveedor?`(${r.codigo_proveedor})`:'',r.proveedor||'',r.numero_factura||'',r.fecha_factura||''];
   return partes.map(x=>String(x).trim()).filter(Boolean).join(' ').replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,' ')+'.pdf';
 }
+// Varios filtros a la vez; «quickFilter» es el filtro cuando solo hay uno (lo usan el modo
+// archivo de «Contabilizadas» y quien llega desde el Resumen).
+function ponerFiltros(v){state.filtros=v;state.quickFilter=v.length===1?v[0]:'';}
 const modoArchivo=()=>state.view==='facturas'&&state.quickFilter==='contabilizadas';
 // Etiqueta amarilla «Descargada para Truenas» (Rubén, 23/10/2026): que se vea en
 // todas partes que esa factura ya se guardó para pasarla a Truenas.

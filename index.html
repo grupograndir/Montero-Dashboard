@@ -789,7 +789,16 @@ function lineasConCotejo(f,lineas){
     return `<div style="font-size:12.5px;color:var(--muted)">${por?'No se comparan las unidades: '+por+'.'
       :'Todavía no se han comparado las unidades del pedido, del albarán y de la factura: el PC lo hace en sus pasadas, cada 10 minutos.'}</div>`;
   }
-  const ESTADO={CUADRA:['var(--green)','var(--gr-s,#e8f5ee)','✓ Completo: pedido, albaranes y factura coinciden'],
+  // «Completo» solo con los papeles que se le piden al proveedor (el PC pone INCOMPLETO si falta
+  // alguno): la F-264155 de Rehins decía «pedido, albaranes y factura coinciden» sin pedido (04/11/2026).
+  const sinPed=co.pedidas==null&&co.importe_pedido==null, sinAlb=co.recibidas==null&&co.importe_albaran==null;
+  const falta=Array.isArray(co.falta)?co.falta:[];
+  const ESTADO={CUADRA:['var(--green)','var(--gr-s,#e8f5ee)',sinPed?'✓ Completo: albaranes y factura coinciden (a este proveedor no se le pide pedido)'
+      :sinAlb?'✓ Completo: pedido y factura coinciden (a este proveedor no se le pide albarán)':'✓ Completo: pedido, albaranes y factura coinciden'],
+    INCOMPLETO:['var(--amber)','var(--amber-s)',falta.includes('pedido')&&!falta.includes('albarán')
+      ?'Albaranes y factura coinciden, pero falta el pedido: sin él no se puede comprobar que Montero lo pidiera ni a qué precio'
+      :falta.includes('albarán')&&!falta.includes('pedido')?'Pedido y factura coinciden, pero falta el albarán: sin él no se puede comprobar que llegara'
+      :'Lo que hay coincide, pero faltan el pedido y el albarán'],
     PARCIAL:['var(--amber)','var(--amber-s)','Entrega parcial: faltan unidades por llegar o por facturar'],
     NO_CUADRA:['var(--rd)','var(--rd-s)','✗ No coinciden: revisa antes de validar'],
     SIN_LEER:['var(--amber)','var(--amber-s)','Faltan papeles por leer: se completará solo'],

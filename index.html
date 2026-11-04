@@ -93,6 +93,12 @@ body.side-off .sidebar{display:none}
 .kpi-trend{font-size:11.5px;font-weight:600;color:var(--faint);display:flex;align-items:center;gap:3px}
 .kpi-val{font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1}
 .kpi-lbl{font-size:12.5px;color:var(--muted);font-weight:500;margin-top:5px}
+.kpis.mini{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0}
+.kpis.mini .kpi{padding:14px 16px;box-shadow:none}
+.kpis.mini .kpi:hover{transform:none;box-shadow:none}
+.kpis.mini .kpi-ic{width:32px;height:32px;margin-bottom:10px}
+.kpis.mini .kpi-ic svg{width:16px;height:16px}
+.kpis.mini .kpi-val{font-size:24px}
 
 /* ===== CARD ===== */
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
@@ -1522,31 +1528,40 @@ function viewSueltos(){
   }
   const ds=state.sueltos||[];
   const hoy=ds.filter(d=>String(d.fecha_recepcion||'').slice(0,10)===hoyISO()).length;
-  const t=state.tareas||[];
+  // Solo las peticiones de emparejar: las demás (soporte) no son de esta pantalla.
+  const t=(state.tareas||[]).filter(x=>x.evento==='TAREA: emparejar');
   const enCurso=t.find(x=>((x.detalle||{}).estado)==='PENDIENTE'||((x.detalle||{}).estado)==='EN_CURSO');
   const ultima=t.find(x=>['HECHO','ERROR'].includes((x.detalle||{}).estado));
+  // Cabecera con cifras (Rubén, 04/11/2026: nada de párrafos; formato limpio y con aire).
+  // Qué es cada papel sale de lo que leyó la IA, como en la columna «Qué es».
+  const tipoDe=d=>String(d.tipo_documento_ia||'');
+  const nAlb=ds.filter(d=>/ALBAR/i.test(tipoDe(d))).length;
+  const nPed=ds.filter(d=>/PEDIDO/i.test(tipoDe(d))&&!/ALBAR/i.test(tipoDe(d))).length;
+  const nSug=ds.filter(d=>(state.sugerencias||new Map()).has(d.id)).length;
+  const nOtro=ds.length-nAlb-nPed;
+  const kpiS=(ic,cls,val,lbl)=>`<div class="kpi"><div class="kpi-ic ${cls}">${svg(ic)}</div><div class="kpi-val">${val}</div><div class="kpi-lbl">${lbl}</div></div>`;
   const cab=`<div class="card" style="margin-bottom:14px">
-    <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
-      <div style="flex:1 1 20rem;min-width:16rem">
-        <div style="font-size:15px;font-weight:600;margin-bottom:4px">${ds.length} documento${ds.length===1?'':'s'} sin asignar</div>
-        <div style="font-size:12.5px;color:var(--muted);line-height:1.55">
-          Han llegado por correo y no están puestos con ninguna factura, de ningún mes: no depende
-          del periodo elegido arriba. Puede ser que su factura aún no haya llegado, que sea de un mes
-          anterior o que el emparejado no los haya reconocido.${hoy?` <b>${hoy} han llegado hoy</b> y lo normal es que se emparejen solos a lo largo del día.`:''}
-          Se emparejan solos aunque lleguen en correos distintos: cuando el número de albarán
-          coincide con el que cita una factura, se ponen con ella y la factura se recalcula.
-          ${(()=>{const n=ds.filter(d=>(state.sugerencias||new Map()).has(d.id)).length;return n?`<b>${n} tienen una sugerencia</b>: confírmala con «Sí, es de esta». `:''})()}Si sabes de qué factura es uno, pulsa «Poner con una factura».
-        </div>
+    <div style="padding:18px 22px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-bottom:1px solid var(--line-2)">
+      <div style="min-width:0">
+        <div style="font-size:16px;font-weight:700">Documentos sin asignar</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:3px">Papeles recibidos que aún no están puestos con ninguna factura, de cualquier mes.</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="act-btn ok" data-tarea="emparejar" ${enCurso?'disabled':''}>Reintentar emparejado</button>
-        <button class="act-btn" data-tarea="salud" ${enCurso?'disabled':''}>Comprobar el sistema</button>
-      </div>
+      <button class="act-btn ok" data-tarea="emparejar" ${enCurso?'disabled':''} style="flex:none;height:38px;padding:0 18px;font-size:13.5px">Reintentar emparejado</button>
     </div>
-    ${enCurso?(pcParado()
-      ?`<div class="rev-note" style="margin-top:10px;color:var(--rd)"><b>El ordenador del proceso no responde</b> desde ${state.salud&&state.salud.fecha?dtL(state.salud.fecha):"hace tiempo"}. La petición está guardada y se hará en cuanto vuelva a funcionar.</div>`
-      :`<div class="rev-note" style="margin-top:10px">Petición enviada · se ejecuta en la próxima pasada (como mucho 10 minutos). Recarga para ver el resultado.</div>`):''}
-    ${!enCurso&&ultima?`<div class="rev-note" style="margin-top:10px">Última ejecución (${esc(ultima.evento.replace('TAREA: ',''))}) · ${dtL(ultima.creado_en)} · <b>${(ultima.detalle||{}).estado==='HECHO'?'correcta':'con error'}</b><br><span style="font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted);white-space:pre-wrap">${esc(String((ultima.detalle||{}).resultado||'').split('\n').slice(-3).join('\n'))}</span></div>`:''}
+    <div style="padding:18px 22px">
+      <div class="kpis mini">
+        ${kpiS(ICN.inbox,'red',ds.length,'Sin asignar')}
+        ${kpiS(ICN.info,'blue',hoy,'Llegados hoy')}
+        ${kpiS(ICN.check,'green',nSug,'Con sugerencia para confirmar')}
+        ${kpiS(ICN.file,'amber',nAlb,'Albaranes')}
+        ${kpiS(ICN.list,'blue',nPed,'Pedidos')}
+        ${kpiS(ICN.alert,'red',nOtro,'Otros o sin identificar')}
+      </div>
+      ${enCurso?(pcParado()
+        ?`<div class="rev-note" style="margin-top:14px;color:var(--rd)"><b>El ordenador del proceso no responde</b> desde ${state.salud&&state.salud.fecha?dtL(state.salud.fecha):"hace tiempo"}. La petición está guardada y se hará en cuanto vuelva a funcionar.</div>`
+        :`<div class="rev-note" style="margin-top:14px">Emparejado pedido: se hace en la próxima pasada (como mucho 10 minutos). Recarga para ver el resultado.</div>`):''}
+      ${!enCurso&&ultima?`<div style="margin-top:12px;font-size:12px;color:var(--muted)">Último emparejado a petición: ${dtL(ultima.creado_en)} · ${(ultima.detalle||{}).estado==='HECHO'?'correcto':'con error'}</div>`:''}
+    </div>
   </div>`;
   // Lo descartado a mano, aparte y recuperable.
   const desc=state.descartados||[];

@@ -1322,6 +1322,17 @@ function albaranesDe(ia){
     return {num:String(delAlbaran||(m&&m.numero)||n||''),fecha:m&&m.fecha?dt(m.fecha):''};
   });
 }
+// Los números de pedido de un papel puesto con la factura: los apuntados al ponerlo (un
+// pedido citado que llegó con otra factura) o los que dice su resumen («PEDIDO: 209.224»).
+// Nunca el nombre del archivo: el de DISMAN es la fecha y hora del escáner (04/11/2026).
+function pedidosDeAdjunto(a){
+  if(!a)return [];
+  if(Array.isArray(a.pedidos)&&a.pedidos.length)return a.pedidos.map(String);
+  const d=(state.docPorId||new Map()).get(a.documento_id), out=[];
+  String(d&&d.resumen_ia||'').split('|').forEach(t=>{const m=t.match(/^\s*PEDIDOS?\s*:\s*(.+)$/i);
+    if(m)m[1].split(/[,;]/).forEach(x=>{x=x.trim();if(/\d/.test(x))out.push(x);});});
+  return [...new Set(out)];
+}
 // Para el AS400: lo que lleve (letras y ceros incluidos) sin espacios, barras ni
 // guiones, y como mucho 10 caracteres (los últimos: «AC ALV 0126013630» → 0126013630).
 const albAS400=n=>String(n||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(-10);
@@ -2456,10 +2467,21 @@ async function openDrawer(id){
         ${botonUnico}
         ${doc(esAbono?'Abono':'Factura',docUrl?`nº ${f.numero_factura||'—'} · recibida ${dtL(f.fecha_recepcion)}`:'el PDF no está disponible',!!docUrl,'')}
         ${esAbono?`<div style="font-size:12.5px;color:var(--muted);line-height:1.5;padding:2px 2px 0">Un abono es una devolución o un descuento sobre lo ya facturado, no mercancía servida: no lleva pedido ni albarán, y por eso no se le piden.</div>`:`
-        ${doc('Pedido',
-              tienePed?(pedJ.length?'dentro del PDF de la factura':nombresAdj('PEDIDO')):'no ha llegado',
-              tienePed,
-              !tienePed&&citaPed?`La factura lo cita (${esc(citaPed)}) pero el documento no está`:'')}
+        ${(()=>{
+          // Los NÚMEROS de pedido, no el nombre del archivo: «20261002073856859.pdf» es la fecha
+          // y hora del escáner de DISMAN y Paqui lo tomó por un pedido que no conocía (10146864,
+          // 04/11/2026). Y cada pedido que citan la factura o sus albaranes tiene que estar: con
+          // uno de dos se daba por presente (lo calcula cotejo_unidades.py en el PC).
+          const faltanPed=Array.isArray((j._cotejo_unidades||{}).pedidos_faltan)?j._cotejo_unidades.pedidos_faltan:[];
+          const hay=[];
+          if(pedJ.length)hay.push(`${(j._pedido||{}).numero?(j._pedido||{}).numero+' ':''}dentro del PDF de la factura`);
+          adj.filter(a=>a.tipo==='PEDIDO').forEach(a=>{const n=pedidosDeAdjunto(a);
+            hay.push(n.length?n.join(', ')+(a.de?` (${a.de})`:''):`archivo ${a.nombre||''}`);});
+          return doc('Pedido',
+              tienePed?(hay.join(' · ')||'sí'):'no ha llegado',
+              tienePed&&!faltanPed.length,
+              faltanPed.length?`Falta el pedido ${esc(faltanPed.join(', '))}: lo citan la factura o sus albaranes y no está entre los papeles`
+              :(!tienePed&&citaPed?`La factura lo cita (${esc(citaPed)}) pero el documento no está`:''));})()}
         ${doc('Albarán',
               tieneAlb?(cob&&cob.citados&&cob.citados.length>1?`las ${cob.citados.length} entregas, con su albarán firmado`
                         :(albJ.length?`dentro del PDF de la factura (${albJ.length})`:nombresAdj('ALBARAN')))
@@ -2471,10 +2493,11 @@ async function openDrawer(id){
                        :(!tieneAlb&&albCitados.length?`La factura lo cita (${esc(albCitados.join(', '))}) pero el documento no está`:'')))}`}
         ${transporte.map(a=>doc('Transporte',`${esc(a.nombre||'')} — acredita el envío, no la mercancía`,true,'')).join('')}
         ${adj.length&&!f.eliminada?`<div style="margin-top:12px"><div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">PAPELES PUESTOS CON ESTA FACTURA</div>
-          ${adj.map(x=>`<div class="pag-sep"><span class="bdg" style="margin:0">${esc(({ALBARAN:'Albarán',PEDIDO:'Pedido',TRANSPORTE:'Transporte'})[x.tipo]||'Otro')}</span>
-            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.como||'')}">${esc(x.nombre||'(sin nombre)')}</span>
-            ${x.url?`<button class="btn-s" data-pdf="${esc(x.url)}">Abrir</button>`:''}
-            ${x.documento_id?`<button class="btn-s rojo" data-quitar-doc="${esc(x.documento_id)}" title="No es de esta factura: se quita y vuelve a «Sin asignar»">Quitar de esta factura</button>`:''}</div>`).join('')}
+          ${adj.map(x=>{const np=x.tipo==='PEDIDO'?pedidosDeAdjunto(x):[];const pg=x.paginas&&x.paginas.desde?x.paginas:null;
+            return `<div class="pag-sep"><span class="bdg" style="margin:0">${esc((({ALBARAN:'Albarán',PEDIDO:'Pedido',TRANSPORTE:'Transporte'})[x.tipo]||'Otro')+(np.length?' '+np.join(', '):''))}</span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc([x.como,x.de].filter(Boolean).join(' · '))}">${esc((x.nombre||'(sin nombre)')+(pg?` · hoja ${pg.desde}${pg.hasta&&pg.hasta!==pg.desde?'-'+pg.hasta:''}`:'')+(x.de?` · ${x.de}`:''))}</span>
+            ${x.url?(pg?`<button class="btn-s" data-juntar="${esc(JSON.stringify([{u:x.url,p:pg}]))}">Abrir</button>`:`<button class="btn-s" data-pdf="${esc(x.url)}">Abrir</button>`):''}
+            ${x.documento_id?`<button class="btn-s rojo" data-quitar-doc="${esc(x.documento_id)}" title="No es de esta factura: se quita y vuelve a «Sin asignar»">Quitar de esta factura</button>`:''}</div>`;}).join('')}
           <div style="font-size:11.5px;color:var(--muted);margin-top:4px">Si un papel no es de esta factura, «Quitar de esta factura» lo devuelve a «Sin asignar» para ponerlo con la suya.</div></div>`:''}
         ${(!esAbono&&(!tienePed||!tieneAlb))?`<div style="margin-top:10px;font-size:12.5px;color:var(--muted);line-height:1.5">Sin ${!tienePed&&!tieneAlb?'pedido ni albarán':(!tienePed?'el pedido':'el albarán')} no se puede comprobar que lo facturado sea lo que Montero pidió y recibió, así que la factura no se da por validada.</div>`:''}
         <details class="raw"><summary>Ver datos extraídos (JSON)</summary><pre>${esc(JSON.stringify(f.json_extraccion_ia,null,2))}</pre></details>
@@ -4020,7 +4043,8 @@ function abrirEnviar(facId){
       const enl=[`- Factura para conformar: ${await enlaceParaFirmar(f)}`];
       if($('#en-resp').checked)
         for(const a of (Array.isArray(j._adjuntos)?j._adjuntos:[]).filter(a=>a&&a.url)){
-          const et=`${({ALBARAN:'Albarán',PEDIDO:'Pedido',TRANSPORTE:'Transporte'})[a.tipo]||'Documento'} ${a.nombre||''}`.trim();
+          const np=a.tipo==='PEDIDO'?pedidosDeAdjunto(a):[];   // el número del pedido, no solo el archivo
+          const et=`${({ALBARAN:'Albarán',PEDIDO:'Pedido',TRANSPORTE:'Transporte'})[a.tipo]||'Documento'} ${np.length?np.join(', ')+' — ':''}${a.nombre||''}`.trim();
           try{enl.push(`- ${et}: ${await urlFirmada(a.url,7*24*3600,String(a.nombre||et).replace(/[\\/:*?"<>|]+/g,'-').replace(/(\.pdf)?$/i,'.pdf'))}`);}catch(_){}
         }
       const asunto=`Validar factura ${f.numero_factura||''} · ${nombreProv(f)} · ${eur(f.total_factura)}`;

@@ -778,7 +778,17 @@ function lineasConCotejo(f,lineas){
   // pidieron, cuántas han llegado y cuántas se facturan, y los tres importes. Se rehace en cada
   // pasada del PC con los papeles que vayan entrando; con todo completo, la factura se da por buena.
   const co=(f.json_extraccion_ia||{})._cotejo_unidades;
-  if(!co)return `<div style="font-size:12.5px;color:var(--muted)">Todavía no se han comparado las unidades del pedido, del albarán y de la factura: se hace solo en la próxima pasada.</div>`;
+  // El PC solo compara las que están en revisión o validadas: a las demás no les llegará
+  // nunca, y decir «en la próxima pasada» era prometer algo que no iba a pasar (04/11/2026).
+  if(!co){
+    const e=f.estado, por=f.eliminada?'está quitada del listado'
+      :(f.es_duplicado||e==='DUPLICADO_PENDIENTE')?'es una copia (se comparan en la original)'
+      :(e==='CONTABILIZADA'||e==='EXPORTADA')?'se contabilizó antes de que existiera esta comparación (03/11/2026); las que se contabilicen a partir de ahora la conservan'
+      :e==='ILEGIBLE'?'la factura no se ha podido leer'
+      :e==='RECHAZADA'?'está rechazada':null;
+    return `<div style="font-size:12.5px;color:var(--muted)">${por?'No se comparan las unidades: '+por+'.'
+      :'Todavía no se han comparado las unidades del pedido, del albarán y de la factura: el PC lo hace en sus pasadas, cada 10 minutos.'}</div>`;
+  }
   const ESTADO={CUADRA:['var(--green)','var(--gr-s,#e8f5ee)','✓ Completo: pedido, albaranes y factura coinciden'],
     PARCIAL:['var(--amber)','var(--amber-s)','Entrega parcial: faltan unidades por llegar o por facturar'],
     NO_CUADRA:['var(--rd)','var(--rd-s)','✗ No coinciden: revisa antes de validar'],

@@ -1704,7 +1704,7 @@ function colaTrabajo(ff){
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
       <td class="r cell-strong">${eur(f.total_factura)}</td>
       <td>${etiquetaTruenas(f)}${badgePago(f)}<span class="bdg s-${f.estado}">${esc(estadoLbl(f.estado))}</span>${(()=>{const m=validadaAMano(f);return m?`<span class="bdg" style="background:var(--amber);color:#fff;margin-left:5px" title="La validó una persona aunque faltaba respaldo">a mano · ${m}</span>`:'';})()}${f.notas_resolucion?`<span title="${esc(f.notas_resolucion)}" style="margin-left:5px;cursor:help;color:var(--amber)">✎</span>`:''}${esDeGiro(f)?'<span class="bdg domic" title="Se paga sola (giro o recibo domiciliado): solo hay que contabilizarla, NO pagarla otra vez">DOMICILIADA · YA PAGADA</span>':''}${badgesSenales(f)}</td>
-      <td style="max-width:300px;color:var(--muted);font-size:12.5px"><div class="trunc" style="max-width:300px">${esc(motivoDe(f.id))}</div></td>
+      <td><button type="button" data-motivo="${f.id}" title="${esc(motivoDe(f.id))}" style="background:none;border:0;padding:0;color:var(--red);text-decoration:underline;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap">Leer motivo</button></td>
     </tr>`).join('');
   return`<div class="tbl-wrap"><table><thead><tr><th>Proveedor</th><th>Nº Factura</th><th>Fecha fra.</th><th>Cargada</th><th class="r">Total</th><th>Estado</th><th>Motivo</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
@@ -2324,7 +2324,7 @@ async function openDrawer(id){
         </div>
       </div>
     </div>`;})()}
-    <div class="dr-sec">
+    <div class="dr-sec" id="dr-incid">
       <div class="dr-sec-t">${svg(ICN.alert)}Incidencias (${inc.length})</div>
       ${inc.length?inc.map(i=>`<div class="inc-mini"><div class="inc-ic ${i.tipo}" style="width:30px;height:30px">${svg(i.tipo==='AVISO'?ICN.info:ICN.alert)}</div><div class="inc-body"><div class="inc-top"><span class="bdg t-${i.tipo}">${esc(i.tipo)}</span><span class="inc-code">${esc(i.codigo_validacion||'')}</span></div><div style="font-size:13px;font-weight:600;margin-top:3px">${esc(i.descripcion||'')}</div>${(i.dato_esperado!=null||i.dato_recibido!=null)?`<div style="font-size:12px;color:var(--muted);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap">${i.dato_esperado!=null?`<span>Esperado: <b style="color:var(--ink-2)">${esc(String(i.dato_esperado))}</b></span>`:''}${i.dato_recibido!=null?`<span>Recibido: <b style="color:var(--ink-2)">${esc(String(i.dato_recibido))}</b></span>`:''}</div>`:''}${ayudaDe(i,f)}</div></div>`).join(''):'<div style="color:var(--green);font-size:13px;display:flex;align-items:center;gap:7px;padding:4px 0">'+svg('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>','var(--green)').replace('viewBox','width="16" height="16" viewBox')+'Sin incidencias. Validación correcta.</div>'}
     </div>
@@ -2880,6 +2880,13 @@ function bindContent(){
     const c=$('#s-cuenta');if(c)c.textContent=`${n} documento${n===1?'':'s'}`;
   };
   document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));
+  // «Leer motivo» (Rubén, 04/11/2026: nada de textos largos en la tabla): abre la ficha por sus incidencias.
+  document.querySelectorAll('[data-motivo]').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    await openDrawer(b.dataset.motivo);
+    const ir=()=>{const s=$('#dr-incid');if(s)s.scrollIntoView({block:'start',behavior:'smooth'});return !!s;};
+    if(!ir())setTimeout(ir,300);
+  });
   bindArchivo();
   document.querySelectorAll('.inc[data-id]').forEach(el=>el.onclick=()=>openDrawer(el.dataset.id));
   document.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{const g=el.dataset.go;if(['revision','cerradas','validadas','contabilizadas','domic','sospecha'].includes(g)){setView('facturas');state.quickFilter=g;render();}else setView(g);});

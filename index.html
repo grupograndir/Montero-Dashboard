@@ -4371,7 +4371,7 @@ function viewRegistro(){
   const sel=state.selTruenas;
   const kpi=(cls,v,l)=>`<div class="kpi"><div class="kpi-top"><div class="kpi-ic ${cls}">${svg(ICN.file)}</div></div><div class="kpi-val">${v}</div><div class="kpi-lbl">${l}</div></div>`;
   return `<div class="kpis">${kpi('blue',R.length,'Líneas del registro')}${kpi('green',casadas,'Casadas con su factura (contabilizadas)')}${kpi('amber',R.length-casadas,'Sin casar')}</div>
-    <div class="card" style="margin-bottom:14px"><div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">
+    <div class="card" style="margin-bottom:14px;padding:16px 20px"><div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:12px">
       Sube el Excel del registro de IVA soportado que saca el AS400 después de contabilizar. Cada línea se guarda con su número de registro y se busca
       su factura en la plataforma (mismo número y además mismo código de proveedor, CIF o total). Las validadas (y las pagadas) pasan solas a <b>contabilizada</b>; las que están en revisión se quedan «sin casar» con el motivo y se contabilizan solas al validarlas.
       Si una factura llega después que su asiento, se casa sola al entrar. Subir el mismo Excel dos veces no duplica nada.<br>
@@ -4383,11 +4383,12 @@ function viewRegistro(){
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="r-buscar" placeholder="Buscar…" value="${esc(state.regBuscar||'')}"></div>
       <span class="card-meta" style="margin-left:auto">${ver.length} línea${ver.length===1?'':'s'}</span>
       <button class="btn-s ok" id="r-truenas" ${sel.size?'':'disabled'} title="Guarda el PDF de las facturas marcadas (solo sus hojas de factura) con el nombre «nº registro (código) proveedor FRA nº fecha».pdf">📥 Truenas (${sel.size})</button></div>
-    ${ver.length?`<div class="tbl-wrap"><table><thead><tr><th style="width:30px"><input type="checkbox" id="r-todas" title="Marcar todas las casadas de la lista"></th><th>Nº registro</th><th>Código</th><th>Proveedor</th><th>Nº factura</th><th>Fecha fra.</th><th>Factura en la plataforma</th></tr></thead><tbody>
+    ${ver.length?`<div class="tbl-wrap"><table><thead><tr><th style="width:30px"><input type="checkbox" id="r-todas" title="Marcar todas las casadas de la lista"></th><th>Nº registro</th><th>Código</th><th>Proveedor</th><th>Nº factura</th><th>Fecha fra.</th><th>Factura en la plataforma</th><th></th></tr></thead><tbody>
       ${ver.slice(0,1500).map(r=>{const f=r.factura_id&&porId.get(r.factura_id);return `<tr ${f?`data-reg-fac="${r.factura_id}" style="cursor:pointer"`:''}>
         <td>${f?`<input type="checkbox" data-seltru="${f.id}" ${sel.has(f.id)?'checked':''} title="${esc('Se guardará como: '+(nombreLineaRegistro(r)||''))}">`:''}</td><td class="mono">${esc(r.numero_registro||'—')}</td><td class="mono">${esc(r.codigo_proveedor||'')}</td><td>${esc(r.proveedor||'')}</td>
         <td class="mono cell-strong">${esc(r.numero_factura||'')}</td><td class="mono">${dt(r.fecha_factura)}</td>
-        <td>${f?`<b>${esc(f.numero_factura||'')}</b> <span style="color:var(--muted);font-size:12px">${esc(r.casado_como||'')}</span>${f.guardada?` <span class="bdg truenas" style="margin:0" title="Descargada el ${dt(f.guardada)}">Descargada para Truenas</span>`:''}`:`<span class="bdg alerta" style="margin:0">sin casar</span>${r.motivo?`<div style="font-size:11.5px;color:var(--muted);margin-top:3px">${esc(r.motivo)}</div>`:''}`}</td></tr>`;}).join('')}
+        <td>${f?`<b>${esc(f.numero_factura||'')}</b> <span style="color:var(--muted);font-size:12px">${esc(r.casado_como||'')}</span>`:`<span class="bdg alerta" style="margin:0">sin casar</span>${r.motivo?`<div style="font-size:11.5px;color:var(--muted);margin-top:3px">${esc(r.motivo)}</div>`:''}`}</td>
+        <td style="white-space:nowrap">${f&&f.guardada?`<span class="bdg truenas" style="margin:0" title="Descargada el ${dt(f.guardada)}">Descargada para Truenas</span>`:''}</td></tr>`;}).join('')}
     </tbody></table></div>`:'<div class="empty">Todavía no se ha subido ningún registro.</div>'}</div>`;
 }
 function bindRegistro(){

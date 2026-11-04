@@ -4412,11 +4412,16 @@ function viewRegistro(){
   const sel=state.selTruenas;
   const kpi=(cls,v,l)=>`<div class="kpi"><div class="kpi-top"><div class="kpi-ic ${cls}">${svg(ICN.file)}</div></div><div class="kpi-val">${v}</div><div class="kpi-lbl">${l}</div></div>`;
   return `<div class="kpis">${kpi('blue',R.length,'Líneas del registro')}${kpi('green',casadas,'Casadas con su factura (contabilizadas)')}${kpi('amber',R.length-casadas,'Sin casar')}</div>
-    <div class="card" style="margin-bottom:14px;padding:16px 20px"><div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:12px">
-      Sube el Excel del registro de IVA soportado que saca el AS400 después de contabilizar. Cada línea se guarda con su número de registro y se busca
-      su factura en la plataforma (mismo número y además mismo código de proveedor, CIF o total). Las validadas (y las pagadas) pasan solas a <b>contabilizada</b>; las que están en revisión se quedan «sin casar» con el motivo y se contabilizan solas al validarlas.
-      Si una factura llega después que su asiento, se casa sola al entrar. Subir el mismo Excel dos veces no duplica nada.<br>
-      Para guardar las facturas en Truenas: marca las casillas (todas o por tandas) y pulsa <b>📥 Truenas</b>. Se guarda un PDF por factura, solo con sus hojas de factura, y queda la etiqueta amarilla <b>Descargada para Truenas</b>.</div>
+    <div class="card" style="margin-bottom:14px;padding:18px 22px">
+      <div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:8px">¿Qué debo hacer aquí?</div>
+      <div style="font-size:13px;color:var(--ink-2);line-height:1.65;max-width:68rem;margin-bottom:14px">
+        <p style="margin:0 0 8px"><b>1. Sube el Excel del registro de IVA</b> que saca el AS400 después de contabilizar. Cada línea se casa con su factura
+          (mismo número y además mismo código de proveedor, CIF o total). Las validadas y las pagadas pasan solas a <b>contabilizada</b>;
+          las que están en revisión quedan «sin casar» y se contabilizan solas al validarlas. Si una factura llega después que su asiento,
+          se casa sola al entrar. Subir el mismo Excel dos veces no duplica nada.</p>
+        <p style="margin:0"><b>2. Para guardarlas en Truenas</b>, marca las casillas (todas o por tandas) y pulsa <b>📥 Truenas</b>: se guarda un PDF por factura,
+          solo con sus hojas de factura, y queda la etiqueta amarilla <b>Descargada para Truenas</b>.</p>
+      </div>
       <label class="btn-s ok" style="display:inline-flex;align-items:center">Subir Excel del AS400<input type="file" id="r-subir" accept=".xlsx,.xls,.csv" style="display:none"></label>
       <div id="r-mapa"></div></div>
     <div class="card"><div class="filtros">

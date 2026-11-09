@@ -293,6 +293,22 @@ td.r{text-align:right}
 .kv-item .k{font-size:11.5px;color:var(--faint);font-weight:500;margin-bottom:2px}
 .kv-item .v{font-size:14px;color:var(--ink);font-weight:600}
 .kv-item .v.big{font-size:17px;font-weight:800}
+/* Líneas de detalle: la tabla de Paqui (pedido, albarán y factura, artículo por artículo) */
+.det-wrap{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+table.det{width:100%;border-collapse:collapse;table-layout:fixed}
+table.det th,table.det td{padding:6px 8px;font-size:12.5px;white-space:normal;word-break:break-word;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line-2)}
+table.det th{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);background:var(--bg)}
+table.det th.r,table.det td.r{text-align:right}
+table.det tbody tr{cursor:default}
+table.det tbody tr:hover{background:none}
+table.det .det-blq td{background:var(--bg);font-size:11.5px;font-weight:700;color:var(--ink-2);padding:7px 8px}
+table.det .det-art{font-weight:600;color:var(--ink);line-height:1.3}
+table.det .det-ref{display:block;font-size:11px;font-weight:500;color:var(--faint);margin-top:1px}
+table.det .det-l{font-size:11.5px;color:var(--muted)}
+table.det .det-rojo{background:var(--rd-s);color:var(--rd);font-weight:700}
+table.det .det-ambar{background:var(--amber-s);color:var(--amber);font-weight:700}
+table.det .det-tot td{font-size:13px;font-weight:800;color:var(--ink);border-top:2px solid var(--line);border-bottom:0;padding:9px 8px}
+table.det .det-tot td.det-rojo{color:var(--rd)}
 .imp-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:13.5px}
 .imp-row+.imp-row{border-top:1px dashed var(--line)}
 .imp-row .l{color:var(--muted)}
@@ -768,10 +784,40 @@ function nifProv(f){const j=f.json_extraccion_ia||{};return j?.proveedor?.nif_ci
 // y lo guarda en _cotejo_unidades; aquí solo se enseña. Quien lee guarda lo que ve, quien
 // recalcula decide: si el panel también sumara, acabaría diciendo otra cosa.
 function fmtU(n){return n==null||isNaN(+n)?'—':(+n).toLocaleString('es-ES',{maximumFractionDigits:3});}
+// La tabla que dibujó Paqui (05/11/2026): por cada pedido y su albarán, cada artículo con sus
+// unidades y su precio en el pedido, el albarán y la factura, y los tres importes abajo. La
+// calcula el PC (cotejo_unidades.tabla_articulos): aquí solo se pinta, no se suma nada.
+function tablaArticulos(f,co){
+  const t=co.tabla, cols=co.estado==='NO_APLICA'?[2]:[0,1,2], NOMBRES=['Pedido','Albarán','Factura'];
+  const fmtP=n=>n==null?'—':(+n).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:4})+' €';
+  const celda=(txt,m)=>`<td class="r${m?' det-'+m:''}">${txt}</td>`;
+  const numero=(v,sin)=>v?esc(v):`<span style="font-weight:500;color:var(--faint)">${sin}</span>`;
+  let primero=true;
+  const cuerpo=t.bloques.map(b=>{
+    let cab;
+    if(b.otros)cab=`<tr class="det-blq"><td colspan="${2+cols.length}">Otros conceptos de la factura (portes, tasas…)</td></tr>`;
+    else{
+      const nums=[numero(b.pedido,'sin pedido'),numero(b.albaran,'sin albarán'),primero?esc(f.numero_factura||'—'):''];
+      cab=`<tr class="det-blq"><td colspan="2"></td>${cols.map(c=>`<td class="r">${nums[c]}</td>`).join('')}</tr>`;
+      primero=false;
+    }
+    return cab+b.articulos.map(a=>{const m=a.m||{};return `<tr>
+      <td rowspan="2" class="det-art">${esc(a.art)}${a.ref?`<span class="det-ref">${esc(a.ref)}</span>`:''}</td><td class="det-l">Uds</td>${cols.map(c=>celda(a.uds[c]==null?'—':esc(fmtU(a.uds[c])),m['u'+c])).join('')}</tr>
+      <tr><td class="det-l">Precio</td>${cols.map(c=>celda(fmtP(a.precio[c]),m['p'+c])).join('')}</tr>`;}).join('');
+  }).join('');
+  const tot=t.total||{}, vals=[tot.pedido,tot.albaran,tot.factura];
+  return `<div class="det-wrap"><table class="det">
+      <colgroup><col style="width:${cols.length===1?'62%':'33%'}"><col style="width:${cols.length===1?'14%':'10%'}">${cols.map(()=>`<col>`).join('')}</colgroup>
+      <thead><tr><th>Artículo</th><th></th>${cols.map(c=>`<th class="r">${NOMBRES[c]}</th>`).join('')}</tr></thead>
+      <tbody>${cuerpo}
+        <tr class="det-tot"><td colspan="2">Total</td>${cols.map(c=>celda(vals[c]==null?'—':eur(vals[c]),c===2?tot.m:null)).join('')}</tr>
+      </tbody></table></div>
+    ${t.mas?`<div style="font-size:12px;color:var(--muted);margin-top:6px">Y ${t.mas} artículo${t.mas>1?'s':''} más que no caben aquí: están en el PDF.</div>`:''}
+    ${t.dto_general?`<div style="font-size:12px;color:var(--muted);margin-top:6px">La factura lleva además un descuento general del ${esc(String(t.dto_general).replace('.',','))} %: ya se tiene en cuenta al comparar los precios.</div>`:''}`;
+}
 function lineasConCotejo(f,lineas){
-  // Solo los totales (Rubén, 03/11/2026): no la lista de artículos, sino cuántas unidades se
-  // pidieron, cuántas han llegado y cuántas se facturan, y los tres importes. Se rehace en cada
-  // pasada del PC con los papeles que vayan entrando; con todo completo, la factura se da por buena.
+  // Artículo por artículo cuando el PC ya ha hecho la tabla (Paqui, 05/11/2026); mientras no
+  // llega, los totales de antes. Se rehace en cada pasada con los papeles que vayan entrando.
   const co=(f.json_extraccion_ia||{})._cotejo_unidades;
   // El PC solo compara las que están en revisión o validadas: a las demás no les llegará
   // nunca, y decir «en la próxima pasada» era prometer algo que no iba a pasar (04/11/2026).
@@ -799,12 +845,16 @@ function lineasConCotejo(f,lineas){
     SIN_LEER:['var(--amber)','var(--amber-s)','Faltan papeles por leer: se completará solo'],
     SIN_PAPELES:['var(--rd)','var(--rd-s)','Aún no ha llegado el pedido ni el albarán'],
     REVISAR:['var(--amber)','var(--amber-s)','No se puede comparar solo: revísalo a mano'],
+    HISTORICA:['var(--muted)','var(--bg)','Contabilizada antes de existir esta comparación: se enseña solo lo que se ha leído'],
     NO_APLICA:['var(--muted)','var(--bg)',esc(co.motivo||'Esta factura no lleva pedido ni albarán')]}[co.estado]||['var(--muted)','var(--bg)',esc(co.estado||'')];
   const de=(v,total)=>v==null?null:esc(fmtU(v))+(total!=null&&co.estado!=='NO_APLICA'?` <span style="color:var(--muted);font-weight:500">de ${esc(fmtU(total))}</span>`:'');
   const fila=(t,origen,v,nota)=>`<div class="imp-row"><span class="l">${t} <span style="color:var(--muted);font-size:12px">(${origen})</span></span><span class="v">${v!=null?v:`<span style="color:var(--muted);font-weight:500">${esc(nota||'—')}</span>`}</span></div>`;
   const ref=co.pedidas!=null?co.pedidas:null;
   const impAlbNota=co.recibidas!=null||co.importe_albaran!=null?'los albaranes no llevan precios':(co.recibidas_nota||'—');
   const aplica=co.estado!=='NO_APLICA';
+  const veredicto=`<div style="margin-top:8px;padding:7px 10px;border-radius:8px;background:${ESTADO[1]};color:${ESTADO[0]};font-size:12.5px;font-weight:700">${ESTADO[2]}</div>
+      ${(co.avisos||[]).filter(a=>a.nivel!=='info').map(a=>`<div style="font-size:12px;margin-top:5px;color:${a.nivel==='rojo'?'var(--rd)':'var(--amber)'}">· ${esc(a.texto)}</div>`).join('')}`;
+  if(co.tabla&&(co.tabla.bloques||[]).length)return tablaArticulos(f,co)+veredicto;
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px">
       ${aplica?fila('Unidades pedidas','del pedido',co.pedidas!=null?esc(fmtU(co.pedidas)):null,co.pedidas_nota):''}
       ${aplica?fila('Unidades recibidas','de los albaranes',de(co.recibidas,ref),co.recibidas_nota):''}
@@ -813,8 +863,7 @@ function lineasConCotejo(f,lineas){
       ${aplica?fila('Importe del pedido','sin IVA',co.importe_pedido!=null?eur(co.importe_pedido):null,co.pedidas_nota):''}
       ${aplica?fila('Importe recibido','de los albaranes',co.importe_albaran!=null?eur(co.importe_albaran):null,impAlbNota):''}
       ${fila('Importe facturado','base imponible',co.importe_facturado!=null?eur(co.importe_facturado):null,'—')}
-      <div style="margin-top:8px;padding:7px 10px;border-radius:8px;background:${ESTADO[1]};color:${ESTADO[0]};font-size:12.5px;font-weight:700">${ESTADO[2]}</div>
-      ${(co.avisos||[]).filter(a=>a.nivel!=='info').map(a=>`<div style="font-size:12px;margin-top:5px;color:${a.nivel==='rojo'?'var(--rd)':'var(--amber)'}">· ${esc(a.texto)}</div>`).join('')}
+      ${veredicto}
     </div>`;
 }
 function lineasDe(f){const j=f.json_extraccion_ia||{};return j?.factura?.lineas||j?.datos_extraidos?.factura?.lineas||[];}

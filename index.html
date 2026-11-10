@@ -1343,10 +1343,12 @@ function fechaContabilizada(f){
 // Lo que no tiene forma de sigla no es una homologación y sale en blanco, con
 // su aviso, para que se complete en el maestro.
 const HOM_OK=/^H[NLS][A-Z]{1,2}$/;
+// Lo que diga el Excel de proveedores manda, sea un código o no (Paqui, 10/11/2026: puso «REVISAR» a
+// Vodafone y Endesa y seguía saliendo «HNG»). El maestro (tipo_hoja) solo guarda códigos válidos, así que
+// con «REVISAR» o «CENTRAL» se quedaba con el de antes; se usa solo si el proveedor no está en el Excel.
 function homologacionDe(f){
   const c=condicionDe(f);
-  const h1=String(c&&c.homologacion||'').toUpperCase().replace(/\s+/g,'');
-  if(HOM_OK.test(h1))return h1;
+  if(c)return String(c.homologacion||'').toUpperCase().trim().replace(/\s+/g,' ');
   const p=proveedorDeFactura(f);
   const h2=String(p&&p.tipo_hoja||'').toUpperCase().replace(/\s+/g,'');
   return HOM_OK.test(h2)?h2:'';

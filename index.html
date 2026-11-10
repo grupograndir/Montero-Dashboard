@@ -2698,8 +2698,10 @@ async function resolverFactura(id,nuevoEstado){
 // minutos abierta: entretanto el PC cuelga albaranes y otra persona aprueba o paga.
 // Se guardaba el JSON entero y se perdía lo de los demás (revisión 21/10/2026).
 // Se mira qué claves ha tocado este botón y solo esas se ponen sobre lo que hay HOY.
-async function iaFresca(id,ia){
-  const antes=(facturaLocal(id)||{}).json_extraccion_ia;
+// `base`: el JSON del que partió el botón cuando la factura no está en pantalla (la baja aparte la
+// descarga para Truenas). Sin él, iaFresca no sabría qué se ha tocado y guardaría la ficha entera.
+async function iaFresca(id,ia,base){
+  const antes=base||(facturaLocal(id)||{}).json_extraccion_ia;
   if(!antes||!ia)return ia;
   const fila=(await api(`facturas_procesadas?select=json_extraccion_ia&id=eq.${id}`))[0];
   if(!fila)return ia;
@@ -2712,9 +2714,9 @@ async function iaFresca(id,ia){
 }
 // Guarda solo json_extraccion_ia: aprobar y pagar no cambian el estado de la
 // factura (validada, contabilizada…), que es otra decisión.
-async function guardarIA(id,ia){
+async function guardarIA(id,ia,base){
   const tok=getToken()||SB_ANON;
-  const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:await iaFresca(id,ia)})});
+  const r=await fetch(`${SB_URL}/rest/v1/facturas_procesadas?id=eq.${id}`,{method:'PATCH',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({json_extraccion_ia:await iaFresca(id,ia,base)})});
   const data=await r.json().catch(()=>[]);
   if(!r.ok||!Array.isArray(data)||!data.length)throw new Error('no_persistido');
 }
@@ -3457,7 +3459,7 @@ async function guardarFacturasRegistro(btn,ff,dir){
   for(const h of hechos){
     const ia=Object.assign({},h.f.json_extraccion_ia||{});
     ia._descargada_registro={fecha:ahora,por:quien,nombre:h.nombre,hojas:h.hojas,carpeta:dir?dir.name:'Descargas'};
-    try{await guardarIA(h.f.id,ia);}catch(e){console.error(e);}
+    try{await guardarIA(h.f.id,ia,h.f.json_extraccion_ia);}catch(e){console.error(e);}
   }
   hechos.forEach(h=>{state.selArchivo.delete(h.f.id);state.selTruenas.delete(h.f.id);});
   btn.disabled=false;btn.innerHTML=txt;

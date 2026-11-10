@@ -309,6 +309,9 @@ table.det .det-rojo{background:var(--rd-s);color:var(--rd);font-weight:700}
 table.det .det-ambar{background:var(--amber-s);color:var(--amber);font-weight:700}
 table.det .det-tot td{font-size:13px;font-weight:800;color:var(--ink);border-top:2px solid var(--line);border-bottom:0;padding:9px 8px}
 table.det .det-tot td.det-rojo{color:var(--rd)}
+.fila-pdf{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;border:1px solid var(--line);background:#fff;color:var(--red);cursor:pointer;flex:none;padding:0}
+.fila-pdf:hover{border-color:var(--red);background:var(--red-soft)}
+.fila-pdf svg{width:13px;height:13px}
 .imp-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:13.5px}
 .imp-row+.imp-row{border-top:1px dashed var(--line)}
 .imp-row .l{color:var(--muted)}
@@ -1895,7 +1898,7 @@ function refreshTabla(){
   if(oldWrap)oldWrap.replaceWith(tmp.firstElementChild);
   const meta=card.querySelector('.tbl-tools .card-meta');
   if(meta)meta.textContent=`${ff.length} resultado${ff.length!==1?'s':''}`;
-  document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));
+  document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));bindFilaPdf();
   document.querySelectorAll('th[data-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.sort;if(state.sort.k===k)state.sort.dir*=-1;else state.sort={k,dir:k==='prov'?1:-1};refreshTabla();});
   bindArchivo();
 }
@@ -1977,6 +1980,23 @@ document.addEventListener('click',e=>{
   else if(p==='aprobadas'){setView('aprobadas');state.apBuscar=q;render();}
   else if(p==='pagadas'){setView('pagadas');state.pgBuscar=q;render();}
 });
+// El PDF original de la factura (el que llegó por correo).
+function pdfDe(f){const j=f&&f.json_extraccion_ia;return j?._documento_url||j?.datos_extraidos?._documento_url||null;}
+// Paqui, 10/11/2026: «desde Pagadas no podemos acceder al documento original». Estaba al final de la
+// ficha (más larga desde la tabla de líneas) y el botón «Documentos» de arriba ya no está en Pagadas:
+// en cada fila de los listados, un botón que abre el PDF de la factura sin entrar en la ficha.
+function botonPdfFila(f){
+  const u=pdfDe(f);if(!u)return '';
+  const p=(f.json_extraccion_ia||{})._paginas_propias||null;
+  return `<button type="button" class="fila-pdf" data-pdf-fila="${esc(JSON.stringify([{u,p}]))}" title="Abrir el PDF original de la factura" aria-label="Abrir el PDF original de la factura">${svg(ICN.file)}</button>`;
+}
+function bindFilaPdf(){
+  document.querySelectorAll('#content [data-pdf-fila]').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    let d=[];try{d=JSON.parse(b.dataset.pdfFila);}catch(_){}
+    if(d.length&&d[0].p)openPdfsJuntos(d);else if(d.length)openPdf(d[0].u);
+  });
+}
 function tablaFacturas(ff,full){
   if(!ff.length&&full&&state.view==='facturas'&&String(state.search||'').trim())return pistaBusqueda(String(state.search).trim());
   if(!ff.length)return`<div class="empty">${svg(ICN.inbox)}<p>No hay facturas</p><small>No se encontraron facturas en este periodo o filtro</small></div>`;
@@ -1989,7 +2009,7 @@ function tablaFacturas(ff,full){
     return `<tr data-id="${f.id}">${arch}
       <td class="mono">${dt(f.fecha_factura||f.fecha_recepcion)}</td>
       <td class="mono" style="color:var(--muted)">${dt(f.fecha_recepcion||f.creado_en)}</td>
-      <td class="mono cell-strong">${esc(f.numero_factura||'—')}</td>
+      <td class="mono cell-strong"><span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap">${esc(f.numero_factura||'—')}${botonPdfFila(f)}</span></td>
       <td><div class="prov-cell"><div class="prov-av">${initials(nombreProv(f))}</div><span class="trunc">${provConCodigo(f)}</span>${badgeSinCodigo(f)}</div></td>
       ${full?(()=>{const p=formaPago(f);return `<td style="font-size:12.5px" title="${esc(p.original?'La factura dice: '+p.original:'La factura no dice cómo se paga')}${p.acordado?' · días según lo acordado con el proveedor':''}">${esc(p.texto)}</td>`;})():''}
       <td class="r cell-strong">${eur(f.total_factura)} ${warn?`<span title="El total no cuadra: base + IVA = ${esc(eur(f.total_calculado))} y se ha leído ${esc(eur(f.total_factura))} (diferencia ${esc(eur(dif))}). Casi siempre es un importe mal leído: ábrela y corrígelo." style="color:var(--rd);cursor:help">${svg(ICN.alert).replace('viewBox','width="13" height="13" style="vertical-align:-2px" viewBox')}</span>`:''}</td>
@@ -2276,7 +2296,7 @@ async function openDrawer(id){
   const lineas=lineasDe(f);
   const j=f.json_extraccion_ia||{};
   const prov=j?.proveedor||j?.datos_extraidos?.proveedor||{};
-  const docUrl=j?._documento_url||j?.datos_extraidos?._documento_url||null;
+  const docUrl=pdfDe(f);
   const avisoElim=f.eliminada?`<div class="dr-sec" style="border-left:4px solid var(--rd);background:var(--rd-s)"><div class="dr-sec-t">Factura quitada del listado</div><div style="font-size:13px;color:var(--ink-2)">${f.motivo_eliminacion?esc(f.motivo_eliminacion)+' · ':''}${f.eliminada_en?dtL(f.eliminada_en):''}</div><button class="act-btn ok" data-restaurar="${f.id}" style="margin-top:10px">Recuperar factura</button></div>`:'';
   const esPend=PEND.includes(f.estado);
   const rev=j?._revision;
@@ -2992,7 +3012,7 @@ function bindContent(){
     });
     const c=$('#s-cuenta');if(c)c.textContent=`${n} documento${n===1?'':'s'}`;
   };
-  document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));
+  document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));bindFilaPdf();
   // «Leer motivo» (Rubén, 04/11/2026: nada de textos largos en la tabla): abre la ficha por sus incidencias.
   document.querySelectorAll('[data-leer-motivo]').forEach(b=>b.onclick=async e=>{
     e.stopPropagation();

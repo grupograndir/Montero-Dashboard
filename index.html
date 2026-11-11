@@ -4440,7 +4440,13 @@ async function guardarExcelProv(){
     while(fin.hechas&&fin.quedan>0);
   }catch(e){suelta(`El Excel está guardado, pero faltan facturas por repasar (${e.message}). Pulsa otra vez «Guardar cambios».`);return;}
   const unidas=Math.max(0,(r.sin_proveedor||0)-(fin.sin_proveedor||0));
-  toast(`Guardado: ${r.proveedores} proveedores${r.altas?` · ${r.altas} dados de alta`:''}${r.homologaciones_cambiadas?` · ${r.homologaciones_cambiadas} homologaciones cambiadas`:''}${unidas?` · ${unidas} facturas unidas a su proveedor`:''}`);
+  toast(`Guardado: ${r.proveedores} proveedores${r.altas?` · ${r.altas} dados de alta`:''}${r.homologaciones_cambiadas?` · ${r.homologaciones_cambiadas} homologaciones cambiadas`:''}${r.fichas_juntadas?` · ${r.fichas_juntadas} fichas repetidas juntadas`:''}${unidas?` · ${unidas} facturas unidas a su proveedor`:''}`);
+  // Dos filas con el mismo código: se guardan como un solo proveedor con los dos nombres. Antes la
+  // segunda se perdía sin avisar y sus facturas salían «sin código» (Sercomosa, Verónica 11/11/2026).
+  const rep=Array.isArray(r.codigos_repetidos)?r.codigos_repetidos:[];
+  if(rep.length)alert('Ojo: hay códigos que están en más de una fila del Excel.\n\n'
+    +rep.map(x=>`· ${x.codigo}: «${x.nombre}» y «${(x.otros||[]).join('», «')}»`).join('\n')
+    +'\n\nSe han guardado como un mismo proveedor: con los datos de la primera fila y todos los nombres, para reconocer sus facturas. Si son proveedores distintos, pon a cada uno su propio código.');
   state.excelSucio=false;state.excel=null;await loadAll();
 }
 // Otra versión del Excel que llegue por correo: se sube entera, con sus hojas.

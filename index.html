@@ -172,6 +172,7 @@ body.side-off .brand{padding:16px 0;border-bottom:0}
 .x-tabla thead input{font-weight:700;text-transform:uppercase;font-size:11.5px}
 .x-tabla td{border-right:1px solid var(--line-2);border-bottom:1px solid var(--line-2);padding:0}
 .x-tabla input[type=text]{min-width:0;max-width:none;border-radius:0}
+.x-tabla select{height:28px;padding:0 4px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;font-family:inherit;background:var(--card);color:var(--ink)}
 .x-tabla td.x-mal input{background:var(--rd-s);color:var(--rd);font-weight:700}
 .x-eliminar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 18px;border-bottom:1px solid var(--line-2);background:var(--rd-s);font-size:13px}
 .x-eliminar input{flex:1 1 22rem;height:32px;padding:0 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit}
@@ -1403,6 +1404,8 @@ function pedidosDeAdjunto(a){
 // Para el AS400: lo que lleve (letras y ceros incluidos) sin espacios, barras ni
 // guiones, y como mucho 10 caracteres (los últimos: «AC ALV 0126013630» → 0126013630).
 const albAS400=n=>String(n||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(-10);
+// El proveedor lleva «ALBARÁN A AS400 = NO» en el Excel de proveedores (migración 031, `albaran_as400`).
+const sinAlbaranAS400=f=>(condicionDe(f)||{}).albaran_as400===false;
 function albaranesConFecha(ia){
   const nums=Array.isArray(ia._albaranes)?ia._albaranes:[];
   const det=Array.isArray(ia.albaranes)?ia.albaranes:[];
@@ -2430,6 +2433,7 @@ async function openDrawer(id){
           ${kv('Plazo (factura)',esc(f.plazo_pago_factura||(p.dias?`${p.dias} días${p.acordado?' (acordado)':''}`:'—')))}
           ${kv('Autoriza pedido',esc(autoriza||'—'))}
           ${kv('Valida factura',esc(validadorDe(f)||'—'))}
+          ${sinAlbaranAS400(f)?kv('Albarán a AS400','<b>NO</b>: el Excel que se sube al AS400 sale sin sus albaranes'):''}
         </div>
         ${porVolumen?'<div style="font-size:12.5px;color:var(--muted);margin-top:6px">El descuento es por volumen: no se aplica factura a factura, así que aquí no se puede comprobar.</div>':''}
       </div>`;
@@ -3246,7 +3250,9 @@ async function exportAS400(){
     ];
     // Paqui, 07/10/2026: el albarán va solo con sus cifras, sin prefijo, símbolos
     // ni fecha, porque cada delegación lo graba a su manera en el AS400.
-    const albNum=albaranesDe(ia).map(a=>({num:albAS400(a.num),fecha:a.fecha})).filter(a=>a.num);
+    // Verónica, 12/11/2026: con «ALBARÁN A AS400 = NO» en el Excel de proveedores, sin albaranes: el AS400
+    // los busca, no los tiene grabados, dice «el albarán no existe» y no contabiliza la factura.
+    const albNum=sinAlbaranAS400(f)?[]:albaranesDe(ia).map(a=>({num:albAS400(a.num),fecha:a.fecha})).filter(a=>a.num);
     for(let i=0;i<MAX_ALBARANES_EXCEL;i++) base.push(albNum[i]?albNum[i].num:'',albNum[i]?albNum[i].fecha:'');
     // Paqui, 06/10/2026: vacía y numérica → 0; vacía y de texto → en blanco.
     // Numéricas son los importes y los tipos (base, IVA, total, IRPF); los
@@ -3261,7 +3267,7 @@ async function exportAS400(){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'AS400');
   XLSX.writeFile(wb,`AS400_asientos_montero_${hoyISO()}.xlsx`);
-  avisoMuchosAlbaranes(ff);
+  avisoMuchosAlbaranes(ff.filter(f=>!sinAlbaranAS400(f)));
   if(tiposRaros.size)alert(`Ojo: ${tiposRaros.size} factura${tiposRaros.size!==1?'s':''} con un importe que no es IVA del 0, 10 o 21 % y que cambia el total (${[...tiposRaros].slice(0,8).join(', ')}).\n\nEse importe (por ejemplo, un recargo de equivalencia) no tiene columna en el Excel del AS400. Grábalo a mano.`);
   // Las facturas en PDF acompañan al Excel: se guardan en el registro de IVA
   // soportado (Paqui, 25/09/2026). Si fallan, el Excel ya está descargado.
@@ -4189,13 +4195,17 @@ async function subirDocumento(pdf,nombre,tipo,asunto){
   return {id:doc.id,hash,nombre};
 }
 async function ponerAdjunto(facId,doc,tipo){
-  const f=await facturaPorId(facId);if(!f)throw new Error('No se encuentra la factura');
-  const ia=Object.assign({},f.json_extraccion_ia||{});
+  // Lo que hay en la BASE, no la copia de la pantalla: al subir varios a la vez la copia no tenía los que se
+  // acababan de poner y cada uno borraba al anterior; solo se veía uno (Verónica, 12/11/2026, factura 89).
+  const fila=(await api1(`facturas_procesadas?select=id,json_extraccion_ia&id=eq.${facId}`))[0];
+  if(!fila)throw new Error('No se encuentra la factura');
+  const base=fila.json_extraccion_ia||{};
+  const ia=Object.assign({},base);
   const adj=(Array.isArray(ia._adjuntos)?ia._adjuntos:[]).filter(a=>a.documento_id!==doc.id);
   adj.push({nombre:doc.nombre,tipo,documento_id:doc.id,como:`añadido a mano por ${quienSoy()}`,leido:true,a_mano:true,
             url:`${SB_URL}/storage/v1/object/public/facturas/${doc.hash}.pdf`});
   ia._adjuntos=adj;
-  await guardarIA(facId,ia);
+  await guardarIA(facId,ia,base);
   // Y que el emparejado del ordenador del proceso lo respete y recalcule la factura
   const tok=getToken()||SB_ANON;
   await fetch(`${SB_URL}/rest/v1/auditoria_workflow`,{method:'POST',headers:{apikey:SB_ANON,Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
@@ -4302,10 +4312,42 @@ async function cargarExcelProv(){
   try{const r=await api(`configuracion?select=valor,actualizado_en&clave=eq.proveedores_excel`);
     state.excel=r&&r[0]?JSON.parse(r[0].valor):{hojas:[]};state.excelFecha=r&&r[0]?r[0].actualizado_en:null;}
   catch(e){console.error(e);state.excel={hojas:[]};}
+  asegurarColAlbAS400(state.excel);
   state.excelSucio=false;
 }
 const HOM_COL=/^(HOM|NUEVOS HOMOL|HOMOLOGACION|HOMOL)$/;
+const CODIGO_COL=/^(CODIGO|COD PROVEEDOR|CODIGO PROVEEDOR|COD)$/;
+const NOMBRE_COL=/^(PROVEEDORES|PROVEEDOR|HOMOLOGADOS ANTIGUOS|NOMBRE|RAZON SOCIAL)$/;
 const cabNorm=t=>String(t||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]+/g,' ').trim();
+// «ALBARÁN A AS400» (Verónica, 12/11/2026): con NO, el Excel que se sube al AS400 lleva vacías las columnas
+// de albarán de ese proveedor (el AS400 no los tiene grabados y dice «el albarán no existe»). La plataforma
+// sigue pidiendo el albarán igual. La lee la base (`_campo_excel`, migración 031): misma regla aquí.
+const esColAlbAS400=t=>{const c=cabNorm(t);return /ALB/.test(c)&&/AS400/.test(c.replace(/ /g,''));};
+// La columna está siempre en cada hoja con código y nombre (detrás de ALBARÁN, o al final), con SÍ en las filas
+// con código. Si se sube otro Excel que no la trae, cada código conserva lo que tenía en el anterior.
+function asegurarColAlbAS400(excel,previo){
+  const codigo=v=>String(v??'').trim().replace(/[.,]0+$/,'');
+  const antes=new Map();
+  ((previo&&previo.hojas)||[]).forEach(h=>{
+    const fs=h.filas||[],cab=(fs[0]||[]).map(cabNorm);
+    const ic=cab.findIndex(c=>CODIGO_COL.test(c)),ia=(fs[0]||[]).findIndex(esColAlbAS400);
+    if(ic<0||ia<0)return;
+    fs.slice(1).forEach(f=>{const k=codigo(f[ic]);if(k&&!antes.has(k)&&String(f[ia]??'').trim())antes.set(k,String(f[ia]).trim());});
+  });
+  ((excel&&excel.hojas)||[]).forEach(h=>{
+    const fs=h.filas||[];
+    if(!fs.length||/^PLANTILLA$/i.test(String(h.nombre||'').trim()))return;
+    const cab=(fs[0]||[]).map(cabNorm);
+    const ic=cab.findIndex(c=>CODIGO_COL.test(c));
+    if(ic<0||!cab.some(c=>NOMBRE_COL.test(c))||(fs[0]||[]).some(esColAlbAS400))return;
+    const ialb=cab.indexOf('ALBARAN'), ia=ialb<0?Math.max(...fs.map(f=>f.length)):ialb+1;
+    fs.forEach((f,r)=>{
+      while(f.length<ia)f.push('');
+      const k=codigo(f[ic]);
+      f.splice(ia,0,r===0?'ALBARÁN A AS400':(/^\d+$/.test(k)?(antes.get(k)||'SÍ'):''));
+    });
+  });
+}
 function viewExcel(){
   if(!state.excel){cargarExcelProv().then(render);return `<div class="card"><div class="empty">Cargando el Excel de proveedores…</div></div>`;}
   const hojas=state.excel.hojas||[];
@@ -4318,13 +4360,19 @@ function viewExcel(){
   // Cada columna tan ancha como su texto más largo (como «autoajustar» en Excel),
   // para que no se corte nada; la tabla se desliza a lo ancho si no cabe.
   const anchoCol=Array.from({length:ancho},(_,c)=>Math.min(80,Math.max(5,...filas.map(f=>String(f[c]??'').length))));
-  const celda=(r,c,v)=>{
+  const iAlbAS=(filas[0]||[]).findIndex(esColAlbAS400), iCod=(filas[0]||[]).findIndex(c=>CODIGO_COL.test(cabNorm(c)));
+  const celda=(r,c,v,f)=>{
+    // «ALBARÁN A AS400»: un desplegable SÍ / NO en cada proveedor con código.
+    if(r>0&&c===iAlbAS&&iCod>=0&&String((f||[])[iCod]??'').trim()){
+      const no=/^\s*N/i.test(String(v??''));
+      return `<td><select data-x="${r}" data-c="${c}" title="NO: el Excel que se sube al AS400 sale sin los albaranes de este proveedor (la plataforma los sigue pidiendo)">${['SÍ','NO'].map(o=>`<option${(o==='NO')===no?' selected':''}>${o}</option>`).join('')}</select></td>`;
+    }
     const mal=r>0&&c===iHom&&String(v||'').trim()&&!HOM_OK.test(String(v).toUpperCase().replace(/\s+/g,''));
     return `<td${mal?' class="x-mal" title="La homologación va siempre con siglas: HNR, HNG, HLGV…"':''}><input type="text" data-x="${r}" data-c="${c}" value="${esc(v??'')}" style="width:${Math.ceil(anchoCol[c]*1.15)+2}ch" title="${esc(v??'')}"></td>`;
   };
   const filaHtml=(f,r)=>{
     const vis=!q||r===0||coincide(f.join(' '),q);
-    return `<tr data-xr="${r}" ${vis?'':'style="display:none"'}>${Array.from({length:ancho},(_,c)=>celda(r,c,f[c])).join('')}</tr>`;
+    return `<tr data-xr="${r}" ${vis?'':'style="display:none"'}>${Array.from({length:ancho},(_,c)=>celda(r,c,f[c],f)).join('')}</tr>`;
   };
   return `<div class="card x-libro ${state.excelCompleto?'x-completo':''}" id="x-libro">
     <div class="filtros">
@@ -4345,15 +4393,15 @@ function viewExcel(){
       <input id="x-eli-buscar" list="dl-xprov" placeholder="Escribe el nombre o el código y elígelo de la lista">
       <datalist id="dl-xprov">${(()=>{
         const cab=(filas[0]||[]).map(cabNorm);
-        const iN=cab.findIndex(c=>/^(PROVEEDORES|PROVEEDOR|HOMOLOGADOS ANTIGUOS|NOMBRE|RAZON SOCIAL)$/.test(c));
-        const iC=cab.findIndex(c=>/^(CODIGO|COD PROVEEDOR|CODIGO PROVEEDOR|COD)$/.test(c));
+        const iN=cab.findIndex(c=>NOMBRE_COL.test(c));
+        const iC=cab.findIndex(c=>CODIGO_COL.test(c));
         state.excelOpcEliminar=new Map();
         return filas.slice(1).map((f,i)=>{const n=String(f[iN]??'').trim();if(!n)return '';
           const et=`${n}${iC>=0&&String(f[iC]??'').trim()?' · '+String(f[iC]).trim():''} (fila ${i+1})`;
           state.excelOpcEliminar.set(et,i+1);return `<option value="${esc(et)}" label="${esc(normBusca(et))}"></option>`;}).join('');})()}</datalist>
       <button class="btn-s rojo" id="x-eli-ok">Eliminar</button><button class="btn-s" id="x-eli-no">Cancelar</button>
     </div>
-    <div class="x-ayuda">Es el Excel de proveedores homologados, igual que en Excel. Lo que guardes aquí lo usa el sistema al momento: homologación (siempre con siglas), código AS400, si lleva pedido y albarán, quién valida la factura (AUT FRA), forma de pago… Los proveedores nuevos se dan de alta solos al guardar.</div>
+    <div class="x-ayuda">Es el Excel de proveedores homologados, igual que en Excel. Lo que guardes aquí lo usa el sistema al momento: homologación (siempre con siglas), código AS400, si lleva pedido y albarán, quién valida la factura (AUT FRA), forma de pago… Los proveedores nuevos se dan de alta solos al guardar. «ALBARÁN A AS400» en NO: el Excel que se sube al AS400 sale sin los albaranes de ese proveedor (la plataforma los sigue pidiendo y avisando igual).</div>
     <div id="x-otras" class="x-ayuda" style="display:none;color:var(--ink);background:var(--amber-s)"></div>
     <div class="tbl-wrap x-hoja"><table class="tbl-ed x-tabla"><thead>${filaHtml(filas[0]||[],0)}</thead>
       <tbody>${filas.slice(1).map((f,i)=>filaHtml(f,i+1)).join('')}</tbody></table></div></div>`;
@@ -4463,7 +4511,9 @@ async function importarExcelProv(archivo){
       return {nombre:n,filas:filas.map(f=>(f.concat(Array(ancho).fill(''))).slice(0,ancho))};
     });
     if(state.excel&&(state.excel.hojas||[]).length&&!confirm(`¿Sustituir el Excel de proveedores por «${archivo.name}»?\n\nSe verá aquí para revisarlo; no se aplica hasta que pulses «Guardar cambios».`))return;
-    state.excel={fichero:archivo.name,hojas,cargado:new Date().toISOString()};state.excelSucio=true;state.excelHoja=0;render();
+    const nuevo={fichero:archivo.name,hojas,cargado:new Date().toISOString()};
+    asegurarColAlbAS400(nuevo,state.excel);   // si no trae la columna, cada proveedor conserva su SÍ / NO
+    state.excel=nuevo;state.excelSucio=true;state.excelHoja=0;render();
     toast('Excel cargado: revísalo y pulsa «Guardar cambios»');
   }catch(e){toast('No se pudo leer el Excel: '+e.message,'err');}
 }

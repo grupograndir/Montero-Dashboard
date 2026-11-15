@@ -1443,6 +1443,19 @@ function validadaAMano(f){
   if(!faltan.length)return null;
   return faltan.map(v=>v.codigo==='V30'?'sin pedido':'sin albaran').join(' y ');
 }
+// Columna TARIFAS del Excel de proveedores, en «Condiciones pactadas». «PEDIDO» es lo PACTADO
+// (el precio tiene que ser el del pedido autorizado), no que la factura traiga pedido ni que se
+// haya comprobado. Antes decía «Según el pedido: los precios son los del pedido autorizado» y en
+// una factura sin pedido parecía que sí lo había (Gasóleos Alicantinos G 1354, Paqui 15/11/2026,
+// E-118). Si falta el pedido (V30, lo pone el PC) se dice al lado; el panel no lo calcula.
+function textoTarifa(tarifa,ia){
+  const t=String(tarifa??'').trim();
+  if(!t)return '';
+  if(!/^PEDIDO$/i.test(t))return `<b>${esc(t)}</b>`;
+  const sinPedido=((ia||{})._validaciones||[]).some(v=>v&&v.codigo==='V30');
+  return '<b>PEDIDO</b>: el precio tiene que ser el del pedido autorizado'
+    +(sinPedido?'<div style="font-size:12px;color:var(--amber);font-weight:600;margin-top:2px">Falta el pedido: el precio no se ha podido comprobar con él.</div>':'');
+}
 function normProv(s){
   return String(s||'').normalize('NFKD').replace(/[̀-ͯ]/g,'').toUpperCase()
     .replace(/[^A-Z0-9 ]/g,' ')
@@ -2426,7 +2439,7 @@ async function openDrawer(id){
       return `<div class="dr-sec">
         <div class="dr-sec-t">${svg('<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>')}Condiciones pactadas</div>
         <div class="kv">
-          ${kv('Tarifa (Excel de proveedores)',tarifa?(/^PEDIDO$/i.test(tarifa)?'Según el pedido: los precios son los del pedido autorizado':`<b>${esc(tarifa)}</b>`):nada(c?'El Excel no pone tarifa':'Este proveedor no está en el Excel'))}
+          ${kv('Tarifa pactada (Excel de proveedores)',tarifa?textoTarifa(tarifa,j):nada(c?'El Excel no pone tarifa':'Este proveedor no está en el Excel'))}
           ${kv('Descuento pactado (Excel)',(pactado?`<b>${esc(pactado)}</b>`:nada(c?'El Excel no pone descuento':'Este proveedor no está en el Excel'))
             +(enFactura!=null?`<div style="font-size:12px;color:var(--muted);font-weight:400">En la factura: ${esc(enFactura.toLocaleString('es-ES',{maximumFractionDigits:2}))} %${vd.descuento_factura_txt?' · '+esc(vd.descuento_factura_txt):''}</div>`:''))}
           ${kv('Forma de pago (factura)',esc(p.tipo)+(p.original&&p.original.toUpperCase()!==p.tipo.toUpperCase()?`<div style="font-size:12px;color:var(--muted);font-weight:400">La factura dice: «${esc(p.original)}»</div>`:''))}

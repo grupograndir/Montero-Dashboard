@@ -1899,7 +1899,7 @@ function viewFacturas(){
       <details class="multi" id="f-pago"><summary class="sel">${state.fPago.length?`Pago: ${esc(state.fPago.join(', '))}`:'Todas las formas de pago'}</summary>
         <div class="multi-op">${pagos.map(p=>`<label><input type="checkbox" value="${esc(p)}" ${state.fPago.includes(p)?'checked':''}> ${esc(p)}</label>`).join('')}
         ${state.fPago.length?'<button type="button" class="multi-limpiar" id="f-pago-limpiar">Quitar filtro</button>':''}</div></details>
-      <button class="ico-btn" id="btn-export"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Resumen</button><button class="ico-btn" id="btn-export-as400"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>AS400</button><button class="ico-btn" id="btn-descargar-docs" title="Descarga los PDF de las facturas que estés viendo, en una carpeta por factura"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polyline points="12 11 12 17"/><polyline points="9 14 12 17 15 14"/></svg>Documentos</button>
+      <button class="ico-btn" id="btn-export"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Resumen</button><button class="ico-btn" id="btn-export-as400"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>AS400</button><button class="ico-btn" id="btn-para-pago" title="Las facturas que estés viendo, con su fecha de vencimiento: fecha de la factura + los días de F.PAGO del Excel de proveedores"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Para pago</button><button class="ico-btn" id="btn-descargar-docs" title="Descarga los PDF de las facturas que estés viendo, en una carpeta por factura"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polyline points="12 11 12 17"/><polyline points="9 14 12 17 15 14"/></svg>Documentos</button>
       </div>
     </div>
     ${tablaFacturas(ff,true)}
@@ -3082,6 +3082,7 @@ function bindRango(){
   // Las descargas solo están en Facturas
   const be=$('#btn-export');if(be)be.onclick=exportExcel;
   const ba=$('#btn-export-as400');if(ba)ba.onclick=exportAS400;
+  const bp=$('#btn-para-pago');if(bp)bp.onclick=exportParaPago;
   const bd=$('#btn-descargar-docs');if(bd)bd.onclick=descargarDocumentos;
 }
 $('#btn-leyenda').onclick=openLegend;
@@ -3158,6 +3159,46 @@ function exportExcel(){
   avisoMuchosAlbaranes(ff);
 }
 
+// «PARA PAGO» (Verónica, 13/11/2026): las facturas que están en pantalla, con los filtros puestos, y su fecha de
+// vencimiento = fecha de la factura + los días de F.PAGO del Excel de proveedores («30», «60», «CONFIRMING 30»…;
+// CONTADO = 0). Si el Excel no dice días (GIRO, TRANSFERENCIA, vacío) o la factura no tiene fecha, el vencimiento
+// va en blanco y se avisa: no se inventa. La última columna va vacía a propósito.
+function diasPagoExcel(f){
+  const fp=String((condicionDe(f)||{}).forma_pago||'').trim();
+  const m=fp.match(/\d{1,3}/);
+  if(m)return +m[0];
+  return /^CONTADO\b/i.test(fp)?0:null;
+}
+const fechaLocal=s=>{const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(+m[1],+m[2]-1,+m[3]):null;};
+// Nº de fecha de Excel calculado aquí: SheetJS 0.18.5 convierte las Date con la hora de Madrid y salían un día antes.
+const serialExcel=d=>d?Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5+25569:'';
+function fechaVencimiento(f){
+  const d=diasPagoExcel(f), ff=fechaLocal(f.fecha_factura);
+  return d==null||!ff?null:new Date(ff.getFullYear(),ff.getMonth(),ff.getDate()+d);
+}
+function exportParaPago(){
+  const ff=(state.view==='facturas'?filtradas():[]).filter(f=>!f.eliminada);
+  if(!ff.length){toast('No hay facturas en pantalla para descargar','err');return;}
+  const sinDias=new Set();let sinFecha=0;
+  const filas=ff.map(f=>{
+    const v=fechaVencimiento(f);
+    if(!f.fecha_factura)sinFecha++;else if(!v)sinDias.add(nombreProv(f)||'(sin proveedor)');
+    return [codigoProv(f)||'',nombreProv(f)||'',homologacionDe(f)||'',f.numero_factura||'',
+            serialExcel(fechaLocal(f.fecha_factura)),serialExcel(v),delegacionCiudad(f)||'',''];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([['Cod. Proveedor','Proveedor','Homologación','Nº Factura','Fecha Factura','Fecha Vencimiento','Delegación',''],...filas]);
+  // Fechas de verdad (se pueden ordenar y filtrar en Excel), vistas como dd/mm/aaaa
+  for(let r=1;r<=filas.length;r++)['E','F'].forEach(c=>{const cel=ws[c+(r+1)];if(cel&&cel.t==='n')cel.z='dd/mm/yyyy';});
+  ws['!cols']=[{wch:14},{wch:42},{wch:13},{wch:22},{wch:13},{wch:17},{wch:16},{wch:30}];
+  ws['!autofilter']={ref:`A1:H${filas.length+1}`};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'PARA PAGO');
+  XLSX.writeFile(wb,`PARA PAGO ${hoyISO()}.xlsx`);
+  const prov=[...sinDias];
+  const aviso=(prov.length?`Sin días de pago en el Excel de proveedores (F.PAGO): ${prov.slice(0,6).join(', ')}${prov.length>6?` y ${prov.length-6} más`:''}. `:'')
+    +(sinFecha?`${sinFecha} factura${sinFecha!==1?'s':''} sin fecha. `:'');
+  toast(`Para pago: ${ff.length} factura${ff.length!==1?'s':''}.${aviso?' Vencimiento en blanco → '+aviso:''}`,aviso?'err':undefined);
+}
 async function exportAS400(){
   const btn=$('#btn-export-as400');
   if(btn&&btn.disabled)return;

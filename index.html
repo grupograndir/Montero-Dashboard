@@ -1449,6 +1449,18 @@ function validadaAMano(f){
 // haya comprobado. Antes decía «Según el pedido: los precios son los del pedido autorizado» y en
 // una factura sin pedido parecía que sí lo había (Gasóleos Alicantinos G 1354, Paqui 15/11/2026,
 // E-118). Si falta el pedido (V30, lo pone el PC) se dice al lado; el panel no lo calcula.
+// «Autoriza pedido» sale SOLO de la columna AUT PEDIDO del Excel de proveedores de hoy. Antes se
+// enseñaba primero `_autoriza_pedido`, una copia que el PC apuntó en la ficha al entrar la factura
+// (de la lista antigua) y que se quedaba congelada: DIVENGAS 8167 tiene PEDIDO NO y AUT PEDIDO vacío,
+// y sus facturas decían «Autoriza pedido: PROVEEDORES» (Rubén 16/11/2026, E-120; 36 fichas así).
+function textoAutorizaPedido(c){
+  const gris=t=>`<span style="color:var(--muted);font-weight:400">${t}</span>`;
+  if(!c)return gris('Este proveedor no está en el Excel');
+  const a=String(c.autoriza_pedido??'').trim();
+  if(a)return esc(a);
+  if(c.pedido===false)return gris('No lleva pedido');
+  return gris('El Excel no lo pone');
+}
 function textoTarifa(tarifa,ia){
   const t=String(tarifa??'').trim();
   if(!t)return '';
@@ -2436,7 +2448,7 @@ async function openDrawer(id){
       const pactado=c?String(c.descuento??'').trim():'', tarifa=c?String(c.tarifas??'').trim():'';
       const enFactura=vd&&vd.descuento_factura_pct!=null&&!isNaN(+vd.descuento_factura_pct)?+vd.descuento_factura_pct:null;
       const porVolumen=/MENSUAL|RAPPEL|ANUAL|TRIMESTR|SEMESTR/i.test(pactado);
-      const autoriza=j._autoriza_pedido||(c&&c.autoriza_pedido)||'';
+      const autoriza=textoAutorizaPedido(c);
       return `<div class="dr-sec">
         <div class="dr-sec-t">${svg('<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>')}Condiciones pactadas</div>
         <div class="kv">
@@ -2445,7 +2457,7 @@ async function openDrawer(id){
             +(enFactura!=null?`<div style="font-size:12px;color:var(--muted);font-weight:400">En la factura: ${esc(enFactura.toLocaleString('es-ES',{maximumFractionDigits:2}))} %${vd.descuento_factura_txt?' · '+esc(vd.descuento_factura_txt):''}</div>`:''))}
           ${kv('Forma de pago (factura)',esc(p.tipo)+(p.original&&p.original.toUpperCase()!==p.tipo.toUpperCase()?`<div style="font-size:12px;color:var(--muted);font-weight:400">La factura dice: «${esc(p.original)}»</div>`:''))}
           ${kv('Plazo (factura)',esc(f.plazo_pago_factura||(p.dias?`${p.dias} días${p.acordado?' (acordado)':''}`:'—')))}
-          ${kv('Autoriza pedido',esc(autoriza||'—'))}
+          ${kv('Autoriza pedido (Excel)',autoriza)}
           ${kv('Valida factura',esc(validadorDe(f)||'—'))}
           ${sinAlbaranAS400(f)?kv('Albarán a AS400','<b>NO</b>: el Excel que se sube al AS400 sale sin sus albaranes'):''}
         </div>

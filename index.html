@@ -3205,6 +3205,16 @@ function fechaVencimiento(f){
   const fin=new Date(ff.getFullYear(),ff.getMonth(),ff.getDate()+d);   // se cumple el plazo
   return new Date(fin.getFullYear(),fin.getMonth()+(fin.getDate()>5?1:0),5);   // el primer día 5 desde entonces
 }
+// Importe Factura (Verónica, 19/11/2026): el total de la factura (el «Total» del listado), como número para poder sumarlo
+// en Excel; los abonos van en negativo. Si la factura no tiene total leído, en blanco.
+const CABECERA_PARA_PAGO=['Cod. Proveedor','Proveedor','Homologación','Nº Factura','Fecha Factura','Fecha Vencimiento','Importe Factura','Delegación',''];
+function filaParaPago(f,v){
+  const t=f.total_factura, n=+t;
+  return [codigoProv(f)||'',nombreProv(f)||'',homologacionDe(f)||'',f.numero_factura||'',
+          serialExcel(fechaLocal(f.fecha_factura)),serialExcel(v),
+          (t==null||t===''||!isFinite(n))?'':Math.round(n*100)/100,
+          delegacionCiudad(f)||'',''];
+}
 function exportParaPago(){
   const ff=(state.view==='facturas'?filtradas():[]).filter(f=>!f.eliminada);
   if(!ff.length){toast('No hay facturas en pantalla para descargar','err');return;}
@@ -3212,21 +3222,24 @@ function exportParaPago(){
   const filas=ff.map(f=>{
     const v=fechaVencimiento(f);
     if(!f.fecha_factura)sinFecha++;else if(!v)sinDias.add(nombreProv(f)||'(sin proveedor)');
-    return [codigoProv(f)||'',nombreProv(f)||'',homologacionDe(f)||'',f.numero_factura||'',
-            serialExcel(fechaLocal(f.fecha_factura)),serialExcel(v),delegacionCiudad(f)||'',''];
+    return filaParaPago(f,v);
   });
-  const ws=XLSX.utils.aoa_to_sheet([['Cod. Proveedor','Proveedor','Homologación','Nº Factura','Fecha Factura','Fecha Vencimiento','Delegación',''],...filas]);
-  // Fechas de verdad (se pueden ordenar y filtrar en Excel), vistas como dd/mm/aaaa
-  for(let r=1;r<=filas.length;r++)['E','F'].forEach(c=>{const cel=ws[c+(r+1)];if(cel&&cel.t==='n')cel.z='dd/mm/yyyy';});
-  ws['!cols']=[{wch:14},{wch:42},{wch:13},{wch:22},{wch:13},{wch:17},{wch:16},{wch:30}];
-  ws['!autofilter']={ref:`A1:H${filas.length+1}`};
+  const ws=XLSX.utils.aoa_to_sheet([CABECERA_PARA_PAGO,...filas]);
+  // Fechas de verdad (se pueden ordenar y filtrar en Excel), vistas como dd/mm/aaaa; el importe, como 1.234,56 €
+  for(let r=1;r<=filas.length;r++){
+    ['E','F'].forEach(c=>{const cel=ws[c+(r+1)];if(cel&&cel.t==='n')cel.z='dd/mm/yyyy';});
+    const imp=ws['G'+(r+1)];if(imp&&imp.t==='n')imp.z='#,##0.00 "€"';
+  }
+  ws['!cols']=[{wch:14},{wch:42},{wch:13},{wch:22},{wch:13},{wch:17},{wch:15},{wch:16},{wch:30}];
+  ws['!autofilter']={ref:`A1:I${filas.length+1}`};
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'PARA PAGO');
   XLSX.writeFile(wb,`PARA PAGO ${hoyISO()}.xlsx`);
   const prov=[...sinDias];
   const aviso=(prov.length?`Sin días de pago en el Excel de proveedores (F.PAGO): ${prov.slice(0,6).join(', ')}${prov.length>6?` y ${prov.length-6} más`:''}. `:'')
     +(sinFecha?`${sinFecha} factura${sinFecha!==1?'s':''} sin fecha. `:'');
-  toast(`Para pago: ${ff.length} factura${ff.length!==1?'s':''}.${aviso?' Vencimiento en blanco → '+aviso:''}`,aviso?'err':undefined);
+  const suma=filas.reduce((s,x)=>s+(+x[6]||0),0);
+  toast(`Para pago: ${ff.length} factura${ff.length!==1?'s':''} por ${eur(suma)}.${aviso?' Vencimiento en blanco → '+aviso:''}`,aviso?'err':undefined);
 }
 async function exportAS400(){
   const btn=$('#btn-export-as400');

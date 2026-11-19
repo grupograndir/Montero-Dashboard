@@ -267,6 +267,13 @@ td.r{text-align:right}
 /* ===== CHART ===== */
 .chart-box{padding:18px 20px;height:260px;position:relative}
 .chart-box canvas{max-height:100%}
+.info-graf{border:1px solid var(--line-2);background:#fff;border-radius:999px;width:26px;height:26px;padding:0;font-size:14px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.info-graf:hover,.info-graf.on{border-color:var(--blue);background:var(--blue-s)}
+.info-graf:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.graf-h{flex-wrap:wrap;row-gap:4px}
+.graf-claves{display:flex;flex-wrap:wrap;gap:6px 16px;padding:12px 20px 0;font-size:12.5px;color:var(--ink-2)}
+.graf-claves i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.info-leyenda{margin:12px 20px 0;padding:12px 14px;background:var(--blue-s);border-radius:10px;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
 
 /* ===== EMPTY ===== */
 .empty{padding:54px 20px;text-align:center;color:var(--faint)}
@@ -604,7 +611,6 @@ async function cambiarClave(){
 
 const state={selArchivo:new Set(),selTruenas:new Set(),soloSinDescargar:false,view:'resumen',dias:0,desde:'',hasta:'',verEliminadas:false,facturas:[],incidencias:[],proveedoresBD:[],search:'',fProv:'',fEstado:'',fPago:[],fValida:'',provSel:null,quickFilter:'',filtros:[],sort:{k:'fecha',dir:-1},
   apDesde:'',apHasta:'',pgDesde:'',pgHasta:'',pgProv:'',pgMin:'',pgMax:'',pgBuscar:'',pgDomic:false};
-let chartMes=null;
 const PEND=['ILEGIBLE','EN_REVISION','DUPLICADO_PENDIENTE','PENDIENTE_CRITERIO'];
 // Facturas que ya no requieren trabajo de revisión: dadas por buenas, exportadas
 // o ya asentadas en el AS400.
@@ -1803,10 +1809,35 @@ function viewResumen(){
     <div class="card-h"><div class="card-t">${svg(ICN.alert)}Requieren tu atención</div>${pend.length?`<span class="card-meta" data-go="revision" style="cursor:pointer;color:var(--red)">Ver todas →</span>`:''}</div>
     ${colaTrabajo(pend)}
   </div>
-  <div class="grid-2">
-    <div class="card"><div class="card-h"><div class="card-t">${svg(ICN.euro)}Gasto mensual</div><span class="card-meta">Últimos 6 meses</span></div><div class="chart-box" style="height:240px"><canvas id="ch-mes"></canvas></div></div>
-    <div class="card"><div class="card-h"><div class="card-t">${svg(ICN.file)}Actividad reciente</div><span class="card-meta" data-go="facturas" style="cursor:pointer;color:var(--red)">Ver todas →</span></div>${tablaFacturas(state.facturas.slice(0,6),false)}</div>
-  </div>`;
+  ${graficosResumen()}
+  <div class="card"><div class="card-h"><div class="card-t">${svg(ICN.file)}Actividad reciente</div><span class="card-meta" data-go="facturas" style="cursor:pointer;color:var(--red)">Ver todas →</span></div>${tablaFacturas(state.facturas.slice(0,6),false)}</div>`;
+}
+// Gráficos del Resumen (Verónica, 19/11/2026; sustituyen a «Gasto mensual»): uno con lo pagado y lo pendiente de cada mes
+// (al ponerse encima, el importe y el % del total del mes) y otro con el total. Cada uno con su ℹ️ que explica qué cuenta.
+const TEXTO_INFO_GRAF={
+  pp:`<b>Qué muestra:</b> de las facturas de cada mes, cuánto está <b style="color:var(--green)">pagado</b> (barra verde) y cuánto
+    está <b style="color:var(--amber)">pendiente de pagar</b> (barra naranja). Al ponerte encima de una barra ves su importe y qué
+    % es del total del mes: pagado + pendiente = 100 %.<br>
+    · <b>Pagado:</b> las marcadas como pagadas («Marcar pagada»), estén o no contabilizadas, y las domiciliadas (giro o recibo),
+    que el banco paga solas.<br>
+    · <b>Pendiente:</b> todas las demás: en revisión, validadas, contabilizadas o aprobadas para pagar que aún no se han pagado.<br>
+    · El mes es el de la <b>fecha de la factura</b>, no el del pago. Los abonos restan. No cuentan las copias duplicadas, las
+    rechazadas ni las quitadas del listado.`,
+  tot:`<b>Qué muestra:</b> el importe total de las facturas de cada mes (lo pagado más lo pendiente), con IVA, por la
+    <b>fecha de la factura</b>. Al ponerte encima de una barra ves el total y cuántas facturas son.<br>
+    · Los abonos restan. No cuentan las copias duplicadas, las rechazadas ni las quitadas del listado.`
+};
+function graficosResumen(){
+  const r=rangoMesesResumen(new Date());
+  const meta=`<span class="card-meta">${esc(r.texto)} · por fecha de factura</span>`;
+  const clave=(color,texto)=>`<span><i style="background:${color}"></i>${texto}</span>`;
+  const caja=(id,titulo,icono,canvas,claves)=>`<div class="card"><div class="card-h graf-h"><div class="card-t">${svg(icono)}${titulo}
+      <button type="button" class="info-graf" data-info-graf="${id}" aria-expanded="false" aria-controls="info-graf-${id}" title="Qué muestra este gráfico">ℹ️</button></div>${meta}</div>
+    <div class="info-leyenda" id="info-graf-${id}" hidden>${TEXTO_INFO_GRAF[id]}</div>
+    <div class="graf-claves">${claves}</div>
+    <div class="chart-box" style="height:250px;padding-top:8px"><canvas id="${canvas}"></canvas></div></div>`;
+  return `<div class="grid-charts">${caja('pp','Pagado y pendiente por mes',ICN.euro,'ch-pp',clave('#0f9d58','Pagado')+clave('#d97706','Pendiente de pagar'))
+    }${caja('tot','Total facturado por mes',ICN.file,'ch-tot',clave('#C8102E','Total del mes (pagado + pendiente)'))}</div>`;
 }
 function colaTrabajo(ff){
   if(!ff.length)return`<div class="empty">${svg(ICN.check,'var(--green)')}<p style="color:var(--green)">Todo al día</p><small>No hay facturas pendientes de revisar</small></div>`;
@@ -2963,18 +2994,69 @@ function openLegend(){
 }
 
 /* ---------- charts ---------- */
-function drawCharts(){
-  if(!window.Chart)return;
-  const ff=state.facturas.filter(cuentaGasto);
-  // Gasto por mes (últimos 6 meses)
-  const now=new Date();
+// Pagada = marcada como pagada (con o sin contabilizar) o domiciliada (el banco la paga sola), como en el Resumen.
+const estaPagada=f=>!!(f.json_extraccion_ia||{})._pago||esDeGiro(f);
+// Meses de los gráficos: los del Del/al del Resumen si está puesto (como mucho los 12 últimos de ese periodo);
+// si no, los 6 últimos hasta hoy.
+function rangoMesesResumen(hoy){
+  const aFecha=s=>{const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(+m[1],+m[2]-1,+m[3]):null;};
+  const desde=aFecha(state.desde), hasta=aFecha(state.hasta)||hoy;
+  let n=6;
+  if(desde)n=Math.max(1,Math.min(12,(hasta.getFullYear()-desde.getFullYear())*12+hasta.getMonth()-desde.getMonth()+1));
   const meses=[];
-  for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);meses.push({key:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),label:d.toLocaleDateString('es-ES',{month:'short'}),total:0});}
-  const idx={};meses.forEach((m,i)=>idx[m.key]=i);
-  ff.forEach(f=>{const d=new Date(f.fecha_factura||f.fecha_recepcion);if(isNaN(d))return;const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(k in idx)meses[idx[k]].total+=+f.total_factura||0;});
-  if(chartMes)chartMes.destroy();
-  const cm=$('#ch-mes');
-  if(cm)chartMes=new Chart(cm,{type:'bar',data:{labels:meses.map(m=>m.label),datasets:[{data:meses.map(m=>m.total),backgroundColor:'#C8102E',borderRadius:6,maxBarThickness:46}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>eur(c.raw)}}},scales:{y:{grid:{color:'#eef1f5'},ticks:{font:{family:'Inter',size:11},color:'#94a3b8',callback:v=>eurS(v)}},x:{grid:{display:false},ticks:{font:{family:'Inter',size:12},color:'#334155'}}},maintainAspectRatio:false}});
+  for(let i=n-1;i>=0;i--){const d=new Date(hasta.getFullYear(),hasta.getMonth()-i,1);
+    meses.push({key:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),
+      label:d.toLocaleDateString('es-ES',{month:'short'}).replace('.','')+' '+String(d.getFullYear()).slice(2),
+      titulo:d.toLocaleDateString('es-ES',{month:'long',year:'numeric'})});}
+  const texto=desde||state.hasta?`${meses[0].titulo} a ${meses[n-1].titulo}`:'Últimos 6 meses';
+  return {meses,texto};
+}
+function datosMesesResumen(ff,meses){
+  const fil=meses.map(m=>({...m,total:0,pagado:0,pendiente:0,n:0}));
+  const idx={};fil.forEach((m,i)=>idx[m.key]=i);
+  ff.forEach(f=>{
+    if(f.eliminada||!cuentaGasto(f))return;
+    const k=String(f.fecha_factura||f.fecha_recepcion||'').slice(0,7);
+    if(!(k in idx))return;
+    const m=fil[idx[k]], t=+f.total_factura||0;
+    m.total+=t;m.n++;
+    if(estaPagada(f))m.pagado+=t;else m.pendiente+=t;
+  });
+  fil.forEach(m=>['total','pagado','pendiente'].forEach(c=>m[c]=Math.round(m[c]*100)/100));
+  return fil;
+}
+const pctDelMes=(v,t)=>t?(v/t*100).toLocaleString('es-ES',{maximumFractionDigits:1})+' %':'—';
+let chartPP=null, chartTot=null;
+function drawCharts(){
+  document.querySelectorAll('[data-info-graf]').forEach(b=>b.onclick=()=>{
+    const p=$('#info-graf-'+b.dataset.infoGraf);if(!p)return;
+    p.hidden=!p.hidden;b.setAttribute('aria-expanded',String(!p.hidden));b.classList.toggle('on',!p.hidden);
+  });
+  if(!window.Chart)return;
+  const datos=datosMesesResumen(state.facturas,rangoMesesResumen(new Date()).meses);
+  const labels=datos.map(m=>m.label);
+  const nFac=n=>`${n} factura${n===1?'':'s'}`;
+  const ejes={y:{grid:{color:'#eef1f5'},ticks:{font:{family:'Inter',size:11},color:'#94a3b8',callback:v=>eurS(v)}},
+              x:{grid:{display:false},ticks:{font:{family:'Inter',size:12},color:'#334155'}}};
+  const titulo=items=>{const m=datos[items[0].dataIndex];return m.titulo.charAt(0).toUpperCase()+m.titulo.slice(1);};
+  if(chartPP)chartPP.destroy();
+  if(chartTot)chartTot.destroy();
+  const cpp=$('#ch-pp'), ctot=$('#ch-tot');
+  if(cpp)chartPP=new Chart(cpp,{type:'bar',data:{labels,datasets:[
+      {label:'Pagado',data:datos.map(m=>m.pagado),backgroundColor:'#0f9d58',borderRadius:5,maxBarThickness:34},
+      {label:'Pendiente',data:datos.map(m=>m.pendiente),backgroundColor:'#d97706',borderRadius:5,maxBarThickness:34}]},
+    options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{title:titulo,
+          label:c=>`${c.dataset.label}: ${eur(c.raw)} (${pctDelMes(c.raw,datos[c.dataIndex].total)} del total)`,
+          footer:items=>{const m=datos[items[0].dataIndex];return `Total del mes: ${eur(m.total)} · ${nFac(m.n)}`;}}}},
+      scales:ejes}});
+  if(ctot)chartTot=new Chart(ctot,{type:'bar',data:{labels,datasets:[
+      {label:'Total',data:datos.map(m=>m.total),backgroundColor:'#C8102E',borderRadius:6,maxBarThickness:46}]},
+    options:{maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{title:titulo,label:c=>`Total: ${eur(c.raw)}`,afterLabel:c=>nFac(datos[c.dataIndex].n)}}},
+      scales:ejes}});
 }
 
 /* ---------- events ---------- */

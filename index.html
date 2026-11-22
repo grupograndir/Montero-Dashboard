@@ -174,6 +174,37 @@ body.side-off .brand{padding:16px 0;border-bottom:0}
 .x-tabla input[type=text]{min-width:0;max-width:none;border-radius:0}
 .x-tabla select{height:28px;padding:0 4px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;font-family:inherit;background:var(--card);color:var(--ink)}
 .x-tabla td.x-mal input{background:var(--rd-s);color:var(--rd);font-weight:700}
+/* Documentos de cada proveedor (Verónica, 22/11/2026): columna del Excel y su barra lateral */
+.x-tabla td.x-docs-cab{font-weight:700;text-transform:uppercase;font-size:11.5px;padding:0 10px;white-space:nowrap;color:var(--ink)}
+.x-tabla td.x-docs{padding:0;min-width:140px}
+.x-tabla td.x-docs button{display:block;width:100%;height:28px;padding:0 10px;border:1px solid transparent;background:transparent;font:inherit;font-size:12.5px;font-weight:600;color:var(--blue);text-align:left;cursor:pointer;white-space:nowrap}
+.x-tabla td.x-docs button:hover{border-color:var(--line);background:var(--card);text-decoration:underline}
+.x-tabla td.x-docs button:empty:hover::after{content:'+ Añadir documentos';color:var(--faint);font-weight:500}
+.x-tabla td.x-docs button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.docs-subir{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;padding:22px 16px;border:2px dashed var(--red);border-radius:12px;background:var(--red-soft);color:var(--red);font:inherit;font-size:17px;font-weight:700;cursor:pointer;transition:.13s}
+.docs-subir svg{width:30px;height:30px}
+.docs-subir small{font-size:12px;font-weight:500;color:var(--ink-2);text-align:center;line-height:1.4}
+.docs-subir:hover,.docs-subir.sobre{background:#fbd9df}
+.docs-subir:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.dp-pend{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.dp-pend:empty{display:none}
+.dp-pend-f{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+.dp-pend-f span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dp-pend-f small{color:var(--muted);white-space:nowrap}
+.dp-pend-f button{border:0;background:none;cursor:pointer;color:var(--muted);font-size:14px;padding:2px 4px}
+.dp-campo{display:block;margin-top:14px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.dp-campo span{font-weight:400;color:var(--muted)}
+.dp-campo input,.dp-campo textarea{display:block;width:100%;margin-top:5px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;font-weight:400;color:var(--ink);background:var(--card);resize:vertical}
+.dp-campo input:focus,.dp-campo textarea:focus{outline:none;border-color:var(--ink)}
+#dp-ok{margin-top:14px}
+.doc-prov{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-2)}
+.doc-prov:last-child{border-bottom:0}
+.doc-prov-ic{font-size:18px;line-height:1.3}
+.doc-prov-txt{flex:1;min-width:0}
+.doc-prov-abrir{border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--blue);cursor:pointer;text-align:left;word-break:break-word}
+.doc-prov-abrir:hover{text-decoration:underline}
+.doc-prov-meta{font-size:11.5px;color:var(--muted);margin-top:2px}
+.doc-prov-obs{font-size:12.5px;color:var(--ink-2);background:var(--bg);border-radius:6px;padding:6px 8px;margin-top:6px;white-space:pre-wrap;word-break:break-word}
 .x-eliminar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 18px;border-bottom:1px solid var(--line-2);background:var(--rd-s);font-size:13px}
 .x-eliminar input{flex:1 1 22rem;height:32px;padding:0 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit}
 .x-libro.x-completo{position:fixed;inset:0;z-index:300;margin:0;border-radius:0;display:flex;flex-direction:column}
@@ -4487,10 +4518,12 @@ function excelAprobadas(ff,desde,hasta){
 // AS400…— con guardar_excel_proveedores (migración 017). Aquí no se convierte
 // nada: una sola conversión, en la base.
 async function cargarExcelProv(){
+  const docs=cargarDocsProv();
   try{const r=await api(`configuracion?select=valor,actualizado_en&clave=eq.proveedores_excel`);
     state.excel=r&&r[0]?JSON.parse(r[0].valor):{hojas:[]};state.excelFecha=r&&r[0]?r[0].actualizado_en:null;}
   catch(e){console.error(e);state.excel={hojas:[]};}
   asegurarColAlbAS400(state.excel);
+  await docs;
   state.excelSucio=false;
 }
 const HOM_COL=/^(HOM|NUEVOS HOMOL|HOMOLOGACION|HOMOL)$/;
@@ -4539,6 +4572,14 @@ function viewExcel(){
   // para que no se corte nada; la tabla se desliza a lo ancho si no cabe.
   const anchoCol=Array.from({length:ancho},(_,c)=>Math.min(80,Math.max(5,...filas.map(f=>String(f[c]??'').length))));
   const iAlbAS=(filas[0]||[]).findIndex(esColAlbAS400), iCod=(filas[0]||[]).findIndex(c=>CODIGO_COL.test(cabNorm(c)));
+  // «Documentos» (Verónica, 22/11/2026): última columna de las hojas con código y nombre. No está en el Excel
+  // guardado: sale de proveedores_documentos (migración 032), por código. En blanco si no tiene ninguno.
+  const colDocs=iCod>=0&&(filas[0]||[]).some(c=>NOMBRE_COL.test(cabNorm(c)));
+  const celdaDocs=(f,r)=>{
+    if(r===0)return `<td class="x-docs-cab" title="Archivos y enlaces de cada proveedor. No se guarda dentro del Excel">Documentos</td>`;
+    const docs=docsDeCodigo(codigoExcel((f||[])[iCod]));
+    return `<td class="x-docs"><button type="button" data-xdocs="${r}" title="${esc(tituloCeldaDocs(docs))}">${textoCeldaDocs(docs.length)}</button></td>`;
+  };
   const celda=(r,c,v,f)=>{
     // «ALBARÁN A AS400»: un desplegable SÍ / NO en cada proveedor con código.
     if(r>0&&c===iAlbAS&&iCod>=0&&String((f||[])[iCod]??'').trim()){
@@ -4550,7 +4591,7 @@ function viewExcel(){
   };
   const filaHtml=(f,r)=>{
     const vis=!q||r===0||coincide(f.join(' '),q);
-    return `<tr data-xr="${r}" ${vis?'':'style="display:none"'}>${Array.from({length:ancho},(_,c)=>celda(r,c,f[c],f)).join('')}</tr>`;
+    return `<tr data-xr="${r}" ${vis?'':'style="display:none"'}>${Array.from({length:ancho},(_,c)=>celda(r,c,f[c],f)).join('')}${colDocs?celdaDocs(f,r):''}</tr>`;
   };
   return `<div class="card x-libro ${state.excelCompleto?'x-completo':''}" id="x-libro">
     <div class="filtros">
@@ -4606,6 +4647,16 @@ function bindExcel(){
     f[r][c]=el.value;sucio();
     const td=el.parentElement,ic=(f[0]||[]).findIndex(x=>HOM_COL.test(cabNorm(x)));
     if(r>0&&c===ic)td.classList.toggle('x-mal',!!el.value.trim()&&!HOM_OK.test(el.value.toUpperCase().replace(/\s+/g,'')));
+    if(r>0&&CODIGO_COL.test(cabNorm((f[0]||[])[c])))pintarCeldasDocs();   // los documentos van por código
+  });
+  // «Documentos»: al pulsar la celda (con o sin documentos) se abre la barra lateral de ese proveedor.
+  libro.querySelectorAll('[data-xdocs]').forEach(b=>b.onclick=()=>{
+    const f=h().filas, cab=(f[0]||[]).map(cabNorm), fila=f[+b.dataset.xdocs]||[];
+    const cod=codigoExcel(fila[cab.findIndex(c=>CODIGO_COL.test(c))]);
+    const nom=String(fila[cab.findIndex(c=>NOMBRE_COL.test(c))]??'').trim();
+    if(!cod){toast('Esta fila no tiene código de proveedor: ponlo primero para poder añadirle documentos','err');return;}
+    if(!codigoDocValido(cod)){toast(`El código «${cod}» lleva signos que no valen: los documentos van por el código del AS400`,'err');return;}
+    abrirDocsProv(cod,nom);
   });
   libro.querySelectorAll('[data-xhoja]').forEach(b=>b.onclick=()=>{state.excelHoja=+b.dataset.xhoja;state.excelScroll=null;render();});
   const bu=$('#x-buscar');if(bu)bu.oninput=e=>{
@@ -4694,6 +4745,151 @@ async function importarExcelProv(archivo){
     state.excel=nuevo;state.excelSucio=true;state.excelHoja=0;render();
     toast('Excel cargado: revísalo y pulsa «Guardar cambios»');
   }catch(e){toast('No se pudo leer el Excel: '+e.message,'err');}
+}
+
+/* ---------- DOCUMENTOS DE CADA PROVEEDOR ---------- */
+// Verónica, 22/11/2026: «que en el Excel de proveedores se pueda añadir un documento, ya sea mediante enlace o
+// una copia». Columna «Documentos» del Excel (en blanco si no tiene; «Ver documentos» si tiene) y, al pulsarla,
+// una barra lateral con «Subir documentos» (archivos de este ordenador), un enlace y observaciones opcionales.
+// Base: migración 032 — tabla proveedores_documentos (por código) y bucket privado «proveedores-documentos»
+// (ruta «<código>/…»). Se guarda con guardar_documentos_proveedor y se quita (sin borrar) con quitar_documento_proveedor.
+const BUCKET_DOCS_PROV='proveedores-documentos', MAX_DOC_PROV=50*1024*1024;
+// Lo único que se abre en el navegador: PDF y fotos. Lo demás se sube como archivo genérico y se descarga
+// (migración 033: el bucket no admite otros tipos y la base apunta el tipo del archivo guardado, no el del panel).
+const TIPOS_VER_DOC=/^(application\/pdf|image\/(png|jpeg|gif|webp))$/i;
+function codigoExcel(v){return String(v??'').trim().replace(/[.,]0+$/,'');}
+function codigoDocValido(c){return /^[0-9A-Za-z._-]{1,30}$/.test(c)&&!/^\.+$/.test(c);}
+function docsPorCodigo(lista){
+  const m=new Map();
+  (lista||[]).forEach(d=>{const k=codigoExcel(d.codigo_proveedor);if(!k)return;if(!m.has(k))m.set(k,[]);m.get(k).push(d);});
+  return m;
+}
+function docsDeCodigo(c){return (c&&state.docsProv&&state.docsProv.get(c))||[];}
+function textoCeldaDocs(n){return n?'Ver documentos':'';}
+function tituloCeldaDocs(docs){
+  return docs.length?`${docs.length} documento${docs.length>1?'s':''}: ${docs.slice(0,5).map(d=>d.nombre).join(' · ')}${docs.length>5?'…':''}`
+    :'Pulsa para añadir documentos de este proveedor';
+}
+// El nombre que se guarda en Storage: sin tildes ni signos (el original se guarda aparte, en la tabla).
+function nombreSeguroDoc(n){
+  const s=String(n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9._-]+/g,'_')
+    .replace(/_+/g,'_').replace(/\.{2,}/g,'.').replace(/^[._-]+/,'');
+  return (s.length>80?s.slice(-80).replace(/^[._-]+/,''):s)||'documento';
+}
+// «www.geancar.es» → «https://www.geancar.es». Solo valen direcciones web (nada de «javascript:»).
+function normEnlace(u){
+  u=String(u||'').trim();
+  if(u&&!/^[a-z][a-z0-9+.-]*:/i.test(u)&&/^[^\s/]+\.[^\s]+$/.test(u))u='https://'+u;
+  return u;
+}
+function enlaceValido(u){
+  u=String(u||'');if(!/^https?:\/\/\S+$/i.test(u)||u.length>2000)return false;
+  try{const x=new URL(u);return /^https?:$/.test(x.protocol)&&!!x.hostname;}catch(_){return false;}
+}
+function tamanoLegible(b){
+  b=+b;if(!b)return '';
+  return b<1024?b+' B':b<1048576?Math.round(b/1024)+' KB':(b/1048576).toLocaleString('es-ES',{maximumFractionDigits:1})+' MB';
+}
+async function cargarDocsProv(){
+  try{state.docsProv=docsPorCodigo(await api('proveedores_documentos?select=id,codigo_proveedor,tipo,nombre,ruta,url,tipo_mime,tamano,observaciones,subido_por,subido_en&quitado_en=is.null&order=subido_en.desc&limit=5000'));}
+  catch(e){console.error(e);if(!state.docsProv)state.docsProv=new Map();}
+}
+// Repinta solo la columna (sin repintar la hoja): tras subir o quitar, o al cambiar un código.
+function pintarCeldasDocs(){
+  const libro=$('#x-libro');if(!libro||!state.excel)return;
+  const hojas=state.excel.hojas||[], h=hojas[Math.min(state.excelHoja||0,hojas.length-1)];if(!h)return;
+  const fs=h.filas||[], ic=(fs[0]||[]).findIndex(c=>CODIGO_COL.test(cabNorm(c)));
+  libro.querySelectorAll('[data-xdocs]').forEach(b=>{
+    const docs=docsDeCodigo(codigoExcel((fs[+b.dataset.xdocs]||[])[ic]));
+    b.textContent=textoCeldaDocs(docs.length);b.title=tituloCeldaDocs(docs);
+  });
+}
+function abrirDocsProv(cod,nom){
+  const docs=docsDeCodigo(cod);
+  state.docsPend=[];
+  const lista=docs.length?docs.map(d=>`<div class="doc-prov">
+      <div class="doc-prov-ic" aria-hidden="true">${d.tipo==='ENLACE'?'🔗':'📄'}</div>
+      <div class="doc-prov-txt"><button type="button" class="doc-prov-abrir" data-dpabrir="${esc(d.id)}" title="${d.tipo==='ENLACE'?esc(d.url||''):'Abrir o descargar'}">${esc(d.nombre)}</button>
+        <div class="doc-prov-meta">${d.tipo==='ENLACE'?'Enlace':esc(tamanoLegible(d.tamano)||'Archivo')} · ${esc(d.subido_por||'')} · ${esc(dtL(d.subido_en))}</div>
+        ${d.observaciones?`<div class="doc-prov-obs">${esc(d.observaciones)}</div>`:''}</div>
+      <button type="button" class="btn-s" data-dpquitar="${esc(d.id)}" title="Quitar de la lista (el archivo no se borra)">Quitar</button></div>`).join('')
+    :`<div style="font-size:13px;color:var(--muted)">Este proveedor todavía no tiene documentos.</div>`;
+  abrirCajon(`Documentos · ${cod}${nom?' '+nom:''}`,docs.length?`${docs.length} documento${docs.length>1?'s':''}`:'Sin documentos todavía',`
+    <div class="dr-sec">
+      <button type="button" class="docs-subir" id="dp-elegir">${svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>')}<span>Subir documentos</span>
+        <small>Elige archivos de este ordenador o arrástralos aquí.<br>PDF, Word, Excel, fotos… hasta 50 MB cada uno.</small></button>
+      <input type="file" id="dp-arch" multiple style="display:none">
+      <div id="dp-pend" class="dp-pend"></div>
+      <label class="dp-campo">Enlace <span>(también cuenta como documento)</span><input id="dp-url" type="url" inputmode="url" maxlength="2000" placeholder="Pega aquí un enlace: https://…"></label>
+      <label class="dp-campo">Observaciones <span>(opcional)</span><textarea id="dp-obs" rows="3" maxlength="2000" placeholder="Por ejemplo: certificado de calidad válido hasta 2027"></textarea></label>
+      <button type="button" class="btn-s ok" id="dp-ok">Guardar documentos</button>
+    </div>
+    <div class="dr-sec"><div class="dr-sec-t">Documentos de este proveedor</div>${lista}</div>`);
+  const pintarPend=()=>{
+    const p=state.docsPend, caja=$('#dp-pend');if(!caja)return;
+    caja.innerHTML=p.map((f,i)=>`<div class="dp-pend-f"><span title="${esc(f.name)}">📄 ${esc(f.name)}</span><small>${esc(tamanoLegible(f.size))}${f.size>MAX_DOC_PROV?' · <b style="color:var(--rd)">pasa de 50 MB</b>':''}</small><button type="button" data-dpq="${i}" title="No subir este" aria-label="No subir ${esc(f.name)}">✕</button></div>`).join('');
+    caja.querySelectorAll('[data-dpq]').forEach(b=>b.onclick=()=>{p.splice(+b.dataset.dpq,1);pintarPend();});
+    $('#dp-ok').textContent=p.length?`Guardar documentos (${p.length} archivo${p.length>1?'s':''})`:'Guardar documentos';
+  };
+  const anadir=files=>{[...(files||[])].forEach(f=>state.docsPend.push(f));pintarPend();};
+  const zona=$('#dp-elegir'), entrada=$('#dp-arch');
+  zona.onclick=()=>entrada.click();
+  entrada.onchange=()=>{anadir(entrada.files);entrada.value='';};
+  zona.ondragover=e=>{e.preventDefault();zona.classList.add('sobre');};
+  zona.ondragleave=()=>zona.classList.remove('sobre');
+  zona.ondrop=e=>{e.preventDefault();zona.classList.remove('sobre');anadir(e.dataTransfer&&e.dataTransfer.files);};
+  $('#dp-ok').onclick=()=>guardarDocsProv(cod,nom);
+  document.querySelectorAll('#dr-body [data-dpabrir]').forEach(b=>b.onclick=()=>{const d=docs.find(x=>x.id===b.dataset.dpabrir);if(d)abrirDocProv(d);});
+  document.querySelectorAll('#dr-body [data-dpquitar]').forEach(b=>b.onclick=async()=>{
+    const d=docs.find(x=>x.id===b.dataset.dpquitar);if(!d)return;
+    if(!confirm(`¿Quitar «${d.nombre}» de los documentos de este proveedor?\n\nDeja de verse aquí; el archivo no se borra.`))return;
+    b.disabled=true;
+    try{await rpc('quitar_documento_proveedor',{p_id:d.id});await cargarDocsProv();pintarCeldasDocs();abrirDocsProv(cod,nom);toast('Documento quitado');}
+    catch(e){toast(e.message,'err');b.disabled=false;}
+  });
+}
+async function guardarDocsProv(cod,nom){
+  const btn=$('#dp-ok'), pend=(state.docsPend||[]).slice();
+  const url=normEnlace(($('#dp-url')||{}).value), obs=(($('#dp-obs')||{}).value||'').trim();
+  if(!pend.length&&!url){toast('Elige un archivo con «Subir documentos» o pega un enlace','err');return;}
+  if(url&&!enlaceValido(url)){toast('El enlace no vale: tiene que ser una dirección web (https://…)','err');return;}
+  const grandes=pend.filter(f=>f.size>MAX_DOC_PROV);
+  if(grandes.length){toast(`Pasa de 50 MB: ${grandes.map(f=>f.name).join(', ')}`,'err');return;}
+  if(pend.length+(url?1:0)>20){toast('Como mucho 20 documentos de una vez','err');return;}
+  btn.disabled=true;
+  const suelta=m=>{toast(m,'err');btn.disabled=false;btn.textContent='Guardar documentos';};
+  const docs=[];
+  try{
+    for(let i=0;i<pend.length;i++){
+      const f=pend[i];
+      btn.textContent=`Subiendo ${i+1} de ${pend.length}…`;
+      const ruta=`${cod}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${nombreSeguroDoc(f.name)}`;
+      const up=await fetch(`${SB_URL}/storage/v1/object/${BUCKET_DOCS_PROV}/${ruta}`,{method:'POST',
+        headers:{apikey:SB_ANON,Authorization:`Bearer ${getToken()||SB_ANON}`,'Content-Type':TIPOS_VER_DOC.test(f.type||'')?f.type:'application/octet-stream'},body:f});
+      if(!up.ok)throw new Error(`No se ha podido subir «${f.name}»: ${(await up.text()).slice(0,120)}`);
+      docs.push({tipo:'ARCHIVO',ruta,nombre:f.name,tipo_mime:f.type||'',tamano:f.size});
+    }
+    if(url)docs.push({tipo:'ENLACE',url,nombre:url});
+    btn.textContent='Guardando…';
+    const n=await rpc('guardar_documentos_proveedor',{p_codigo:cod,p_documentos:docs,p_observaciones:obs||null});
+    await cargarDocsProv();pintarCeldasDocs();abrirDocsProv(cod,nom);
+    toast(`${n} documento${n>1?'s':''} guardado${n>1?'s':''}`);
+  }catch(e){suelta(e.message);}
+}
+// Abrir: el enlace en otra pestaña; el PDF o la foto, en otra pestaña; lo demás (Word, Excel…) se descarga.
+async function abrirDocProv(d){
+  if(d.tipo==='ENLACE'){
+    if(enlaceValido(d.url))window.open(d.url,'_blank','noopener,noreferrer');else toast('Ese enlace no es una dirección web','err');
+    return;
+  }
+  const verAqui=TIPOS_VER_DOC.test(d.tipo_mime||'');
+  const win=verAqui?window.open('about:blank','_blank'):null;
+  try{
+    if(win)try{win.opener=null;}catch(_){}
+    const u=await urlFirmada(`${SB_URL}/storage/v1/object/${BUCKET_DOCS_PROV}/${d.ruta}`,600,verAqui?null:(d.nombre||'documento'));
+    if(win){win.location.href=u;return;}
+    const a=document.createElement('a');a.href=u;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+  }catch(e){if(win)win.close();toast('No se ha podido abrir el documento: '+e.message,'err');}
 }
 
 /* ---------- REGISTRO DE IVA SOPORTADO ---------- */

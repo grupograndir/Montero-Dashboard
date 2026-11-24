@@ -1775,7 +1775,7 @@ function viewSueltos(){
         <button class="act-btn del" data-asig-no="${d.id}" style="${BTN}">Cancelar</button>
       </div></td></tr>`;}).join('');
   return cab+`<div class="card">
-    <div class="tbl-tools"><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="s-search" placeholder="Buscar por archivo, proveedor, número…"></div>
+    <div class="tbl-tools"><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="s-search" placeholder="Buscar por archivo, proveedor, número…" value="${esc(state.sBuscar||'')}"></div>
     <span class="card-meta" style="margin-left:auto" id="s-cuenta">${ds.length} documento${ds.length===1?'':'s'}</span></div>
     <datalist id="dl-facturas">${opciones}</datalist>
     <div class="tbl-wrap"><table>
@@ -2167,13 +2167,15 @@ function desplegableFiltros(id,sel,extra=''){
     <div class="multi-op" style="display:grid;grid-template-columns:repeat(2,minmax(210px,1fr));gap:0 8px;min-width:460px">
       <div>${GRUPOS_FILTRO.slice(0,1).map(grupo).join('')}</div>
       <div>${GRUPOS_FILTRO.slice(1).map(grupo).join('')}${extra}
-        ${sel.length?`<button type="button" class="multi-limpiar" id="${id}-limpiar" style="margin-top:10px">Quitar filtros</button>`:''}</div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:12px"><button type="button" class="btn-s ok" id="${id}-aplicar">Aplicar filtros</button>
+        ${sel.length?`<button type="button" class="multi-limpiar" id="${id}-limpiar">Quitar filtros</button>`:''}</div></div>
     </div></details>`;
 }
+// Paqui, 24/11/2026: las casillas solo se marcan; los filtros se aplican al pulsar «Aplicar filtros» (y el desplegable se cierra).
 function bindFiltros(id,alCambiar){
   const d=$('#'+id);if(!d)return;
-  const tras=()=>{const n=$('#'+id);if(n)n.open=true;};
-  d.querySelectorAll('input[data-fk]').forEach(c=>c.onchange=()=>{alCambiar([...d.querySelectorAll('input[data-fk]:checked')].map(x=>x.value));tras();});
+  const marcadas=()=>[...d.querySelectorAll('input[data-fk]:checked')].map(x=>x.value);
+  const ap=$('#'+id+'-aplicar');if(ap)ap.onclick=()=>{d.open=false;alCambiar(marcadas());};
   const l=$('#'+id+'-limpiar');if(l)l.onclick=()=>alCambiar([]);
 }
 function porVariosFiltros(ff,sel){
@@ -3158,9 +3160,9 @@ function bindContent(){
   const pgd=$('#pg-domic');if(pgd)pgd.onchange=e=>{state.pgDomic=e.target.checked;render();};
   const apx=$('#ap-excel');if(apx)apx.onclick=()=>excelAprobadas(aprobadasFiltradas(),state.desde,state.hasta);
   const fv=$('#f-valida');if(fv)fv.onchange=e=>{state.fValida=e.target.value;refreshTabla();};
+  // Sin asignar: el buscador se recuerda (Verónica, 24/11/2026: al tocar una línea se repintaba y perdía el filtro).
   const ss=$('#s-search');
-  if(ss)ss.oninput=e=>{
-    const q=e.target.value;
+  const filtraSueltos=q=>{
     let n=0;
     document.querySelectorAll('tr[data-suelto]').forEach(tr=>{
       const ok=coincide(tr.textContent,q);
@@ -3169,6 +3171,8 @@ function bindContent(){
     });
     const c=$('#s-cuenta');if(c)c.textContent=`${n} documento${n===1?'':'s'}`;
   };
+  if(ss){ss.oninput=e=>{state.sBuscar=e.target.value;filtraSueltos(state.sBuscar);};
+    if(state.sBuscar)filtraSueltos(state.sBuscar);}
   document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));bindFilaPdf();
   // «Leer motivo» (Rubén, 04/11/2026: nada de textos largos en la tabla): abre la ficha por sus incidencias.
   document.querySelectorAll('[data-leer-motivo]').forEach(b=>b.onclick=async e=>{
@@ -3642,6 +3646,29 @@ async function guardarRegistroTruenas(btn){
   }catch(e){toast('No se han podido leer las facturas: '+e.message,'err');render();return;}
   await guardarFacturasRegistro(btn,ff,dir);
 }
+// Verónica, 24/11/2026: lo bajado a mano a Truenas se puede marcar como descargado (y desmarcar), para no duplicarlo.
+async function marcarDescargadasRegistro(btn,poner){
+  const ids=[...state.selTruenas];
+  if(!ids.length){toast('Marca primero las facturas','err');return;}
+  if(!confirm(poner?`¿Marcar ${ids.length} factura${ids.length>1?'s':''} como YA descargada${ids.length>1?'s':''} en Truenas?\n\nNo se descarga nada: solo queda apuntado para que no se repita.`
+    :`¿Quitar la marca «Descargada para Truenas» a ${ids.length} factura${ids.length>1?'s':''}?`))return;
+  btn.disabled=true;let n=0;
+  try{
+    const faltan=ids.filter(id=>!facturaLocal(id));
+    const bajadas=faltan.length?await api(`facturas_procesadas?select=id,json_extraccion_ia&id=in.(${faltan.join(',')})`):[];
+    const quien=(_session?.user?.email||'Panel'),ahora=new Date().toISOString();
+    for(const id of ids){
+      const f=facturaLocal(id)||bajadas.find(x=>x.id===id);if(!f)continue;
+      const ia=Object.assign({},f.json_extraccion_ia||{});
+      if(poner){if(ia._descargada_registro)continue;ia._descargada_registro={fecha:ahora,por:quien,nombre:'(marcada a mano)',manual:true,carpeta:'Truenas'};}
+      else{if(!ia._descargada_registro)continue;delete ia._descargada_registro;}
+      await guardarIA(id,ia,f.json_extraccion_ia);n++;
+    }
+    ids.forEach(id=>state.selTruenas.delete(id));
+    toast(poner?`${n} marcada${n===1?'':'s'} como descargada${n===1?'':'s'}`:`Marca quitada a ${n}`);
+  }catch(e){toast(e.message,'err');}
+  await loadAll();
+}
 async function guardarFacturasRegistro(btn,ff,dir){
   const txt=btn.innerHTML;btn.disabled=true;
   const hechos=[],fallos=[];
@@ -3653,9 +3680,10 @@ async function guardarFacturasRegistro(btn,ff,dir){
       if(!url)throw new Error('no tiene PDF');
       const r=await fetch(await urlFirmada(url));
       if(!r.ok)throw new Error('no se ha podido bajar su PDF');
-      const rec=await recortarPdf(await r.arrayBuffer(),total=>paginasFactura(f,total,true),nombre.replace(/\.pdf$/,''));
-      if(!rec)throw new Error('no se sabe con seguridad qué hoja es la factura: descárgala a mano desde su ficha');
-      const bytes=rec.bytes,pags=rec.paginas;
+      const orig=await r.arrayBuffer();
+      const rec=await recortarPdf(orig,total=>paginasFactura(f,total,true),nombre.replace(/\.pdf$/,''));
+      // Verónica, 24/11/2026: si no se sabe con seguridad qué hoja es la factura, se descarga TODO el PDF.
+      const bytes=rec?rec.bytes:new Uint8Array(orig),pags=rec?rec.paginas:[],entero=!rec;
       if(dir){
         const fh=await dir.getFileHandle(nombre,{create:true});
         const w=await fh.createWritable();await w.write(bytes);await w.close();
@@ -3666,7 +3694,7 @@ async function guardarFacturasRegistro(btn,ff,dir){
         setTimeout(()=>URL.revokeObjectURL(a.href),15000);
         await new Promise(ok=>setTimeout(ok,400));
       }
-      hechos.push({f,nombre,hojas:pags.length});
+      hechos.push({f,nombre,hojas:entero?'completo':pags.length,entero});
     }catch(e){fallos.push(`${f.numero_factura||'?'} · ${nombreProv(f)}: ${e.message}`);}
     btn.textContent=`Descargando ${hechos.length+fallos.length}/${ff.length}…`;
   }
@@ -3680,6 +3708,8 @@ async function guardarFacturasRegistro(btn,ff,dir){
   btn.disabled=false;btn.innerHTML=txt;
   await loadAll();
   const donde=dir?`en la carpeta «${dir.name}»`:'en Descargas';
+  const enteros=hechos.filter(h=>h.entero).length;
+  if(enteros)toast(`${enteros} se han guardado con todas sus hojas: no se sabía cuál era la factura`);
   if(fallos.length)alert(`${hechos.length} factura${hechos.length!==1?'s':''} guardada${hechos.length!==1?'s':''} ${donde}.\n\nNo se han descargado ${fallos.length}:\n- ${fallos.join('\n- ')}`);
   else toast(`${hechos.length} factura${hechos.length!==1?'s':''} guardada${hechos.length!==1?'s':''} ${donde}`);
 }
@@ -4933,7 +4963,9 @@ function viewRegistro(){
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="r-buscar" placeholder="Buscar…" value="${esc(state.regBuscar||'')}"></div>
       ${rangoHtml()}
       <span class="card-meta" style="margin-left:auto">${ver.length} línea${ver.length===1?'':'s'}</span>
-      <button class="btn-s ok" id="r-truenas" ${sel.size?'':'disabled'} title="Guarda el PDF de las facturas marcadas (solo sus hojas de factura) con el nombre «nº registro (código) proveedor FRA nº fecha».pdf">📥 Truenas (${sel.size})</button></div>
+      <button class="btn-s ok" id="r-truenas" ${sel.size?'':'disabled'} title="Guarda el PDF de las facturas marcadas (solo sus hojas de factura) con el nombre «nº registro (código) proveedor FRA nº fecha».pdf">📥 Truenas (${sel.size})</button>
+      <button class="btn-s" id="r-marcar" ${sel.size?'':'disabled'} title="Para lo que ya has bajado a mano: queda apuntado como descargado y no se duplica">✔ Marcar como descargadas</button>
+      <button class="btn-s" id="r-desmarcar" ${sel.size?'':'disabled'} title="Quita la etiqueta «Descargada para Truenas» a las marcadas">Quitar marca</button></div>
     ${ver.length?`<div class="tbl-wrap"><table><thead><tr><th style="width:30px"><input type="checkbox" id="r-todas" title="Marcar todas las casadas de la lista"></th><th>Nº registro</th><th>Código</th><th>Proveedor</th><th>Nº factura</th><th>Fecha fra.</th><th>Factura en la plataforma</th><th></th></tr></thead><tbody>
       ${ver.slice(0,1500).map(r=>{const f=r.factura_id&&porId.get(r.factura_id);return `<tr ${f?`data-reg-fac="${r.factura_id}" style="cursor:pointer"`:''}>
         <td>${f?`<input type="checkbox" data-seltru="${f.id}" ${sel.has(f.id)?'checked':''} title="${esc('Se guardará como: '+(nombreLineaRegistro(r)||''))}">`:''}</td><td class="mono">${esc(r.numero_registro||'—')}</td><td class="mono">${esc(r.codigo_proveedor||'')}</td><td>${esc(r.proveedor||'')}</td>
@@ -4950,7 +4982,8 @@ function bindRegistro(){
   const s=$('#r-subir');if(s)s.onchange=()=>leerRegistro(s.files[0]);
   const t=$('#r-truenas');if(t)t.onclick=()=>guardarRegistroTruenas(t);
   const cs=()=>[...document.querySelectorAll('[data-seltru]')];
-  const pinta=()=>{if(t){t.disabled=!state.selTruenas.size;t.textContent=`📥 Truenas (${state.selTruenas.size})`;}
+  ['r-marcar','r-desmarcar'].forEach(id=>{const b=$('#'+id);if(b)b.onclick=()=>marcarDescargadasRegistro(b,id==='r-marcar');});
+  const pinta=()=>{['r-marcar','r-desmarcar'].forEach(id=>{const b=$('#'+id);if(b)b.disabled=!state.selTruenas.size;});if(t){t.disabled=!state.selTruenas.size;t.textContent=`📥 Truenas (${state.selTruenas.size})`;}
     const td=$('#r-todas');if(td){const c=cs();td.checked=c.length>0&&c.every(x=>x.checked);}};
   cs().forEach(c=>{c.onclick=e=>e.stopPropagation();
     c.onchange=()=>{c.checked?state.selTruenas.add(c.dataset.seltru):state.selTruenas.delete(c.dataset.seltru);pinta();};});

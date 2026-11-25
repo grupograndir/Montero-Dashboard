@@ -2488,6 +2488,7 @@ async function openDrawer(id){
     ${!f.eliminada?cajaConformada(f):''}
     ${!f.eliminada?`<div id="manual-form" style="display:none;margin:10px 0;padding:12px;border:1px dashed var(--line);border-radius:10px;background:var(--bg)">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">Añadir documentos a esta factura</div>
+      <div id="manual-zona" style="padding:14px;margin-bottom:8px;border:2px dashed var(--line);border-radius:10px;text-align:center;font-size:12.5px;color:var(--muted);cursor:pointer;background:var(--card)"><b style="color:var(--ink)">Arrastra aquí los archivos</b> desde el ordenador, o pulsa para elegirlos</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input type="file" id="manual-archivo" multiple accept=".pdf,application/pdf,image/jpeg,image/png" style="flex:1 1 14rem;min-width:12rem;font-size:12.5px">
         <select class="sel" id="manual-tipo" title="Marca de golpe todos los archivos elegidos">${opcTipoManual('','— todos son… —')}</select>
@@ -2767,6 +2768,19 @@ async function openDrawer(id){
   });
   const subir=$('#manual-subir');if(subir)subir.onclick=()=>anadirManual(subir.dataset.fac,subir);
   const mArch=$('#manual-archivo');if(mArch)mArch.onchange=listaManual;
+  // Verónica, 25/11/2026: también se pueden arrastrar los archivos (como en «¿Ya está conformada?»).
+  const mZona=$('#manual-zona');
+  if(mZona&&mArch){
+    const sobre=on=>{mZona.style.borderColor=on?'var(--red)':'var(--line)';mZona.style.background=on?'var(--red-soft)':'var(--card)';};
+    mZona.onclick=()=>mArch.click();
+    mZona.ondragover=e=>{e.preventDefault();sobre(true);};
+    mZona.ondragleave=()=>sobre(false);
+    mZona.ondrop=e=>{e.preventDefault();sobre(false);
+      const ok=[...(e.dataTransfer.files||[])].filter(f=>/\.(pdf|jpe?g|png)$/i.test(f.name)||/^(application\/pdf|image\/(jpeg|png))$/.test(f.type));
+      if(!ok.length){toast('Solo se pueden subir PDF, JPG o PNG','err');return;}
+      const dt=new DataTransfer();ok.forEach(f=>dt.items.add(f));mArch.files=dt.files;listaManual();
+      if(ok.length<(e.dataTransfer.files||[]).length)toast('Se han ignorado los archivos que no son PDF, JPG o PNG','err');};
+  }
   const mTipo=$('#manual-tipo');if(mTipo)mTipo.onchange=()=>document.querySelectorAll('#manual-lista [data-man-tipo]').forEach(x=>x.value=mTipo.value);
   document.querySelectorAll('#dr-body [data-desaprobar]').forEach(b=>b.onclick=()=>aprobarPago(b.dataset.desaprobar,false));
   // Los botones de la ayuda: el que lanza la acción que arregla el aviso y el que

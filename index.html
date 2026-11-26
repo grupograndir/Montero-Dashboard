@@ -4446,7 +4446,8 @@ function abrirEnviar(facId){
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-s ok" id="en-ok">Abrir el correo</button>
       <button class="btn-s" id="en-pdf">Descargar el PDF para conformar</button>
-      <button class="btn-s" id="en-guardar">Guardar este destinatario</button></div></div>`;
+      <button class="btn-s" id="en-guardar">Guardar este destinatario</button></div>
+    <div id="en-listo"></div></div>`;
   $('#en-pdf').onclick=()=>descargarParaFirmar(f,$('#en-pdf'));
   $('#en-guardar').onclick=async()=>{
     const email=$('#en-para').value.trim(); if(!/@/.test(email)){toast('Escribe primero el correo','err');return;}
@@ -4458,7 +4459,6 @@ function abrirEnviar(facId){
   $('#en-ok').onclick=async()=>{
     const para=$('#en-para').value.trim(); if(!/@/.test(para)){toast('Falta el correo del destinatario','err');return;}
     const b=$('#en-ok');b.disabled=true;b.textContent='Preparando…';
-    const win=window.open('about:blank','_blank');
     try{
       const j=f.json_extraccion_ia||{};
       const enl=[`- Factura para conformar: ${await enlaceParaFirmar(f)}`];
@@ -4474,10 +4474,28 @@ function abrirEnviar(facId){
         `Pulsa el enlace: se descarga el PDF. Ábrelo con Adobe Acrobat y confórmalo con «Rellenar y firmar» (los enlaces valen 7 días).`,...enl,``,`Un saludo.`]
         .filter((x,i)=>x!==''||i!==3).join('\n');
       const url=`mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
-      if(win)win.location.href=url;else location.href=url;
+      // Sin pestaña en blanco: el correo se abre con un enlace pulsado por la persona (Verónica 26/11: en su
+      // Windows la pestaña se quedaba en blanco). Si su ordenador no tiene programa de correo, Outlook web o copiar.
+      const owa=`https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(para)}&subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+      const listo=$('#en-listo');
+      listo.innerHTML=`<div style="margin-top:10px;padding:10px;border:1px solid var(--line,#ddd);border-radius:8px">
+        <div style="font-size:12px;margin-bottom:8px"><b>Correo preparado.</b> Elige cómo enviarlo:</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn-s ok" style="display:inline-flex;align-items:center;text-decoration:none" id="en-mailto" href="${esc(url)}">Abrir en mi programa de correo</a>
+          <a class="btn-s" style="display:inline-flex;align-items:center;text-decoration:none" href="${esc(owa)}" target="_blank" rel="noopener noreferrer">Abrir en Outlook web</a>
+          <button class="btn-s" id="en-copiar">Copiar el mensaje</button></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Si no se abre nada, pulsa «Copiar el mensaje» y pégalo en un correo nuevo (Para: ${esc(para)}).</div></div>`;
+      $('#en-copiar').onclick=async()=>{
+        const txt=`Asunto: ${asunto}\n\n${cuerpo}`;
+        try{await navigator.clipboard.writeText(txt);toast('Mensaje copiado: pégalo en un correo nuevo');}
+        catch(_){const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();
+          try{document.execCommand('copy');toast('Mensaje copiado: pégalo en un correo nuevo');}catch(__){toast('No se pudo copiar','err');}t.remove();}
+      };
+      try{$('#en-mailto').click();}catch(_){}
+      listo.scrollIntoView({block:'nearest'});
       const ia=Object.assign({},j);ia._envios=(Array.isArray(ia._envios)?ia._envios:[]).concat([{a:para,por:quienSoy(),fecha:new Date().toISOString(),para_firmar:true}]);
       guardarIA(facId,ia).catch(()=>{});
-    }catch(e){if(win)win.close();toast('No se pudo preparar el correo: '+e.message,'err');}
+    }catch(e){toast('No se pudo preparar el correo: '+e.message,'err');}
     b.disabled=false;b.textContent='Abrir el correo';
   };
   box.scrollIntoView({block:'nearest'});

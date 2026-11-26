@@ -846,7 +846,9 @@ function tablaArticulos(f,co){
     let cab;
     if(b.otros)cab=`<tr class="det-blq"><td colspan="${2+cols.length}">Otros conceptos de la factura (portes, tasas…)</td></tr>`;
     else{
-      const nums=[numero(b.pedido,'sin pedido'),numero(b.albaran,'sin albarán'),primero?esc(f.numero_factura||'—'):''];
+      // Paqui 26/11: bajo el nº de pedido, la máquina o el almacén (lo leído desde ese día)
+      const maq=b.maquina?`<span class="det-ref" style="font-weight:500">${esc(b.maquina)}</span>`:'';
+      const nums=[numero(b.pedido,'sin pedido')+maq,numero(b.albaran,'sin albarán'),primero?esc(f.numero_factura||'—'):''];
       cab=`<tr class="det-blq"><td colspan="2"></td>${cols.map(c=>`<td class="r">${nums[c]}</td>`).join('')}</tr>`;
       primero=false;
     }
